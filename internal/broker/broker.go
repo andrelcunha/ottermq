@@ -13,10 +13,24 @@ import (
 
 type Broker struct {
 	connections     map[net.Conn]bool
+	exchanges       map[string]*Exchange
 	queues          map[string]*Queue
 	unackedMessages map[string]Message
 	mu              sync.Mutex
 }
+
+type Exchange struct {
+	name   string
+	queues map[string]*Queue
+	typ    ExchangeType
+}
+
+type ExchangeType string
+
+const (
+	Direct ExchangeType = "direct"
+	Fanout ExchangeType = "fanout"
+)
 
 type Queue struct {
 	name     string
@@ -31,6 +45,7 @@ type Message struct {
 func NewBroker() *Broker {
 	return &Broker{
 		connections:     make(map[net.Conn]bool),
+		exchanges:       make(map[string]*Exchange),
 		queues:          make(map[string]*Queue),
 		unackedMessages: make(map[string]Message),
 	}
@@ -85,13 +100,13 @@ func (b *Broker) processCommand(command string) (string, error) {
 
 	switch parts[0] {
 	case "CREATE_EXCHANGE":
-		// if len(parts) != 3 {
-		// 	return "", fmt.Errorf("Invalid %s command", parts[0])
-		// }
-		// name := parts[1]
-		// typ := parts[2]
-		// b.CreateExchange(name, models.ExchangeType(typ))
-		// return fmt.Sprintf("Exchange %s of type %s created", name, typ), nil
+		if len(parts) != 3 {
+			return "", fmt.Errorf("Invalid %s command", parts[0])
+		}
+		exchangeName := parts[1]
+		typ := parts[2]
+		b.CreateExchange(exchangeName, ExchangeType(typ))
+		return fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ), nil
 
 	case "CREATE_QUEUE":
 		if len(parts) != 2 {
@@ -102,16 +117,16 @@ func (b *Broker) processCommand(command string) (string, error) {
 		return fmt.Sprintf("Queue %s created", queueName), nil
 
 	case "BIND_QUEUE":
-		// if len(parts) != 3 {
-		// 	return "", fmt.Errorf("Invalid %s command", parts[0])
-		// }
-		// exchangeName := parts[1]
-		// queueName := parts[2]
-		// err := b.BindQueue(exchangeName, queueName)
-		// if err != nil {
-		// 	return "", err
-		// }
-		// return fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName), err
+		if len(parts) != 3 {
+			return "", fmt.Errorf("Invalid %s command", parts[0])
+		}
+		exchangeName := parts[1]
+		queueName := parts[2]
+		err := b.BindQueue(exchangeName, queueName)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName), err
 
 	case "PUBLISH":
 		if len(parts) < 3 {
@@ -136,9 +151,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		msgID := parts[1]
-		b.mu.Lock()
-		delete(b.unackedMessages, msgID)
-		b.mu.Unlock()
+		b.Acknowledge(msgID)
 		return fmt.Sprintf("Message ID %s acknowledged", msgID), nil
 
 	case "DELETE_QUEUE":
@@ -160,7 +173,12 @@ func (b *Broker) processCommand(command string) (string, error) {
 	default:
 		return "", fmt.Errorf("Unknown command '%s'", parts[0])
 	}
-	return "", nil
+}
+
+func (b *Broker) Acknowledge(msgID string) {
+	b.mu.Lock()
+	delete(b.unackedMessages, msgID)
+	b.mu.Unlock()
 }
 
 func (b *Broker) CreateQueue(name string) *Queue {
@@ -208,10 +226,6 @@ func (b *Broker) DeleteQueue(name string) {
 	delete(b.queues, name)
 }
 
-func (b *Broker) TestProcessCommand(command string) (string, error) {
-	return b.processCommand(command)
-}
-
 func (b *Broker) ListQueues() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -220,4 +234,29 @@ func (b *Broker) ListQueues() []string {
 		queueNames = append(queueNames, name)
 	}
 	return queueNames
+}
+
+func (b *Broker) CreateExchange(name string, typ ExchangeType) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchange := &Exchange{
+		name: name,
+		typ:  typ,
+	}
+	b.exchanges[name] = exchange
+}
+
+func (b *Broker) BindQueue(exchangeName, queueName string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchange, ok := b.exchanges[exchangeName]
+	if !ok {
+		return fmt.Errorf("Exchange %s not found", exchangeName)
+	}
+	queue, ok := b.queues[queueName]
+	if !ok {
+		return fmt.Errorf("Queue %s not found", queueName)
+	}
+	exchange.queues[queueName] = queue
+	return nil
 }
