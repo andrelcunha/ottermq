@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/andrelcunha/ottermq/cmd/broker"
+	"github.com/andrelcunha/ottermq/internal/broker"
 )
 
 func main() {

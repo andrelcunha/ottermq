@@ -40,6 +40,10 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			break
 		}
 		log.Printf("Received: %s\n", msg)
+		// Parse and handle the message
+		// Example: if message == "CREATE_QUEUE testQueue\n" {
+		// Call b.CreateQueue("testQueue")
+		// }
 	}
 }
 
