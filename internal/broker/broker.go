@@ -149,6 +149,14 @@ func (b *Broker) processCommand(command string) (string, error) {
 		b.DeleteQueue(queueName)
 		return fmt.Sprintf("Queue %s deleted", queueName), nil
 
+	case "LIST_QUEUES":
+		if len(parts) != 1 {
+			return "", fmt.Errorf("Invalid %s command", parts[0])
+		}
+		queueNames := b.ListQueues()
+		queues := strings.Join(queueNames, ", ")
+		return fmt.Sprintf("Queues: %s", queues), nil
+
 	default:
 		return "", fmt.Errorf("Unknown command '%s'", parts[0])
 	}
@@ -202,4 +210,14 @@ func (b *Broker) DeleteQueue(name string) {
 
 func (b *Broker) TestProcessCommand(command string) (string, error) {
 	return b.processCommand(command)
+}
+
+func (b *Broker) ListQueues() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	queueNames := make([]string, 0, len(b.queues))
+	for name := range b.queues {
+		queueNames = append(queueNames, name)
+	}
+	return queueNames
 }

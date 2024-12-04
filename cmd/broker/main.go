@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"strings"
 
 	"github.com/andrelcunha/ottermq/internal/broker"
 )
@@ -22,4 +24,8 @@ func main() {
 		log.Printf("Failed to ACK message: %v", err)
 	}
 	log.Printf(ackResponse)
+
+	queueNames := b.ListQueues()
+	queues := strings.Join(queueNames, ", ")
+	fmt.Printf("Queues: %s\n", queues)
 }
