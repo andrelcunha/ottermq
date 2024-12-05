@@ -1,23 +1,27 @@
 package main
 
+import (
+	"log"
+	"os"
+	"os/signal"
+
+	"github.com/andrelcunha/ottermq/internal/broker"
+)
+
 func main() {
-	// log.Println("OtterMq is starting...")
-	// b := broker.NewBroker()
-	// go b.Start(":5672")
+	log.Println("OtterMq is starting...")
+	b := broker.NewBroker()
 
-	// b.CreateQueue("testQueue")
-	// go b.Publish("testQueue", "Hello, OtterMq!")
+	go b.Start(":5672")
 
-	// msg := <-b.Consume("testQueue")
-	// log.Printf("Received message: %s (ID: %s)", msg.Content, msg.ID)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
 
-	// ackResponse, err := b.TestProcessCommand("ACK " + msg.ID)
-	// if err != nil {
-	// 	log.Printf("Failed to ACK message: %v", err)
-	// }
-	// log.Printf(ackResponse)
+	<-stop
+	log.Println("Shutting down OtterMq...")
 
-	// queueNames := b.ListQueues()
-	// queues := strings.Join(queueNames, ", ")
-	// fmt.Printf("Queues: %s\n", queues)
+	// Perform any necessary cleanup or shutdown tasks here
+	// Example: b.Shytdown()
+
+	log.Println("Server gracefully stopped.")
 }

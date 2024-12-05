@@ -65,11 +65,19 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			log.Println("Connection closed")
 			break
 		}
+
 		log.Printf("Received: %s\n", msg)
-		_, err = b.processCommand(msg)
+		response, err := b.processCommand(msg)
 		if err != nil {
 			log.Println("Error processing command:", err)
 			continue
+		}
+
+		// Write the response back to the client
+		_, err = conn.Write([]byte(response + "\n"))
+		if err != nil {
+			log.Println("Failed to write response:", err)
+			break
 		}
 	}
 }
