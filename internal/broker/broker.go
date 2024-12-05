@@ -29,8 +29,8 @@ type Exchange struct {
 type ExchangeType string
 
 const (
-	Direct ExchangeType = "direct"
-	Fanout ExchangeType = "fanout"
+	DIRECT ExchangeType = "direct"
+	FANOUT ExchangeType = "fanout"
 )
 
 type Queue struct {
@@ -44,12 +44,14 @@ type Message struct {
 }
 
 func NewBroker() *Broker {
-	return &Broker{
+	b := &Broker{
 		connections:     make(map[net.Conn]bool),
 		exchanges:       make(map[string]*Exchange),
 		queues:          make(map[string]*Queue),
 		unackedMessages: make(map[string]Message),
 	}
+	b.CreateExchange("default", DIRECT)
+	return b
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
@@ -70,8 +72,8 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		log.Printf("Received: %s\n", msg)
 		response, err := b.processCommand(msg)
 		if err != nil {
-			log.Println("Error processing command:", err)
-			continue
+			log.Println("ERROR: ", err)
+			response = "ERROR: " + err.Error()
 		}
 
 		// Write the response back to the client
@@ -81,6 +83,9 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			break
 		}
 	}
+	b.mu.Lock()
+	delete(b.connections, conn)
+	b.mu.Unlock()
 }
 
 func (b *Broker) Start(addr string) {
@@ -122,7 +127,12 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		queueName := parts[1]
-		b.CreateQueue(queueName)
+		_ = b.CreateQueue(queueName)
+		// Bind the queue to the default exchange with the same name as the queue
+		err := b.BindQueue("default", queueName, queueName)
+		if err != nil {
+			return "", err
+		}
 		return fmt.Sprintf("Queue %s created", queueName), nil
 
 	case "BIND_QUEUE":
@@ -189,6 +199,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 	}
 }
 
+// Acknowledge removes the message with the given ID frrom the unackedMessages map.
 func (b *Broker) Acknowledge(msgID string) {
 	b.mu.Lock()
 	delete(b.unackedMessages, msgID)
@@ -221,7 +232,7 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 	}
 
 	switch exchange.typ {
-	case Direct:
+	case DIRECT:
 		queues, ok := exchange.bindings[routingKey]
 		if ok {
 			for _, queue := range queues {
@@ -232,7 +243,7 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 			log.Printf("Queue %s not found for routing key %s", routingKey, exchangeName)
 			return
 		}
-	case Fanout:
+	case FANOUT:
 		for _, queue := range exchange.queues {
 			queue.messages <- msg
 			log.Printf("Message %s sent to queue %s", msgID, queue.name)
@@ -242,8 +253,8 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 
 func (b *Broker) Consume(queueName string) <-chan Message {
 	b.mu.Lock()
+	defer b.mu.Unlock()
 	queue, ok := b.queues[queueName]
-	b.mu.Unlock()
 	if !ok {
 		log.Printf("Queue %s not found", queueName)
 		return nil
@@ -282,6 +293,9 @@ func (b *Broker) CreateExchange(name string, typ ExchangeType) {
 func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if exchangeName == "" {
+		exchangeName = "default"
+	}
 	exchange, ok := b.exchanges[exchangeName]
 	if !ok {
 		return fmt.Errorf("Exchange %s not found", exchangeName)
@@ -292,12 +306,15 @@ func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
 	}
 
 	switch exchange.typ {
-	case Direct:
-		if routingKey == "" {
-			return fmt.Errorf("Routing key is required for direct exchange")
+	case DIRECT:
+		if exchangeName == "default" {
+			log.Printf("Binding queue %s to %s exchange", queueName, exchangeName)
+			routingKey = queueName
+		} else {
+			delete(exchange.bindings, routingKey)
 		}
 		exchange.bindings[routingKey] = append(exchange.bindings[routingKey], queue)
-	case Fanout:
+	case FANOUT:
 		exchange.queues[queueName] = queue
 	}
 
