@@ -20,9 +20,10 @@ type Broker struct {
 }
 
 type Exchange struct {
-	name   string
-	queues map[string]*Queue
-	typ    ExchangeType
+	name     string
+	queues   map[string]*Queue
+	typ      ExchangeType
+	bindings map[string][]*Queue
 }
 
 type ExchangeType string
@@ -125,12 +126,16 @@ func (b *Broker) processCommand(command string) (string, error) {
 		return fmt.Sprintf("Queue %s created", queueName), nil
 
 	case "BIND_QUEUE":
-		if len(parts) != 3 {
+		if len(parts) < 3 {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		exchangeName := parts[1]
 		queueName := parts[2]
-		err := b.BindQueue(exchangeName, queueName)
+		routingKey := ""
+		if len(parts) == 4 {
+			routingKey = parts[3]
+		}
+		err := b.BindQueue(exchangeName, queueName, routingKey)
 		if err != nil {
 			return "", err
 		}
@@ -248,13 +253,15 @@ func (b *Broker) CreateExchange(name string, typ ExchangeType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange := &Exchange{
-		name: name,
-		typ:  typ,
+		name:     name,
+		typ:      typ,
+		queues:   make(map[string]*Queue),
+		bindings: make(map[string][]*Queue),
 	}
 	b.exchanges[name] = exchange
 }
 
-func (b *Broker) BindQueue(exchangeName, queueName string) error {
+func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange, ok := b.exchanges[exchangeName]
@@ -265,6 +272,16 @@ func (b *Broker) BindQueue(exchangeName, queueName string) error {
 	if !ok {
 		return fmt.Errorf("Queue %s not found", queueName)
 	}
-	exchange.queues[queueName] = queue
+
+	switch exchange.typ {
+	case Direct:
+		if routingKey == "" {
+			return fmt.Errorf("Routing key is required for direct exchange")
+		}
+		exchange.bindings[routingKey] = append(exchange.bindings[routingKey], queue)
+	case Fanout:
+		exchange.queues[queueName] = queue
+	}
+
 	return nil
 }
