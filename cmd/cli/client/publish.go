@@ -1,9 +1,6 @@
 package client
 
 import (
-	"fmt"
-
-	"github.com/andrelcunha/ottermq/internal/broker"
 	"github.com/spf13/cobra"
 )
 
@@ -15,9 +12,9 @@ var publishCmd = &cobra.Command{
 	Use:   "publish",
 	Short: "Publish a message to a queue",
 	Run: func(cmd *cobra.Command, args []string) {
-		b := broker.NewBroker()
-		b.Publish(exchangeName, routingKey, message)
-		fmt.Printf("Message '%s' published to exchange %s\n", message, exchangeName)
+		// b := broker.NewBroker()
+		// b.Publish(exchangeName, routingKey, message)
+		// fmt.Printf("Message '%s' published to exchange %s\n", message, exchangeName)
 	},
 }
 

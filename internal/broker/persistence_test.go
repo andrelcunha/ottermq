@@ -55,7 +55,7 @@ func TestLoadMessages(t *testing.T) {
 
 func TestSaveBrokerState(t *testing.T) {
 	b := NewBroker()
-	b.CreateQueue("testQueue")
+	b.createQueue("testQueue")
 	err := b.saveBrokerState()
 	if err != nil {
 		t.Fatalf("Failed to save broker state: %v", err)
@@ -70,7 +70,7 @@ func TestSaveBrokerState(t *testing.T) {
 
 func TestLoadBrokerState(t *testing.T) {
 	b := NewBroker()
-	b.CreateQueue("testQueue")
+	b.createQueue("testQueue")
 	err := b.saveBrokerState()
 	if err != nil {
 		t.Fatalf("Failed to save broker state: %v", err)

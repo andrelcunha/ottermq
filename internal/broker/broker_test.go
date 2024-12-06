@@ -9,6 +9,10 @@ func (b *Broker) TestProcessCommand(command string) (string, error) {
 	return b.processCommand(command)
 }
 
+func (b *Broker) TestConsume(queueName string) <-chan Message {
+	return b.consume(queueName)
+}
+
 func TestProcessCommand(t *testing.T) {
 	t.Log("OtterMq is starting...")
 	b := NewBroker()
@@ -160,7 +164,7 @@ func TestAcknowledge(t *testing.T) {
 	b.TestProcessCommand("CREATE_QUEUE testQueue")
 	b.TestProcessCommand("PUBLISH default testQueue Hello, World!")
 
-	msg := <-b.Consume("testQueue")
+	msg := <-b.TestConsume("testQueue")
 	resp, err := b.TestProcessCommand("ACK " + msg.ID)
 	if err != nil {
 		t.Fatalf("Failed to acknowledge message: %v", err)

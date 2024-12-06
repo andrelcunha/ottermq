@@ -1,9 +1,6 @@
 package client
 
 import (
-	"fmt"
-
-	"github.com/andrelcunha/ottermq/internal/broker"
 	"github.com/spf13/cobra"
 )
 
@@ -11,9 +8,9 @@ var consumeCmd = &cobra.Command{
 	Use:   "consume",
 	Short: "Consume messages from a queue",
 	Run: func(cmd *cobra.Command, args []string) {
-		b := broker.NewBroker()
-		msg := <-b.Consume(queueName)
-		fmt.Printf("Consumed message: %s (ID: %s)\n", msg.Content, msg.ID)
+		// b := broker.NewBroker()
+		// msg := <-b.Consume(queueName)
+		// fmt.Printf("Consumed message: %s (ID: %s)\n", msg.Content, msg.ID)
 	},
 }
 

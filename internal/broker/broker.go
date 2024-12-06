@@ -51,7 +51,7 @@ func NewBroker() *Broker {
 		UnackedMessages: make(map[string]Message),
 	}
 	b.loadBrokerState()
-	b.CreateExchange("default", DIRECT)
+	b.createExchange("default", DIRECT)
 	return b
 }
 
@@ -120,7 +120,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 		}
 		exchangeName := parts[1]
 		typ := parts[2]
-		b.CreateExchange(exchangeName, ExchangeType(typ))
+		b.createExchange(exchangeName, ExchangeType(typ))
 		return fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ), nil
 
 	case "CREATE_QUEUE":
@@ -128,9 +128,9 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		queueName := parts[1]
-		_ = b.CreateQueue(queueName)
+		_ = b.createQueue(queueName)
 		// Bind the queue to the default exchange with the same name as the queue
-		err := b.BindQueue("default", queueName, queueName)
+		err := b.bindQueue("default", queueName, queueName)
 		if err != nil {
 			return "", err
 		}
@@ -146,7 +146,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 		if len(parts) == 4 {
 			routingKey = parts[3]
 		}
-		err := b.BindQueue(exchangeName, queueName, routingKey)
+		err := b.bindQueue(exchangeName, queueName, routingKey)
 		if err != nil {
 			return "", err
 		}
@@ -160,7 +160,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 		exchangeName := parts[1]
 		routingKey := parts[2]
 		message := strings.Join(parts[3:], " ")
-		b.Publish(exchangeName, routingKey, message)
+		b.publish(exchangeName, routingKey, message)
 		return "Message sent", nil
 
 	case "CONSUME":
@@ -168,7 +168,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		queueName := parts[1]
-		msg := <-b.Consume(queueName)
+		msg := <-b.consume(queueName)
 		return msg.Content, nil
 
 	case "ACK":
@@ -176,7 +176,7 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		msgID := parts[1]
-		b.Acknowledge(msgID)
+		b.acknowledge(msgID)
 		return fmt.Sprintf("Message ID %s acknowledged", msgID), nil
 
 	case "DELETE_QUEUE":
@@ -184,14 +184,14 @@ func (b *Broker) processCommand(command string) (string, error) {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
 		queueName := parts[1]
-		b.DeleteQueue(queueName)
+		b.deleteQueue(queueName)
 		return fmt.Sprintf("Queue %s deleted", queueName), nil
 
 	case "LIST_QUEUES":
 		if len(parts) != 1 {
 			return "", fmt.Errorf("Invalid %s command", parts[0])
 		}
-		queueNames := b.ListQueues()
+		queueNames := b.listQueues()
 		queues := strings.Join(queueNames, ", ")
 		return fmt.Sprintf("Queues: %s", queues), nil
 
@@ -200,15 +200,15 @@ func (b *Broker) processCommand(command string) (string, error) {
 	}
 }
 
-// Acknowledge removes the message with the given ID frrom the unackedMessages map.
-func (b *Broker) Acknowledge(msgID string) {
+// acknowledge removes the message with the given ID frrom the unackedMessages map.
+func (b *Broker) acknowledge(msgID string) {
 	b.mu.Lock()
 	delete(b.UnackedMessages, msgID)
 	b.mu.Unlock()
 	b.saveBrokerState()
 }
 
-func (b *Broker) CreateQueue(name string) *Queue {
+func (b *Broker) createQueue(name string) *Queue {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queue := &Queue{
@@ -220,7 +220,7 @@ func (b *Broker) CreateQueue(name string) *Queue {
 	return queue
 }
 
-func (b *Broker) Publish(exchangeName, routingKey, message string) {
+func (b *Broker) publish(exchangeName, routingKey, message string) {
 	b.mu.Lock()
 	exchange, ok := b.Exchanges[exchangeName]
 	b.mu.Unlock()
@@ -260,7 +260,7 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 	}
 }
 
-func (b *Broker) Consume(queueName string) <-chan Message {
+func (b *Broker) consume(queueName string) <-chan Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queue, ok := b.Queues[queueName]
@@ -271,14 +271,14 @@ func (b *Broker) Consume(queueName string) <-chan Message {
 	return queue.messages
 }
 
-func (b *Broker) DeleteQueue(name string) {
+func (b *Broker) deleteQueue(name string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.Queues, name)
 	b.saveBrokerState()
 }
 
-func (b *Broker) ListQueues() []string {
+func (b *Broker) listQueues() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queueNames := make([]string, 0, len(b.Queues))
@@ -288,7 +288,7 @@ func (b *Broker) ListQueues() []string {
 	return queueNames
 }
 
-func (b *Broker) CreateExchange(name string, typ ExchangeType) {
+func (b *Broker) createExchange(name string, typ ExchangeType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange := &Exchange{
@@ -300,7 +300,7 @@ func (b *Broker) CreateExchange(name string, typ ExchangeType) {
 	b.Exchanges[name] = exchange
 }
 
-func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
+func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if exchangeName == "" {

@@ -1,0 +1,14 @@
+
+services:
+  ottermq:
+    build: .
+    ports:
+      - "8081:8081"
+      - "5672:5672"
+    volumes:
+      - data:/app/data
+    environment:
+      - GO_ENV=production
+
+volumes:
+  data:

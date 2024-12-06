@@ -1,9 +1,6 @@
 package client
 
 import (
-	"fmt"
-
-	"github.com/andrelcunha/ottermq/internal/broker"
 	"github.com/spf13/cobra"
 )
 
@@ -13,9 +10,9 @@ var createQueueCmd = &cobra.Command{
 	Use:   "create-queue",
 	Short: "Create a new queue",
 	Run: func(cmd *cobra.Command, args []string) {
-		b := broker.NewBroker()
-		b.CreateQueue(queueName)
-		fmt.Printf("Queue %s created\n", queueName)
+		// b := broker.NewBroker()
+		// b.CreateQueue(queueName)
+		// fmt.Printf("Queue %s created\n", queueName)
 	},
 }
 
