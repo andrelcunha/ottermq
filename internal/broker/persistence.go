@@ -9,7 +9,6 @@ import (
 func (b *Broker) saveMessage(queueName string, msg Message) error {
 	wd, err := os.Getwd()
 	dir := filepath.Join(wd, "data", "queues", queueName)
-	print(dir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -50,7 +49,6 @@ func (b *Broker) saveBrokerState() error {
 	// get the current directory
 	wd, err := os.Getwd()
 	brokerFile := filepath.Join(wd, "data", "broker_state.json")
-	print(brokerFile)
 	err = os.MkdirAll(filepath.Dir(brokerFile), 0755)
 	return os.WriteFile(brokerFile, data, 0644)
 }

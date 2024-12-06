@@ -26,6 +26,11 @@ func (ws *WebServer) SetupRouter() *gin.Engine {
 	router.GET("/queues", ws.ListQueues)
 	router.POST("/queues", ws.CreateQueue)
 	router.POST("/publish", ws.PublishMessage)
+	router.POST("/exchanges", ws.CreateExchange)
+	router.POST("/bindings", ws.BindQueue)
+	router.POST("/consume", ws.ConsumeMessage)
+	router.POST("/ack", ws.AckMessage)
+	router.POST("/delete", ws.DeleteQueue)
 	// Add more routes as needed
 	return router
 }
@@ -123,6 +128,162 @@ func (ws *WebServer) PublishMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
 		return
 	}
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"data": commandResponse.Data,
+		})
+	}
+}
+
+func (ws *WebServer) CreateExchange(c *gin.Context) {
+	var request struct {
+		ExchangeName string `json:"exchange_name"`
+		ExchangeType string `json:"exchange_type"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("CREATE_EXCHANGE %s %s", request.ExchangeName, request.ExchangeType)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
+}
+
+func (ws *WebServer) BindQueue(c *gin.Context) {
+	var request struct {
+		ExchangeName string `json:"exchange_name"`
+		QueueName    string `json:"queue_name"`
+		RoutingKey   string `json:"routing_key"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("BIND_QUEUE %s %s %s",
+		request.ExchangeName,
+		request.QueueName,
+		request.RoutingKey)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
+}
+
+func (ws *WebServer) ConsumeMessage(c *gin.Context) {
+	var request struct {
+		QueueName string `json:"queue_name"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("CONSUME %s", request.QueueName)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"data": commandResponse.Data,
+		})
+	}
+}
+
+func (ws *WebServer) AckMessage(c *gin.Context) {
+	var request struct {
+		MsgID string `json:"msg_id"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("ACK %s", request.MsgID)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
+}
+
+func (ws *WebServer) DeleteQueue(c *gin.Context) {
+	var request struct {
+		QueueName string `json:"queue_name"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("DELETE_QUEUE %s", request.QueueName)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
 	if commandResponse.Status == "ERROR" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
 	} else {

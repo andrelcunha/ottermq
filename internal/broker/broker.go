@@ -174,8 +174,16 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		exchangeName := parts[1]
 		routingKey := parts[2]
 		message := strings.Join(parts[3:], " ")
-		b.publish(exchangeName, routingKey, message)
-		return common.CommandResponse{Status: "OK", Message: "Message sent"}, nil
+		msgId, err := b.publish(exchangeName, routingKey, message)
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
+		// create type message response with message id
+		var data struct {
+			MessageID string `json:"message_id"`
+		}
+		data.MessageID = msgId
+		return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
 
 	case "CONSUME":
 		if len(parts) != 2 {
@@ -183,8 +191,9 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
-		msg := <-b.consume(queueName)
-		return common.CommandResponse{Status: "OK", Data: msg.Content}, nil
+		msg := b.consume(queueName)
+		fmt.Printf("Message %s: %s", msg.ID, msg.Content)
+		return common.CommandResponse{Status: "OK", Data: msg}, nil
 
 	case "ACK":
 		if len(parts) != 2 {
@@ -242,13 +251,13 @@ func (b *Broker) createQueue(name string) *Queue {
 	return queue
 }
 
-func (b *Broker) publish(exchangeName, routingKey, message string) {
+func (b *Broker) publish(exchangeName, routingKey, message string) (string, error) {
 	b.mu.Lock()
 	exchange, ok := b.Exchanges[exchangeName]
 	b.mu.Unlock()
 	if !ok {
 		log.Printf("Exchange %s not found", exchangeName)
-		return
+		return "", fmt.Errorf("Exchange %s not found", exchangeName)
 	}
 	msgID := uuid.New().String()
 	msg := Message{
@@ -260,6 +269,7 @@ func (b *Broker) publish(exchangeName, routingKey, message string) {
 	err := b.saveMessage(routingKey, msg)
 	if err != nil {
 		log.Printf("Failed to save message to file: %v", err)
+		return "", err
 	}
 
 	switch exchange.Typ {
@@ -270,19 +280,23 @@ func (b *Broker) publish(exchangeName, routingKey, message string) {
 				queue.messages <- msg
 				log.Printf("Message %s sent to queue %s", msgID, queue.Name)
 			}
+			return msgID, nil
 		} else {
-			log.Printf("Queue %s not found for routing key %s", routingKey, exchangeName)
-			return
+			log.Printf("Routing key %s not found for exchange %s", routingKey, exchangeName)
+			return "", fmt.Errorf("Routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
 	case FANOUT:
 		for _, queue := range exchange.Queues {
 			queue.messages <- msg
 			log.Printf("Message %s sent to queue %s", msgID, queue.Name)
 		}
+		return msgID, nil
 	}
+	return "", fmt.Errorf("Unknown exchange type")
 }
 
-func (b *Broker) consume(queueName string) <-chan Message {
+// func (b *Broker) consume(queueName string) <-chan Message {
+func (b *Broker) consume(queueName string) *Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queue, ok := b.Queues[queueName]
@@ -290,7 +304,8 @@ func (b *Broker) consume(queueName string) <-chan Message {
 		log.Printf("Queue %s not found", queueName)
 		return nil
 	}
-	return queue.messages
+	msg := <-queue.messages
+	return &msg
 }
 
 func (b *Broker) deleteQueue(name string) {
@@ -347,7 +362,7 @@ func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 			log.Printf("Binding queue %s to %s exchange", queueName, exchangeName)
 			routingKey = queueName
 		} else {
-			delete(exchange.Bindings, routingKey)
+			delete(exchange.Bindings, queueName)
 		}
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
 	case FANOUT:
