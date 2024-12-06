@@ -26,7 +26,9 @@ func (ws *WebServer) SetupRouter() *gin.Engine {
 	router.GET("/queues", ws.ListQueues)
 	router.POST("/queues", ws.CreateQueue)
 	router.POST("/publish", ws.PublishMessage)
+	router.GET("/exchanges", ws.ListExchanges)
 	router.POST("/exchanges", ws.CreateExchange)
+	router.POST("/bindings/list", ws.ListBindings)
 	router.POST("/bindings", ws.BindQueue)
 	router.POST("/consume", ws.ConsumeMessage)
 	router.POST("/ack", ws.AckMessage)
@@ -168,6 +170,28 @@ func (ws *WebServer) CreateExchange(c *gin.Context) {
 	}
 }
 
+func (ws *WebServer) ListExchanges(c *gin.Context) {
+	response, err := ws.SendCommand("LIST_EXCHANGES")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"exchanges": commandResponse.Data,
+		})
+	}
+}
+
 func (ws *WebServer) BindQueue(c *gin.Context) {
 	var request struct {
 		ExchangeName string `json:"exchange_name"`
@@ -199,6 +223,36 @@ func (ws *WebServer) BindQueue(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{
 			"message": commandResponse.Message,
+		})
+	}
+}
+
+func (ws *WebServer) ListBindings(c *gin.Context) {
+	var request struct {
+		ExchangeName string `json:"exchange_name"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	command := fmt.Sprintf("LIST_BINDINGS %s", request.ExchangeName)
+	response, err := ws.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"bindings": commandResponse.Data,
 		})
 	}
 }

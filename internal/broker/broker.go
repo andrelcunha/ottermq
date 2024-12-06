@@ -217,16 +217,27 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 
 	case "LIST_QUEUES":
 		if len(parts) != 1 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queues := b.listQueues()
-		// queues := strings.Join(queueNames, ", ")
-		// return fmt.Sprintf("Queues: %s", queues), nil
 		return common.CommandResponse{Status: "OK", Data: queues}, nil
 
+	case "LIST_EXCHANGES":
+		if len(parts) != 1 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		exchanges := b.listExchanges()
+		return common.CommandResponse{Status: "OK", Data: exchanges}, nil
+
+	case "LIST_BINDINGS":
+		if len(parts) != 2 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		exchangeName := parts[1]
+		bindings := b.listBindings(exchangeName)
+		return common.CommandResponse{Status: "OK", Data: bindings}, nil
+
 	default:
-		// return "", fmt.Errorf("Unknown command '%s'", parts[0])
 		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
 	}
 }
@@ -375,5 +386,48 @@ func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 		log.Printf("Failed to save broker state: %v", err)
 	}
 
+	return nil
+}
+
+func (b *Broker) listExchanges() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchangeNames := make([]string, 0, len(b.Exchanges))
+	for name := range b.Exchanges {
+		exchangeNames = append(exchangeNames, name)
+	}
+	return exchangeNames
+}
+
+func (b *Broker) listBindings(exchangeName string) map[string][]string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchange, ok := b.Exchanges[exchangeName]
+	if !ok {
+		return nil
+	}
+
+	switch exchange.Typ {
+	case DIRECT:
+		// bindings := make([]string, 0, len(exchange.Bindings))
+		bindings := make(map[string][]string)
+		for routingKey, queues := range exchange.Bindings {
+			var queuesStr []string
+			for _, queue := range queues {
+				queuesStr = append(queuesStr, queue.Name)
+			}
+			bindings[routingKey] = queuesStr
+		}
+		return bindings
+	case FANOUT:
+		// bindings := make([]string, 0, len(exchange.Queues))
+		bindings := make(map[string][]string)
+		var queues []string
+		for queueName := range exchange.Queues {
+			queues = append(queues, queueName)
+		}
+		bindings["fanout"] = queues
+		return bindings
+	}
 	return nil
 }

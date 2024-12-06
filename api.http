@@ -33,6 +33,12 @@ Content-Type: application/json
     "exchange_type": "direct"
 }
 
+### List Exchanges
+GET http://localhost:8081/exchanges
+Content-Type: application/json
+
+###
+
 ### Bind Queue to Exchange
 POST http://localhost:8081/bindings
 
@@ -40,6 +46,13 @@ POST http://localhost:8081/bindings
     "exchange_name": "testExchange",
     "queue_name": "testQueue",
     "routing_key": "testkey"
+}
+
+### List Bindings
+POST http://localhost:8081/bindings/list
+
+{
+    "exchange_name": "testExchange"
 }
 
 ### Consume Messages
