@@ -12,18 +12,18 @@ import (
 )
 
 type Broker struct {
-	connections     map[net.Conn]bool
-	exchanges       map[string]*Exchange
-	queues          map[string]*Queue
-	unackedMessages map[string]Message
-	mu              sync.Mutex
+	Connections     map[net.Conn]bool    `json:"-"`
+	Exchanges       map[string]*Exchange `json:"exchanges"`
+	Queues          map[string]*Queue    `json:"queues"`
+	UnackedMessages map[string]Message   `json:"unacked_messages"`
+	mu              sync.Mutex           `json:"-"`
 }
 
 type Exchange struct {
-	name     string
-	queues   map[string]*Queue
-	typ      ExchangeType
-	bindings map[string][]*Queue
+	Name     string              `json:"name"`
+	Queues   map[string]*Queue   `json:"queues"`
+	Typ      ExchangeType        `json:"type"`
+	Bindings map[string][]*Queue `json:"bindings"`
 }
 
 type ExchangeType string
@@ -34,22 +34,23 @@ const (
 )
 
 type Queue struct {
-	name     string
-	messages chan Message
+	Name     string       `json:"name"`
+	messages chan Message `json:"-"`
 }
 
 type Message struct {
-	ID      string
-	Content string
+	ID      string `json:"id"`
+	Content string `json:"content"`
 }
 
 func NewBroker() *Broker {
 	b := &Broker{
-		connections:     make(map[net.Conn]bool),
-		exchanges:       make(map[string]*Exchange),
-		queues:          make(map[string]*Queue),
-		unackedMessages: make(map[string]Message),
+		Connections:     make(map[net.Conn]bool),
+		Exchanges:       make(map[string]*Exchange),
+		Queues:          make(map[string]*Queue),
+		UnackedMessages: make(map[string]Message),
 	}
+	b.loadBrokerState()
 	b.CreateExchange("default", DIRECT)
 	return b
 }
@@ -57,7 +58,7 @@ func NewBroker() *Broker {
 func (b *Broker) handleConnection(conn net.Conn) {
 	defer conn.Close()
 	b.mu.Lock()
-	b.connections[conn] = true
+	b.Connections[conn] = true
 	b.mu.Unlock()
 	log.Println("New connection established")
 
@@ -84,7 +85,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		}
 	}
 	b.mu.Lock()
-	delete(b.connections, conn)
+	delete(b.Connections, conn)
 	b.mu.Unlock()
 }
 
@@ -202,24 +203,26 @@ func (b *Broker) processCommand(command string) (string, error) {
 // Acknowledge removes the message with the given ID frrom the unackedMessages map.
 func (b *Broker) Acknowledge(msgID string) {
 	b.mu.Lock()
-	delete(b.unackedMessages, msgID)
+	delete(b.UnackedMessages, msgID)
 	b.mu.Unlock()
+	b.saveBrokerState()
 }
 
 func (b *Broker) CreateQueue(name string) *Queue {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queue := &Queue{
-		name:     name,
+		Name:     name,
 		messages: make(chan Message, 100),
 	}
-	b.queues[name] = queue
+	b.Queues[name] = queue
+	b.saveBrokerState()
 	return queue
 }
 
 func (b *Broker) Publish(exchangeName, routingKey, message string) {
 	b.mu.Lock()
-	exchange, ok := b.exchanges[exchangeName]
+	exchange, ok := b.Exchanges[exchangeName]
 	b.mu.Unlock()
 	if !ok {
 		log.Printf("Exchange %s not found", exchangeName)
@@ -231,22 +234,28 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 		Content: message,
 	}
 
-	switch exchange.typ {
+	// Save message to file
+	err := b.saveMessage(routingKey, msg)
+	if err != nil {
+		log.Printf("Failed to save message to file: %v", err)
+	}
+
+	switch exchange.Typ {
 	case DIRECT:
-		queues, ok := exchange.bindings[routingKey]
+		queues, ok := exchange.Bindings[routingKey]
 		if ok {
 			for _, queue := range queues {
 				queue.messages <- msg
-				log.Printf("Message %s sent to queue %s", msgID, queue.name)
+				log.Printf("Message %s sent to queue %s", msgID, queue.Name)
 			}
 		} else {
 			log.Printf("Queue %s not found for routing key %s", routingKey, exchangeName)
 			return
 		}
 	case FANOUT:
-		for _, queue := range exchange.queues {
+		for _, queue := range exchange.Queues {
 			queue.messages <- msg
-			log.Printf("Message %s sent to queue %s", msgID, queue.name)
+			log.Printf("Message %s sent to queue %s", msgID, queue.Name)
 		}
 	}
 }
@@ -254,7 +263,7 @@ func (b *Broker) Publish(exchangeName, routingKey, message string) {
 func (b *Broker) Consume(queueName string) <-chan Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	queue, ok := b.queues[queueName]
+	queue, ok := b.Queues[queueName]
 	if !ok {
 		log.Printf("Queue %s not found", queueName)
 		return nil
@@ -265,14 +274,15 @@ func (b *Broker) Consume(queueName string) <-chan Message {
 func (b *Broker) DeleteQueue(name string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	delete(b.queues, name)
+	delete(b.Queues, name)
+	b.saveBrokerState()
 }
 
 func (b *Broker) ListQueues() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	queueNames := make([]string, 0, len(b.queues))
-	for name := range b.queues {
+	queueNames := make([]string, 0, len(b.Queues))
+	for name := range b.Queues {
 		queueNames = append(queueNames, name)
 	}
 	return queueNames
@@ -282,12 +292,12 @@ func (b *Broker) CreateExchange(name string, typ ExchangeType) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchange := &Exchange{
-		name:     name,
-		typ:      typ,
-		queues:   make(map[string]*Queue),
-		bindings: make(map[string][]*Queue),
+		Name:     name,
+		Typ:      typ,
+		Queues:   make(map[string]*Queue),
+		Bindings: make(map[string][]*Queue),
 	}
-	b.exchanges[name] = exchange
+	b.Exchanges[name] = exchange
 }
 
 func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
@@ -296,26 +306,36 @@ func (b *Broker) BindQueue(exchangeName, queueName, routingKey string) error {
 	if exchangeName == "" {
 		exchangeName = "default"
 	}
-	exchange, ok := b.exchanges[exchangeName]
+
+	// Find the exchange
+	exchange, ok := b.Exchanges[exchangeName]
 	if !ok {
 		return fmt.Errorf("Exchange %s not found", exchangeName)
 	}
-	queue, ok := b.queues[queueName]
+
+	// Find the queue
+	queue, ok := b.Queues[queueName]
 	if !ok {
 		return fmt.Errorf("Queue %s not found", queueName)
 	}
 
-	switch exchange.typ {
+	switch exchange.Typ {
 	case DIRECT:
 		if exchangeName == "default" {
 			log.Printf("Binding queue %s to %s exchange", queueName, exchangeName)
 			routingKey = queueName
 		} else {
-			delete(exchange.bindings, routingKey)
+			delete(exchange.Bindings, routingKey)
 		}
-		exchange.bindings[routingKey] = append(exchange.bindings[routingKey], queue)
+		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
 	case FANOUT:
-		exchange.queues[queueName] = queue
+		exchange.Queues[queueName] = queue
+	}
+
+	// Persist the state
+	err := b.saveBrokerState()
+	if err != nil {
+		log.Printf("Failed to save broker state: %v", err)
 	}
 
 	return nil

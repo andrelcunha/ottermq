@@ -21,7 +21,7 @@ func TestProcessCommand(t *testing.T) {
 	}
 	t.Log(resp)
 
-	if _, ok := b.queues["testQueue"]; !ok {
+	if _, ok := b.Queues["testQueue"]; !ok {
 		t.Fatalf("Queue testQueue was not created")
 	}
 
@@ -33,7 +33,7 @@ func TestProcessCommand(t *testing.T) {
 	t.Log(resp)
 
 	// Verify the message was published
-	queue, ok := b.queues["testQueue"]
+	queue, ok := b.Queues["testQueue"]
 	if !ok {
 		t.Fatalf("Queue testQueue does not exist")
 	}
@@ -53,7 +53,7 @@ func TestProcessCommand(t *testing.T) {
 		t.Log(resp)
 
 		// Verify the message was acknowledged
-		if _, ok := b.unackedMessages[msg.ID]; ok {
+		if _, ok := b.UnackedMessages[msg.ID]; ok {
 			t.Fatalf("Message %s was not acknowledged", msg.ID)
 		}
 	case <-time.After(time.Second):
@@ -79,7 +79,7 @@ func TestProcessCommand(t *testing.T) {
 	t.Log(resp)
 
 	// Verify the queue was deleted
-	if _, ok := b.queues["testQueue"]; ok {
+	if _, ok := b.Queues["testQueue"]; ok {
 		t.Fatalf("Queue testQueue was not deleted")
 	}
 }
@@ -92,7 +92,7 @@ func TestCreateExchange(t *testing.T) {
 	}
 	t.Log(resp)
 
-	if _, ok := b.exchanges["testExchange"]; !ok {
+	if _, ok := b.Exchanges["testExchange"]; !ok {
 		t.Fatalf("Exchange testExchange was not created")
 	}
 }
@@ -105,7 +105,7 @@ func TestCreateQueue(t *testing.T) {
 	}
 	t.Log(resp)
 
-	if _, ok := b.queues["testQueue"]; !ok {
+	if _, ok := b.Queues["testQueue"]; !ok {
 		t.Fatalf("Queue testQueue was not created")
 	}
 }
@@ -178,7 +178,7 @@ func TestDeleteQueue(t *testing.T) {
 	}
 	t.Log(resp)
 
-	if _, ok := b.queues["testQueue"]; ok {
+	if _, ok := b.Queues["testQueue"]; ok {
 		t.Fatalf("Queue testQueue was not deleted")
 	}
 }
