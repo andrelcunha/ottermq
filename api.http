@@ -1,0 +1,26 @@
+### List Queues
+GET http://localhost:8081/queues
+Content-Type: application/json
+
+###
+
+### Create Queue
+POST http://localhost:8081/queues
+Content-Type: application/json
+
+{
+    "queue_name": "testQueue"
+}
+
+###
+
+### Publish Message
+POST http://localhost:8081/publish
+Content-Type: application/json
+
+{
+    "exchange_name": "default",
+    "routing_key": "testQueue",
+    "message": "Hello, World!"
+}
+

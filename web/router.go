@@ -2,10 +2,12 @@ package web
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 
+	"github.com/andrelcunha/ottermq/pkg/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,7 +33,7 @@ func (ws *WebServer) SetupRouter() *gin.Engine {
 func (ws *WebServer) SendCommand(command string) (string, error) {
 	conn, err := net.Dial("tcp", ":5672")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to connect to broker: %v", err)
 	}
 	defer conn.Close()
 
@@ -44,7 +46,6 @@ func (ws *WebServer) SendCommand(command string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %v", err)
 	}
-
 	return response, nil
 }
 
@@ -54,9 +55,20 @@ func (ws *WebServer) ListQueues(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"queues": response,
-	})
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"queues": commandResponse.Data,
+		})
+	}
 }
 
 func (ws *WebServer) CreateQueue(c *gin.Context) {
@@ -73,9 +85,20 @@ func (ws *WebServer) CreateQueue(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": response,
-	})
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
 }
 
 func (ws *WebServer) PublishMessage(c *gin.Context) {
@@ -94,7 +117,17 @@ func (ws *WebServer) PublishMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": response,
-	})
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
 }

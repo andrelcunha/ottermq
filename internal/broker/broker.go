@@ -2,12 +2,14 @@ package broker
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"strings"
 	"sync"
 
+	"github.com/andrelcunha/ottermq/pkg/common"
 	"github.com/google/uuid"
 )
 
@@ -74,11 +76,19 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		response, err := b.processCommand(msg)
 		if err != nil {
 			log.Println("ERROR: ", err)
-			response = "ERROR: " + err.Error()
+			response = common.CommandResponse{
+				Status:  "error",
+				Message: err.Error(),
+			}
 		}
 
-		// Write the response back to the client
-		_, err = conn.Write([]byte(response + "\n"))
+		// Serialize the response into JSON
+		responseJSON, err := json.Marshal(response)
+		if err != nil {
+			log.Println("Failed to serialize response:", err)
+			continue
+		}
+		_, err = conn.Write(append(responseJSON, '\n'))
 		if err != nil {
 			log.Println("Failed to write response:", err)
 			break
@@ -107,38 +117,42 @@ func (b *Broker) Start(addr string) {
 	}
 }
 
-func (b *Broker) processCommand(command string) (string, error) {
+func (b *Broker) processCommand(command string) (common.CommandResponse, error) {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
-		return "", fmt.Errorf("Invalid command")
+		// return "", fmt.Errorf("Invalid command")
+		return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 	}
 
 	switch parts[0] {
 	case "CREATE_EXCHANGE":
 		if len(parts) != 3 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]
 		typ := parts[2]
 		b.createExchange(exchangeName, ExchangeType(typ))
-		return fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ), nil
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ)}, nil
 
 	case "CREATE_QUEUE":
 		if len(parts) != 2 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
 		_ = b.createQueue(queueName)
 		// Bind the queue to the default exchange with the same name as the queue
 		err := b.bindQueue("default", queueName, queueName)
 		if err != nil {
-			return "", err
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
-		return fmt.Sprintf("Queue %s created", queueName), nil
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s created", queueName)}, nil
 
 	case "BIND_QUEUE":
 		if len(parts) < 3 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]
 		queueName := parts[2]
@@ -148,55 +162,63 @@ func (b *Broker) processCommand(command string) (string, error) {
 		}
 		err := b.bindQueue(exchangeName, queueName, routingKey)
 		if err != nil {
-			return "", err
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
-		return fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName), err
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName)}, err
 
 	case "PUBLISH":
 		if len(parts) < 4 {
-			fmt.Printf("Length: %d", len(parts))
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]
 		routingKey := parts[2]
 		message := strings.Join(parts[3:], " ")
 		b.publish(exchangeName, routingKey, message)
-		return "Message sent", nil
+		return common.CommandResponse{Status: "OK", Message: "Message sent"}, nil
 
 	case "CONSUME":
 		if len(parts) != 2 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
 		msg := <-b.consume(queueName)
-		return msg.Content, nil
+		return common.CommandResponse{Status: "OK", Data: msg.Content}, nil
 
 	case "ACK":
 		if len(parts) != 2 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		msgID := parts[1]
 		b.acknowledge(msgID)
-		return fmt.Sprintf("Message ID %s acknowledged", msgID), nil
+		// return fmt.Sprintf("Message ID %s acknowledged", msgID), nil
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
 	case "DELETE_QUEUE":
 		if len(parts) != 2 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
 		b.deleteQueue(queueName)
-		return fmt.Sprintf("Queue %s deleted", queueName), nil
+		// return fmt.Sprintf("Queue %s deleted", queueName), nil
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
 
 	case "LIST_QUEUES":
 		if len(parts) != 1 {
-			return "", fmt.Errorf("Invalid %s command", parts[0])
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
-		queueNames := b.listQueues()
-		queues := strings.Join(queueNames, ", ")
-		return fmt.Sprintf("Queues: %s", queues), nil
+		queues := b.listQueues()
+		// queues := strings.Join(queueNames, ", ")
+		// return fmt.Sprintf("Queues: %s", queues), nil
+		return common.CommandResponse{Status: "OK", Data: queues}, nil
 
 	default:
-		return "", fmt.Errorf("Unknown command '%s'", parts[0])
+		// return "", fmt.Errorf("Unknown command '%s'", parts[0])
+		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
 	}
 }
 
