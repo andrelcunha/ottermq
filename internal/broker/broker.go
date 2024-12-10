@@ -187,12 +187,14 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 
 	case "CONSUME":
 		if len(parts) != 2 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
+		fmt.Println("Consuming from queue:", queueName)
 		msg := b.consume(queueName)
-		fmt.Printf("Message %s: %s", msg.ID, msg.Content)
+		if msg == nil {
+			return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
+		}
 		return common.CommandResponse{Status: "OK", Data: msg}, nil
 
 	case "ACK":
@@ -222,6 +224,23 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		queues := b.listQueues()
 		return common.CommandResponse{Status: "OK", Data: queues}, nil
 
+	case "COUNT_MESSAGES":
+		if len(parts) != 2 {
+			// return "", fmt.Errorf("Invalid %s command", parts[0])
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		queueName := parts[1]
+		count, err := b.countMessages(queueName)
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
+		countResponse := struct {
+			Count int `json:"count"`
+		}{
+			Count: count,
+		}
+		return common.CommandResponse{Status: "OK", Data: countResponse}, nil
+
 	case "LIST_EXCHANGES":
 		if len(parts) != 1 {
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
@@ -236,6 +255,16 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		exchangeName := parts[1]
 		bindings := b.listBindings(exchangeName)
 		return common.CommandResponse{Status: "OK", Data: bindings}, nil
+
+	case "DELETE_BINDING":
+		if len(parts) != 4 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		exchangeName := parts[1]
+		queueName := parts[2]
+		routingKey := parts[3]
+		b.DeletBinding(exchangeName, queueName, routingKey)
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Binding deleted")}, nil
 
 	default:
 		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
@@ -315,8 +344,13 @@ func (b *Broker) consume(queueName string) *Message {
 		log.Printf("Queue %s not found", queueName)
 		return nil
 	}
-	msg := <-queue.messages
-	return &msg
+	select {
+	case msg := <-queue.messages:
+		return &msg
+	default:
+		log.Printf("No messages in queue %s", queueName)
+		return nil
+	}
 }
 
 func (b *Broker) deleteQueue(name string) {
@@ -430,4 +464,64 @@ func (b *Broker) listBindings(exchangeName string) map[string][]string {
 		return bindings
 	}
 	return nil
+}
+
+func (b *Broker) DeletBinding(exchangeName, queueName, routingKey string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if exchangeName == "default" {
+		return fmt.Errorf("Cannot delete binding from default exchange")
+	}
+
+	// Find the exchange
+	exchange, ok := b.Exchanges[exchangeName]
+	if !ok {
+		return fmt.Errorf("Exchange %s not found", exchangeName)
+	}
+
+	queues, ok := exchange.Bindings[routingKey]
+	if !ok {
+		return fmt.Errorf("Binding with routing key %s not found", routingKey)
+	}
+
+	// Find the queue
+	var index int
+	found := false
+	for i, q := range queues {
+		if q.Name == queueName {
+			index = i
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("Queue %s not found", queueName)
+	}
+
+	// Remove the queue from the bindings
+	exchange.Bindings[routingKey] = append(queues[:index], queues[index+1:]...)
+	if len(exchange.Bindings[routingKey]) == 0 {
+		delete(exchange.Bindings, routingKey)
+	}
+
+	// Persist the state
+	err := b.saveBrokerState()
+	if err != nil {
+		log.Printf("Failed to save broker state: %v", err)
+	}
+
+	return nil
+}
+
+func (b *Broker) countMessages(queueName string) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	queue, ok := b.Queues[queueName]
+	if !ok {
+		return 0, fmt.Errorf("Queue %s not found", queueName)
+	}
+
+	messageCount := len(queue.messages)
+	return messageCount, nil
 }
