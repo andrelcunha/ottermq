@@ -17,12 +17,6 @@ Content-Type: application/json
     "queue_name": "{{queue_name}}"
 }
 
-### Count Messages in Queue
-GET {{host}}/queues/{{queue_name}}/count
-Content-Type: application/json
-
-###
-
 ### Delete Queue
 DELETE {{host}}/queues/{{queue_name}}
 Content-Type: application/json
@@ -57,6 +51,12 @@ Content-Type: application/json
 
 ###
 
+### Delete Exchange
+DELETE {{host}}/exchanges/{{exchange_name}}
+Content-Type: application/json
+
+###
+
 ### Bind Queue to Exchange
 POST {{host}}/bindings
 Content-Type: application/json
@@ -81,7 +81,6 @@ Content-Type: application/json
 
 ###
 
-
 ### List Bindings
 GET {{host}}/bindings/{{exchange_name}}
 Content-Type: application/json
@@ -105,7 +104,3 @@ POST {{host}}/messages/{{message_id}}/ack
 Content-Type: application/json
 
 ###
-
-### Delete Queue
-DELETE {{host}}/queues/newQueue
-Content-Type: application/json

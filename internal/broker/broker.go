@@ -132,7 +132,10 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		}
 		exchangeName := parts[1]
 		typ := parts[2]
-		b.createExchange(exchangeName, ExchangeType(typ))
+		err := b.createExchange(exchangeName, ExchangeType(typ))
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ)}, nil
 
 	case "CREATE_QUEUE":
@@ -141,9 +144,12 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
-		_ = b.createQueue(queueName)
+		_, err := b.createQueue(queueName)
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
 		// Bind the queue to the default exchange with the same name as the queue
-		err := b.bindQueue("default", queueName, queueName)
+		err = b.bindQueue("default", queueName, queueName)
 		if err != nil {
 			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
@@ -199,22 +205,21 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 
 	case "ACK":
 		if len(parts) != 2 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		msgID := parts[1]
 		b.acknowledge(msgID)
-		// return fmt.Sprintf("Message ID %s acknowledged", msgID), nil
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
 	case "DELETE_QUEUE":
 		if len(parts) != 2 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
-		b.deleteQueue(queueName)
-		// return fmt.Sprintf("Queue %s deleted", queueName), nil
+		err := b.deleteQueue(queueName)
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
 
 	case "LIST_QUEUES":
@@ -226,7 +231,6 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 
 	case "COUNT_MESSAGES":
 		if len(parts) != 2 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
@@ -236,9 +240,7 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		}
 		countResponse := struct {
 			Count int `json:"count"`
-		}{
-			Count: count,
-		}
+		}{Count: count}
 		return common.CommandResponse{Status: "OK", Data: countResponse}, nil
 
 	case "LIST_EXCHANGES":
@@ -266,6 +268,17 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		b.DeletBinding(exchangeName, queueName, routingKey)
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Binding deleted")}, nil
 
+	case "DELETE_EXCHANGE":
+		if len(parts) != 2 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		exchangeName := parts[1]
+		err := b.deleteExchange(exchangeName)
+		if err != nil {
+			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+		}
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s deleted", exchangeName)}, nil
+
 	default:
 		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
 	}
@@ -279,16 +292,21 @@ func (b *Broker) acknowledge(msgID string) {
 	b.saveBrokerState()
 }
 
-func (b *Broker) createQueue(name string) *Queue {
+func (b *Broker) createQueue(name string) (*Queue, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// Check if the queue already exists
+	if _, ok := b.Queues[name]; ok {
+		return nil, fmt.Errorf("queue %s already exists", name)
+	}
+
 	queue := &Queue{
 		Name:     name,
 		messages: make(chan Message, 100),
 	}
 	b.Queues[name] = queue
 	b.saveBrokerState()
-	return queue
+	return queue, nil
 }
 
 func (b *Broker) publish(exchangeName, routingKey, message string) (string, error) {
@@ -353,11 +371,18 @@ func (b *Broker) consume(queueName string) *Message {
 	}
 }
 
-func (b *Broker) deleteQueue(name string) {
+func (b *Broker) deleteQueue(name string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// Check if the queue exists
+	_, ok := b.Queues[name]
+	if !ok {
+		return fmt.Errorf("queue %s not found", name)
+	}
+
 	delete(b.Queues, name)
 	b.saveBrokerState()
+	return nil
 }
 
 func (b *Broker) listQueues() []string {
@@ -370,9 +395,14 @@ func (b *Broker) listQueues() []string {
 	return queueNames
 }
 
-func (b *Broker) createExchange(name string, typ ExchangeType) {
+func (b *Broker) createExchange(name string, typ ExchangeType) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// Check if the exchange already exists
+	if _, ok := b.Exchanges[name]; ok {
+		return fmt.Errorf("exchange %s already exists", name)
+	}
+
 	exchange := &Exchange{
 		Name:     name,
 		Typ:      typ,
@@ -380,6 +410,7 @@ func (b *Broker) createExchange(name string, typ ExchangeType) {
 		Bindings: make(map[string][]*Queue),
 	}
 	b.Exchanges[name] = exchange
+	return nil
 }
 
 func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
@@ -469,14 +500,11 @@ func (b *Broker) listBindings(exchangeName string) map[string][]string {
 func (b *Broker) DeletBinding(exchangeName, queueName, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if exchangeName == "default" {
-		return fmt.Errorf("Cannot delete binding from default exchange")
-	}
 
 	// Find the exchange
 	exchange, ok := b.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("Exchange %s not found", exchangeName)
+		return fmt.Errorf("exchange %s not found", exchangeName)
 	}
 
 	queues, ok := exchange.Bindings[routingKey]
@@ -524,4 +552,22 @@ func (b *Broker) countMessages(queueName string) (int, error) {
 
 	messageCount := len(queue.messages)
 	return messageCount, nil
+}
+
+func (b *Broker) deleteExchange(name string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// If the exchange is the default exchange, return an error
+	if name == "default" {
+		return fmt.Errorf("cannot delete default exchange")
+	}
+
+	// Check if the exchange exists
+	_, ok := b.Exchanges[name]
+	if !ok {
+		return fmt.Errorf("exchange %s not found", name)
+	}
+	delete(b.Exchanges, name)
+	b.saveBrokerState()
+	return nil
 }

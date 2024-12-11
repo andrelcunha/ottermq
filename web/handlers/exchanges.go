@@ -62,3 +62,32 @@ func CreateExchange(c *gin.Context) {
 		})
 	}
 }
+
+func DeleteExchange(c *gin.Context) {
+	exchangeName := c.Param("exchange")
+	if exchangeName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "exchange name is required"})
+		return
+	}
+
+	command := fmt.Sprintf("DELETE_EXCHANGE %s", exchangeName)
+	response, err := utils.SendCommand(command)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var commandResponse common.CommandResponse
+	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse response"})
+		return
+	}
+
+	if commandResponse.Status == "ERROR" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": commandResponse.Message})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": commandResponse.Message,
+		})
+	}
+}

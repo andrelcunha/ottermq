@@ -33,6 +33,7 @@ func (ws *WebServer) SetupRouter() *gin.Engine {
 
 	router.GET("/exchanges", handlers.ListExchanges)
 	router.POST("/exchanges", handlers.CreateExchange)
+	router.DELETE("/exchanges/:exchange", handlers.DeleteExchange)
 
 	router.GET("/bindings/:exchange", handlers.ListBindings)
 	router.POST("/bindings", handlers.BindQueue)
