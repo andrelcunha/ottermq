@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/andrelcunha/ottermq/web/handlers"
+	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +18,10 @@ func NewWebServer(brokerAddr string) *WebServer {
 
 func (ws *WebServer) SetupRouter() *gin.Engine {
 	router := gin.Default()
+
+	// Enable CORS
+	router.Use(utils.CORSMiddleware())
+
 	router.GET("/queues", handlers.ListQueues)
 	router.POST("/queues", handlers.CreateQueue)
 	router.DELETE("/queues/:queue", handlers.DeleteQueue)

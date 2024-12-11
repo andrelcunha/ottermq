@@ -94,6 +94,12 @@ Content-Type: application/json
 
 ###
 
+### Count Messages
+GET {{host}}/queues/{{queue_name}}/count
+Content-Type: application/json
+
+###
+
 ### Acknowledge Message
 POST {{host}}/messages/{{message_id}}/ack
 Content-Type: application/json
