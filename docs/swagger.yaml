@@ -2,6 +2,15 @@ definitions:
   fiber.Map:
     additionalProperties: true
     type: object
+  models.BindQueueRequest:
+    properties:
+      exchange_name:
+        type: string
+      queue_name:
+        type: string
+      routing_key:
+        type: string
+    type: object
   models.CreateExchangeRequest:
     properties:
       exchange_name:
@@ -14,12 +23,106 @@ definitions:
       queue_name:
         type: string
     type: object
-  models.FiberMap:
-    additionalProperties: true
+  models.DeleteBindingRequest:
+    properties:
+      exchange_name:
+        type: string
+      queue_name:
+        type: string
+      routing_key:
+        type: string
     type: object
 info:
   contact: {}
 paths:
+  /api/bindings:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a binding from an exchange to a queue
+      parameters:
+      - description: Binding to delete
+        in: body
+        name: binding
+        required: true
+        schema:
+          $ref: '#/definitions/models.DeleteBindingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Delete a binding
+      tags:
+      - bindings
+    post:
+      consumes:
+      - application/json
+      description: Bind a queue to an exchange with the specified routing key
+      parameters:
+      - description: Binding details
+        in: body
+        name: binding
+        required: true
+        schema:
+          $ref: '#/definitions/models.BindQueueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Bind a queue to an exchange
+      tags:
+      - bindings
+  /api/bindings/{exchange}:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all bindings for the specified exchange
+      parameters:
+      - description: Exchange name
+        in: path
+        name: exchange
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: List all bindings for an exchange
+      tags:
+      - bindings
   /api/exchanges:
     get:
       consumes:
@@ -31,11 +134,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
       summary: List all exchanges
       tags:
       - exchanges
@@ -56,15 +159,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
       summary: Create a new exchange
       tags:
       - exchanges
@@ -85,15 +188,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/models.FiberMap'
+            $ref: '#/definitions/fiber.Map'
       summary: Delete an exchange
       tags:
       - exchanges

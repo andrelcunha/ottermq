@@ -15,6 +15,140 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/bindings": {
+            "post": {
+                "description": "Bind a queue to an exchange with the specified routing key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "Bind a queue to an exchange",
+                "parameters": [
+                    {
+                        "description": "Binding details",
+                        "name": "binding",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.BindQueueRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete a binding from an exchange to a queue",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "Delete a binding",
+                "parameters": [
+                    {
+                        "description": "Binding to delete",
+                        "name": "binding",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DeleteBindingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/bindings/{exchange}": {
+            "get": {
+                "description": "Get a list of all bindings for the specified exchange",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "bindings"
+                ],
+                "summary": "List all bindings for an exchange",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    }
+                }
+            }
+        },
         "/api/exchanges": {
             "get": {
                 "description": "Get a list of all exchanges",
@@ -32,13 +166,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     }
                 }
@@ -70,19 +204,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     }
                 }
@@ -114,19 +248,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/fiber.Map"
                         }
                     }
                 }
@@ -343,6 +477,20 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": true
         },
+        "models.BindQueueRequest": {
+            "type": "object",
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "queue_name": {
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                }
+            }
+        },
         "models.CreateExchangeRequest": {
             "type": "object",
             "properties": {
@@ -362,9 +510,19 @@ const docTemplate = `{
                 }
             }
         },
-        "models.FiberMap": {
+        "models.DeleteBindingRequest": {
             "type": "object",
-            "additionalProperties": true
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "queue_name": {
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                }
+            }
         }
     }
 }`
