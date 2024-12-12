@@ -266,6 +266,96 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/messages": {
+            "post": {
+                "description": "Publish a message to the specified exchange with a routing key",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Publish a message to an exchange",
+                "parameters": [
+                    {
+                        "description": "Message details",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.PublishMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/messages/{id}/ack": {
+            "post": {
+                "description": "Acknowledge a message with the specified ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Acknowledge a message",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Message ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    }
+                }
+            }
+        },
         "/api/queues": {
             "get": {
                 "description": "Get a list of all queues",
@@ -517,6 +607,24 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "queue_name": {
+                    "type": "string"
+                },
+                "routing_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.FiberMap": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "models.PublishMessageRequest": {
+            "type": "object",
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "message": {
                     "type": "string"
                 },
                 "routing_key": {

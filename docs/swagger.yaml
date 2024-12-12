@@ -32,6 +32,18 @@ definitions:
       routing_key:
         type: string
     type: object
+  models.FiberMap:
+    additionalProperties: true
+    type: object
+  models.PublishMessageRequest:
+    properties:
+      exchange_name:
+        type: string
+      message:
+        type: string
+      routing_key:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
@@ -200,6 +212,65 @@ paths:
       summary: Delete an exchange
       tags:
       - exchanges
+  /api/messages:
+    post:
+      consumes:
+      - application/json
+      description: Publish a message to the specified exchange with a routing key
+      parameters:
+      - description: Message details
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/models.PublishMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+      summary: Publish a message to an exchange
+      tags:
+      - messages
+  /api/messages/{id}/ack:
+    post:
+      consumes:
+      - application/json
+      description: Acknowledge a message with the specified ID
+      parameters:
+      - description: Message ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+      summary: Acknowledge a message
+      tags:
+      - messages
   /api/queues:
     get:
       consumes:
