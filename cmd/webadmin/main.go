@@ -11,10 +11,8 @@ func main() {
 
 	brokerAddr := "localhost:5672"
 	webServer := web.NewWebServer(brokerAddr)
-	router := webServer.SetupRouter()
+	app := webServer.SetupApp()
 
-	err := router.Run(":3000")
-	if err != nil {
-		log.Fatalf("Failed to start web server: %v", err)
-	}
+	log.Fatal(app.Listen(":3000"))
+
 }

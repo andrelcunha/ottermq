@@ -3,7 +3,7 @@ package web
 import (
 	"github.com/andrelcunha/ottermq/web/handlers"
 	"github.com/andrelcunha/ottermq/web/utils"
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 )
 
 type WebServer struct {
@@ -16,29 +16,36 @@ func NewWebServer(brokerAddr string) *WebServer {
 	}
 }
 
-func (ws *WebServer) SetupRouter() *gin.Engine {
-	router := gin.Default()
+func (ws *WebServer) SetupApp() *fiber.App {
+	config := fiber.Config{
+		Prefork:               false,
+		AppName:               "ottermq-webadmin",
+		DisableStartupMessage: true,
+	}
+	app := fiber.New(config)
 
 	// Enable CORS
-	router.Use(utils.CORSMiddleware())
+	app.Use(utils.CORSMiddleware())
 
-	router.GET("/queues", handlers.ListQueues)
-	router.POST("/queues", handlers.CreateQueue)
-	router.DELETE("/queues/:queue", handlers.DeleteQueue)
-	router.POST("/queues/:queue/consume", handlers.ConsumeMessage)
-	router.GET("/queues/:queue/count", handlers.CountMessages)
+	api := app.Group("/api")
 
-	router.POST("/messages/:id/ack", handlers.AckMessage)
-	router.POST("/messages", handlers.PublishMessage)
+	api.Get("/queues", handlers.ListQueues)
+	api.Post("/queues", handlers.CreateQueue)
+	api.Delete("/queues/:queue", handlers.DeleteQueue)
+	api.Post("/queues/:queue/consume", handlers.ConsumeMessage)
+	api.Get("/queues/:queue/count", handlers.CountMessages)
 
-	router.GET("/exchanges", handlers.ListExchanges)
-	router.POST("/exchanges", handlers.CreateExchange)
-	router.DELETE("/exchanges/:exchange", handlers.DeleteExchange)
+	api.Post("/messages/:id/ack", handlers.AckMessage)
+	api.Post("/messages", handlers.PublishMessage)
 
-	router.GET("/bindings/:exchange", handlers.ListBindings)
-	router.POST("/bindings", handlers.BindQueue)
-	router.DELETE("/bindings", handlers.DeleteBinding)
+	api.Get("/exchanges", handlers.ListExchanges)
+	api.Post("/exchanges", handlers.CreateExchange)
+	api.Delete("/exchanges/:exchange", handlers.DeleteExchange)
+
+	api.Get("/bindings/:exchange", handlers.ListBindings)
+	api.Post("/bindings", handlers.BindQueue)
+	api.Delete("/bindings", handlers.DeleteBinding)
 
 	// Add more routes as needed
-	return router
+	return app
 }
