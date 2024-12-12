@@ -13,7 +13,7 @@ func main() {
 	webServer := web.NewWebServer(brokerAddr)
 	router := webServer.SetupRouter()
 
-	err := router.Run(":8081")
+	err := router.Run(":3000")
 	if err != nil {
 		log.Fatalf("Failed to start web server: %v", err)
 	}

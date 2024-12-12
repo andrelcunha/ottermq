@@ -100,7 +100,7 @@ Content-Type: application/json
 ###
 
 ### Acknowledge Message
-POST {{host}}/messages/{{message_id}}/ack
+POST {{host}}/messages/59e6d30d-7395-4447-bd10-ab74ea74cd6b/ack
 Content-Type: application/json
 
 ###
