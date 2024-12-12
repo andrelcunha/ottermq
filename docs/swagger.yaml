@@ -2,14 +2,101 @@ definitions:
   fiber.Map:
     additionalProperties: true
     type: object
+  models.CreateExchangeRequest:
+    properties:
+      exchange_name:
+        type: string
+      exchange_type:
+        type: string
+    type: object
   models.CreateQueueRequest:
     properties:
       queue_name:
         type: string
     type: object
+  models.FiberMap:
+    additionalProperties: true
+    type: object
 info:
   contact: {}
 paths:
+  /api/exchanges:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all exchanges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+      summary: List all exchanges
+      tags:
+      - exchanges
+    post:
+      consumes:
+      - application/json
+      description: Create a new exchange with the specified name and type
+      parameters:
+      - description: Exchange to create
+        in: body
+        name: exchange
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateExchangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+      summary: Create a new exchange
+      tags:
+      - exchanges
+  /api/exchanges/{exchange}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete an exchange with the specified name
+      parameters:
+      - description: Exchange name
+        in: path
+        name: exchange
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.FiberMap'
+      summary: Delete an exchange
+      tags:
+      - exchanges
   /api/queues:
     get:
       consumes:

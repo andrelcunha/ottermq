@@ -15,6 +15,123 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/exchanges": {
+            "get": {
+                "description": "Get a list of all exchanges",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "List all exchanges",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new exchange with the specified name and type",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "Create a new exchange",
+                "parameters": [
+                    {
+                        "description": "Exchange to create",
+                        "name": "exchange",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateExchangeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchanges/{exchange}": {
+            "delete": {
+                "description": "Delete an exchange with the specified name",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "exchanges"
+                ],
+                "summary": "Delete an exchange",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Exchange name",
+                        "name": "exchange",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.FiberMap"
+                        }
+                    }
+                }
+            }
+        },
         "/api/queues": {
             "get": {
                 "description": "Get a list of all queues",
@@ -226,6 +343,17 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": true
         },
+        "models.CreateExchangeRequest": {
+            "type": "object",
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "exchange_type": {
+                    "type": "string"
+                }
+            }
+        },
         "models.CreateQueueRequest": {
             "type": "object",
             "properties": {
@@ -233,6 +361,10 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "models.FiberMap": {
+            "type": "object",
+            "additionalProperties": true
         }
     }
 }`
