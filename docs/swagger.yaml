@@ -1,0 +1,148 @@
+definitions:
+  fiber.Map:
+    additionalProperties: true
+    type: object
+  models.CreateQueueRequest:
+    properties:
+      queue_name:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /api/queues:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all queues
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: List all queues
+      tags:
+      - queues
+    post:
+      consumes:
+      - application/json
+      description: Create a new queue with the specified name
+      parameters:
+      - description: Queue to create
+        in: body
+        name: queue
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateQueueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Create a new queue
+      tags:
+      - queues
+  /api/queues/{queue}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a queue with the specified name
+      parameters:
+      - description: Queue name
+        in: path
+        name: queue
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Delete a queue
+      tags:
+      - queues
+  /api/queues/{queue}/consume:
+    post:
+      consumes:
+      - application/json
+      description: Consume a message from the specified queue
+      parameters:
+      - description: Queue name
+        in: path
+        name: queue
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Consume a message from a queue
+      tags:
+      - queues
+  /api/queues/{queue}/count:
+    get:
+      consumes:
+      - application/json
+      description: Count the number of messages in the specified queue
+      parameters:
+      - description: Queue name
+        in: path
+        name: queue
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Count messages in a queue
+      tags:
+      - queues
+swagger: "2.0"

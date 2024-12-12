@@ -1,9 +1,11 @@
 package web
 
 import (
+	_ "github.com/andrelcunha/ottermq/docs"
 	"github.com/andrelcunha/ottermq/web/handlers"
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/swagger"
 )
 
 type WebServer struct {
@@ -20,7 +22,7 @@ func (ws *WebServer) SetupApp() *fiber.App {
 	config := fiber.Config{
 		Prefork:               false,
 		AppName:               "ottermq-webadmin",
-		DisableStartupMessage: true,
+		DisableStartupMessage: false,
 	}
 	app := fiber.New(config)
 
@@ -28,6 +30,8 @@ func (ws *WebServer) SetupApp() *fiber.App {
 	app.Use(utils.CORSMiddleware())
 
 	api := app.Group("/api")
+
+	api.Get("/swagger/*", swagger.HandlerDefault)
 
 	api.Get("/queues", handlers.ListQueues)
 	api.Post("/queues", handlers.CreateQueue)
