@@ -42,7 +42,7 @@ func PublishMessage(c *gin.Context) {
 }
 
 func AckMessage(c *gin.Context) {
-	msgID := c.Param("msg_id")
+	msgID := c.Param("id")
 	if msgID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "message ID is required"})
 		return
