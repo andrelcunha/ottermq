@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
+	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
@@ -57,11 +58,8 @@ func ListExchanges(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [post]
 func CreateExchange(c *fiber.Ctx) error {
-	var request struct {
-		ExchangeName string `json:"exchange_name"`
-		ExchangeType string `json:"exchange_type"`
-	}
-	if err := c.ParamsParser(&request); err != nil {
+	var request models.CreateExchangeRequest
+	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})

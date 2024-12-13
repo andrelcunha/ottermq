@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
+	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/andrelcunha/ottermq/web/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -22,11 +23,7 @@ import (
 // @Failure 500 {object} models.FiberMap
 // @Router /api/messages [post]
 func PublishMessage(c *fiber.Ctx) error {
-	var request struct {
-		ExchangeName string `json:"exchange_name"`
-		RoutingKey   string `json:"routing_key"`
-		Message      string `json:"message"`
-	}
+	var request models.PublishMessageRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),

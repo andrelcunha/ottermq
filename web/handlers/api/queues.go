@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
@@ -58,10 +59,8 @@ func ListQueues(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues [post]
 func CreateQueue(c *fiber.Ctx) error {
-	var request struct {
-		QueueName string `json:"queue_name"`
-	}
-	if err := c.ParamsParser(&request); err != nil {
+	var request models.CreateQueueRequest
+	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})

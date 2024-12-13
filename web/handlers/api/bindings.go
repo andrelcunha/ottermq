@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
+	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 )
@@ -22,11 +23,7 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings [post]
 func BindQueue(c *fiber.Ctx) error {
-	var request struct {
-		ExchangeName string `json:"exchange_name"`
-		QueueName    string `json:"queue_name"`
-		RoutingKey   string `json:"routing_key"`
-	}
+	var request models.BindQueueRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
@@ -119,11 +116,7 @@ func ListBindings(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings [delete]
 func DeleteBinding(c *fiber.Ctx) error {
-	var request struct {
-		ExchangeName string `json:"exchange_name"`
-		QueueName    string `json:"queue_name"`
-		RoutingKey   string `json:"routing_key"`
-	}
+	var request models.DeleteBindingRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
