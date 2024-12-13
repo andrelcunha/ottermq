@@ -28,3 +28,5 @@ bin/
 
 **/data/
 data/
+
+server.log
