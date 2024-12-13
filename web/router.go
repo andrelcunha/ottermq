@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"os"
 
 	_ "github.com/andrelcunha/ottermq/docs"
@@ -25,7 +24,7 @@ func NewWebServer(brokerAddr string) *WebServer {
 	}
 }
 
-func (ws *WebServer) SetupApp() *fiber.App {
+func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	engine := html.New("./web/templates", ".html")
 
 	config := fiber.Config{
@@ -40,14 +39,8 @@ func (ws *WebServer) SetupApp() *fiber.App {
 	// Enable CORS
 	app.Use(utils.CORSMiddleware())
 
-	// Logger
-	file, err := os.OpenFile("server.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer file.Close()
 	app.Use(logger.New(logger.Config{
-		Output: file,
+		Output: logFile,
 	}))
 
 	// API routes
