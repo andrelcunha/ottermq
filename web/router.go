@@ -69,7 +69,9 @@ func (ws *WebServer) SetupApp() *fiber.App {
 
 	// Web Interface Routes
 	webGrp := app.Group("/")
+	webGrp.Static("/", "./web/static")
 	webGrp.Get("/", webui.Dashboard)
+	webGrp.Get("/overview", webui.Dashboard)
 	// webGrp.Get("/queues", webui.ListQueues)
 	// webGrp.Get("/exchanges", webui.ListExchanges)
 	// webGrp.Get("/bindings", webui.ListBindings)
