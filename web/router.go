@@ -62,16 +62,14 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	// Web Interface Routes
 	webGrp := app.Group("/")
-	webGrp.Static("/", "./web/static")
 	webGrp.Get("/", webui.Dashboard)
 	webGrp.Get("/overview", webui.Dashboard)
+	webGrp.Get("/exchanges", webui.ListExchanges)
 	// webGrp.Get("/queues", webui.ListQueues)
-	// webGrp.Get("/exchanges", webui.ListExchanges)
-	// webGrp.Get("/bindings", webui.ListBindings)
 	// webGrp.Get("/settings", webui.Settings)
 
 	// Serve static files
-	app.Static("/static", "./static")
+	app.Static("/", "./web/static")
 
 	return app
 }
