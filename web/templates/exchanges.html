@@ -1,34 +1,30 @@
 {{ define "exchanges" }}
 <div>
     <h1>{{.Title}}</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Virtual Host</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="exchanges-list">
-            <!-- Exchanges will be populated here -->
-        </tbody>
-    </table>
-    <div>        
+    <div class="container"> 
+        <table>
+            <thead>
+                <tr>
+                    <th>Virtual Host</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="exchanges-list">
+                <!-- Exchanges will be populated here -->
+            </tbody>
+        </table>
+    </div>
+    <div class="container">        
         <p>Add a new exchange</p>
         <form id="add-exchange-form">
             <input type="text" id="exchange-name" placeholder="Exchange Name" required>
             <button type="submit">Add Exchange</button>
         </form>
     </div>
-    <div id="bindings-manager" style="display: none;">
+    <div class="container" id="bindings-manager" style="display: none;">
         <p>Bindings</p>
-        <form id="add-binding-form">
-            <input type="hidden" id="selected-exchange">
-            <input type="text" id="routing-key" placeholder="Routing Key" required>
-            <input type="text" id="queue-name" placeholder="Queue Name" required>
-            <button type="submit">Add Binding</button>
-        </form>
         <table>
             <thead>
                 <tr>
@@ -41,8 +37,14 @@
                 <!-- Bindings will be populated here -->
             </tbody>
         </table>
+        <form id="add-binding-form">
+            <input type="hidden" id="selected-exchange">
+            <input type="text" id="routing-key" placeholder="Routing Key" required>
+            <input type="text" id="queue-name" placeholder="Queue Name" required>
+            <button type="submit">Add Binding</button>
+        </form>
     </div>
-    <div id="publish-message" style="display: none;">
+    <div class="container" id="publish-message" style="display: none;">
         <p>Publish Message</p>
         <form id="publish-message-form">
             <input type="hidden" id="selected-exchange-for-message">

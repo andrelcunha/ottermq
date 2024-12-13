@@ -1,31 +1,33 @@
 {{ define "queues" }}
 <div>
     <h1>{{.Title}}</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>Virtual Host</th>
-                <th>Name</th>
-                <th>State</th>
-                <th>Ready</th>
-                <th>Unacked</th>
-                <th>Persistent</th>
-                <th>Total</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="queues-list">
-            <!-- Queues will be populated here -->
-        </tbody>
-    </table>
-    <div>
+    <div class="container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Virtual Host</th>
+                    <th>Name</th>
+                    <th>State</th>
+                    <th>Ready</th>
+                    <th>Unacked</th>
+                    <th>Persistent</th>
+                    <th>Total</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="queues-list">
+                <!-- Queues will be populated here -->
+            </tbody>
+        </table>
+    </div>
+    <div class="container">
         <p>Add a new queue</p>
         <form id="add-queue-form">
             <input type="text" id="queue-name" placeholder="Queue Name" required>
             <button type="submit">Add Queue</button>
         </form>
     </div>
-    <div id="get-message" style="display: none;">
+    <div class="container" id="get-message" style="display: none;">
         <h2>Get Message</h2>
         <p class="warning">Warning: This action is destructive and will remove the message from the queue.</p>
         <form id="get-message-form">
@@ -65,7 +67,7 @@
             row.onclick = () => selectQueue(queue);
             row.innerHTML = `
                 <td>localhost</td>
-                <td>${queue}</td>
+                <td><b>${queue}</b></td>
                 <td>running</td>
                 <td>0</td>
                 <td>0</td>

@@ -33,9 +33,9 @@ form {
 form input {
     padding: 8px;
     border-radius: 4px;
-    background-color: #4a5568;
+    background-color: white;
     border: 1px solid #2d3748;
-    color: white;
+    color: #4a5568;
 }
 
 form button {
@@ -61,21 +61,46 @@ nav ul {
     margin: auto;
     display: flex;
     gap: 16px;
-    padding: 16px;
+    padding-top: 18px;
+    padding-bottom: 14px;
     list-style: none;
 }
 
 nav a {
     color: white;
     text-decoration: none;
+    padding: 16px;
+     padding-top: 10px;
+    padding-bottom: 17px; 
+    /* padding-left: 5px; */
+    /* padding-right: 5px; */
 }
 
 nav a:hover {
     color: #4299e1;
 }
 
+nav a.active {
+    border-radius: 4px 4px 0 0;
+    border: none;
+    background-color: white;
+    color: #4a5568
+}
+
 .container {
     max-width: 1200px;
     margin: auto;
     padding: 16px;
+}
+
+/* Table Styles */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+}
+
+table th, table td {
+    border: 1px solid #c0c0c0;
+    padding: 8px;
 }
