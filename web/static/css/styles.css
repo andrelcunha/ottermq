@@ -104,3 +104,11 @@ table th, table td {
     border: 1px solid #c0c0c0;
     padding: 8px;
 }
+
+textarea {
+    resize: none;
+    max-width: 400px;
+    min-width: 400px;
+    max-height: 200px;
+    min-height: 200px;
+}

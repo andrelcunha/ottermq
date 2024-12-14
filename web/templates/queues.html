@@ -36,7 +36,7 @@
         </form>
         <div id="message-content" style="display: none;">
             <h3>Message:</h3>
-            <pre id="message"></pre>
+            <textarea id="message"></textarea>
         </div>
     </div>
 </div>
@@ -62,14 +62,15 @@
         const data = await response.json();
         const queuesList = document.getElementById('queues-list');
         queuesList.innerHTML = '';
-        data.queues.forEach(queue => {
+        for (const queue of data.queues) {
+            const count = await CountMessages(queue)
             const row = document.createElement('tr');
             row.onclick = () => selectQueue(queue);
             row.innerHTML = `
                 <td>localhost</td>
                 <td><b>${queue}</b></td>
                 <td>running</td>
-                <td>0</td>
+                <td>${count}</td>
                 <td>0</td>
                 <td>0</td>
                 <td>0</td>
@@ -78,7 +79,13 @@
                 </td>
             `;
             queuesList.appendChild(row);
-        });
+        };
+    }
+
+    async function CountMessages(name) {
+        const response = await fetch(`/api/queues/${name}/count`);
+        const json = await response.json()
+        return json.data.count
     }
 
     async function addQueue(name) {
@@ -101,10 +108,12 @@
             headers: {'Content-Type': 'application/json'}
         });
         if (response.ok) {
-            const data = await response.json();
+            const json = await response.json();
+            const message = json.data.content
             const messageContent = document.getElementById('message-content');
             messageContent.style.display = 'block';
-            document.getElementById('message').textContent = data.message;
+            document.getElementById('message').textContent = message;
+            fetchQueues();
         } else {
             console.error('Failed to get message');
         }
