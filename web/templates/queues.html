@@ -21,107 +21,28 @@
         </table>
     </div>
     <div class="container">
-        <p>Add a new queue</p>
-        <form id="add-queue-form">
-            <input type="text" id="queue-name" placeholder="Queue Name" required>
-            <button type="submit">Add Queue</button>
-        </form>
+        <p class="section-title"><span class="triangle" id="triangle-add-exchange">▸</span> Add a new queue</p>
+        <div class="section-content hidden">
+            <form id="add-queue-form">
+                <input type="text" id="queue-name" placeholder="Queue Name" required>
+                <button type="submit">Add Queue</button>
+            </form>
+        </div>
     </div>
     <div class="container" id="get-message" style="display: none;">
-        <h2>Get Message</h2>
-        <p class="warning">Warning: This action is destructive and will remove the message from the queue.</p>
-        <form id="get-message-form">
-            <input type="hidden" id="selected-queue">
-            <button type="submit">Get Message</button>
-        </form>
-        <div id="message-content" style="display: none;">
-            <h3>Message:</h3>
-            <textarea id="message"></textarea>
+        <p class="section-title"><span class="triangle" id="triangle-add-exchange">▸</span>Get Message</p>
+        <div class="section-content hidden">
+            <p class="warning">Warning: This action is destructive and will remove the message from the queue.</p>
+            <form id="get-message-form">
+                <input type="hidden" id="selected-queue">
+                <button type="submit">Get Message</button>
+            </form>
+            <div id="message-content" style="display: none;">
+                <h3>Message:</h3>
+                <textarea id="message"></textarea>
+            </div>
         </div>
     </div>
 </div>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        fetchQueues();
-
-        document.getElementById('add-queue-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const queueName = document.getElementById('queue-name').value;
-            addQueue(queueName);
-        });
-
-        document.getElementById('get-message-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const queue = document.getElementById('selected-queue').value;
-            getMessage(queue);
-        });
-    });
-
-    async function fetchQueues() {
-        const response = await fetch('/api/queues');
-        const data = await response.json();
-        const queuesList = document.getElementById('queues-list');
-        queuesList.innerHTML = '';
-        for (const queue of data.queues) {
-            const count = await CountMessages(queue)
-            const row = document.createElement('tr');
-            row.onclick = () => selectQueue(queue);
-            row.innerHTML = `
-                <td>localhost</td>
-                <td><b>${queue}</b></td>
-                <td>running</td>
-                <td>${count}</td>
-                <td>0</td>
-                <td>0</td>
-                <td>0</td>
-                <td>
-                    <button onclick="deleteQueue('${queue}')">Delete</button>
-                </td>
-            `;
-            queuesList.appendChild(row);
-        };
-    }
-
-    async function CountMessages(name) {
-        const response = await fetch(`/api/queues/${name}/count`);
-        const json = await response.json()
-        return json.data.count
-    }
-
-    async function addQueue(name) {
-        const response = await fetch('/api/queues', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name})
-        });
-        if (response.ok) fetchQueues();
-    }
-
-    async function deleteQueue(name) {
-        const response = await fetch(`/api/queues/${name}`, { method: 'DELETE' });
-        if (response.ok) fetchQueues();
-    }
-
-    async function getMessage(queue) {
-        const response = await fetch(`/api/queues/${queue}/consume`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        });
-        if (response.ok) {
-            const json = await response.json();
-            const message = json.data.content
-            const messageContent = document.getElementById('message-content');
-            messageContent.style.display = 'block';
-            document.getElementById('message').textContent = message;
-            fetchQueues();
-        } else {
-            console.error('Failed to get message');
-        }
-    }
-
-    function selectQueue(queue) {
-        document.getElementById('selected-queue').value = queue;
-        document.getElementById('get-message').style.display = 'block';
-    }
-</script>
+<script src="./js/queues.js"></script>
 {{ end }}

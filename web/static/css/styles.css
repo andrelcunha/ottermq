@@ -70,10 +70,8 @@ nav a {
     color: white;
     text-decoration: none;
     padding: 16px;
-     padding-top: 10px;
+    padding-top: 10px;
     padding-bottom: 17px; 
-    /* padding-left: 5px; */
-    /* padding-right: 5px; */
 }
 
 nav a:hover {
@@ -111,4 +109,14 @@ textarea {
     min-width: 400px;
     max-height: 200px;
     min-height: 200px;
+}
+
+
+.triangle {
+    margin-right: 8px;
+    color: #999;
+}
+
+.hidden {
+    display: none;
 }
