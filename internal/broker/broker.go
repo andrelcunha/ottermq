@@ -10,15 +10,17 @@ import (
 	"sync"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/google/uuid"
 )
 
 type Broker struct {
-	Connections     map[net.Conn]bool    `json:"-"`
-	Exchanges       map[string]*Exchange `json:"exchanges"`
-	Queues          map[string]*Queue    `json:"queues"`
-	UnackedMessages map[string]Message   `json:"unacked_messages"`
-	mu              sync.Mutex           `json:"-"`
+	Connections       map[net.Conn]bool          `json:"-"`
+	Exchanges         map[string]*Exchange       `json:"exchanges"`
+	Queues            map[string]*Queue          `json:"queues"`
+	UnackMsgs         map[string]map[string]bool `json:"unacked_messages"`
+	Consumers         map[string]*Consumer       `json:"consumers"`
+	ConsumerSessions  map[string]string          `json:"consumer_sessions"`
+	ConsumerUnackMsgs map[string]map[string]bool `json:"consumer_unacked_messages"`
+	mu                sync.Mutex                 `json:"-"`
 }
 
 type Exchange struct {
@@ -45,58 +47,27 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+type Consumer struct {
+	ID        string `json:"id"`
+	Queue     string `json:"queue"`
+	SessionID string `json:"session_id"`
+}
+
 func NewBroker() *Broker {
 	b := &Broker{
-		Connections:     make(map[net.Conn]bool),
-		Exchanges:       make(map[string]*Exchange),
-		Queues:          make(map[string]*Queue),
-		UnackedMessages: make(map[string]Message),
+		Connections:       make(map[net.Conn]bool),
+		Exchanges:         make(map[string]*Exchange),
+		Queues:            make(map[string]*Queue),
+		UnackMsgs:         make(map[string]map[string]bool),
+		Consumers:         make(map[string]*Consumer),
+		ConsumerSessions:  make(map[string]string),
+		ConsumerUnackMsgs: make(map[string]map[string]bool),
 	}
 	b.loadBrokerState()
 	b.createExchange("default", DIRECT)
+	b.createQueue("default")
+	b.bindQueue("default", "default", "default")
 	return b
-}
-
-func (b *Broker) handleConnection(conn net.Conn) {
-	defer conn.Close()
-	b.mu.Lock()
-	b.Connections[conn] = true
-	b.mu.Unlock()
-	log.Println("New connection established")
-
-	reader := bufio.NewReader(conn)
-	for {
-		msg, err := reader.ReadString('\n')
-		if err != nil {
-			log.Println("Connection closed")
-			break
-		}
-
-		log.Printf("Received: %s\n", msg)
-		response, err := b.processCommand(msg)
-		if err != nil {
-			log.Println("ERROR: ", err)
-			response = common.CommandResponse{
-				Status:  "error",
-				Message: err.Error(),
-			}
-		}
-
-		// Serialize the response into JSON
-		responseJSON, err := json.Marshal(response)
-		if err != nil {
-			log.Println("Failed to serialize response:", err)
-			continue
-		}
-		_, err = conn.Write(append(responseJSON, '\n'))
-		if err != nil {
-			log.Println("Failed to write response:", err)
-			break
-		}
-	}
-	b.mu.Lock()
-	delete(b.Connections, conn)
-	b.mu.Unlock()
 }
 
 func (b *Broker) Start(addr string) {
@@ -117,7 +88,94 @@ func (b *Broker) Start(addr string) {
 	}
 }
 
-func (b *Broker) processCommand(command string) (common.CommandResponse, error) {
+func (b *Broker) handleConnection(conn net.Conn) {
+	defer conn.Close()
+	b.mu.Lock()
+	b.Connections[conn] = true
+	b.mu.Unlock()
+	log.Println("New connection established")
+
+	sessionID := generateSessionID()
+	consumerID := conn.RemoteAddr().String()
+
+	b.registerConsumer(consumerID, "default", sessionID)
+
+	reader := bufio.NewReader(conn)
+	for {
+		msg, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Connection closed")
+			break
+		}
+
+		log.Printf("Received: %s\n", msg)
+		response, err := b.processCommand(msg, consumerID)
+		if err != nil {
+			log.Println("ERROR: ", err)
+			response = common.CommandResponse{
+				Status:  "error",
+				Message: err.Error(),
+			}
+		}
+
+		responseJSON, err := json.Marshal(response)
+		if err != nil {
+			log.Println("Failed to serialize response:", err)
+			continue
+		}
+		_, err = conn.Write(append(responseJSON, '\n'))
+		if err != nil {
+			log.Println("Failed to write response:", err)
+			break
+		}
+	}
+	b.mu.Lock()
+	delete(b.Connections, conn)
+	b.handleConsumerDisconnection(sessionID)
+	b.mu.Unlock()
+}
+
+func (b *Broker) registerConsumer(consumerID, queue, sessionID string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	consumer := &Consumer{
+		ID:        consumerID,
+		Queue:     queue,
+		SessionID: sessionID,
+	}
+	b.Consumers[consumerID] = consumer
+	b.ConsumerSessions[sessionID] = consumerID
+	b.ConsumerUnackMsgs[consumerID] = make(map[string]bool)
+}
+
+func (b *Broker) handleConsumerDisconnection(sessionID string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	consumerID, ok := b.ConsumerSessions[sessionID]
+	if !ok {
+		log.Printf("Session %s not found\n", sessionID)
+		return
+	}
+
+	consumer, ok := b.Consumers[consumerID]
+	if !ok {
+		log.Printf("Consumer %s not found\n", consumerID)
+		return
+	}
+
+	for msgID := range b.ConsumerUnackMsgs[consumerID] {
+		if queue, ok := b.Queues[consumer.Queue]; ok {
+			queue.messages <- Message{ID: msgID}
+		}
+	}
+
+	delete(b.ConsumerUnackMsgs, consumerID)
+	delete(b.ConsumerSessions, sessionID)
+	delete(b.Consumers, consumerID)
+}
+
+func (b *Broker) processCommand(command, consumerID string) (common.CommandResponse, error) {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
 		// return "", fmt.Errorf("Invalid command")
@@ -197,7 +255,7 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		}
 		queueName := parts[1]
 		fmt.Println("Consuming from queue:", queueName)
-		msg := b.consume(queueName)
+		msg := b.consume(queueName, consumerID)
 		if msg == nil {
 			return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
 		}
@@ -208,7 +266,13 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		msgID := parts[1]
-		b.acknowledge(msgID)
+		// get queue from consumerID
+		consumer, ok := b.Consumers[consumerID]
+		if !ok {
+			return common.CommandResponse{Status: "ERROR", Message: "Consumer not found"}, nil
+		}
+		queue := consumer.Queue
+		b.acknowledge(queue, consumerID, msgID)
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
 	case "DELETE_QUEUE":
@@ -279,295 +343,16 @@ func (b *Broker) processCommand(command string) (common.CommandResponse, error) 
 		}
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s deleted", exchangeName)}, nil
 
+	case "SUBSCRIBE":
+		if len(parts) != 3 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		consumerID := parts[1]
+		queueName := parts[2]
+		b.subscribe(consumerID, queueName)
+		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Consumer %s subscribed to queue %s", consumerID, queueName)}, nil
+
 	default:
 		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
 	}
-}
-
-// acknowledge removes the message with the given ID frrom the unackedMessages map.
-func (b *Broker) acknowledge(msgID string) {
-	b.mu.Lock()
-	delete(b.UnackedMessages, msgID)
-	b.mu.Unlock()
-	b.saveBrokerState()
-}
-
-func (b *Broker) createQueue(name string) (*Queue, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// Check if the queue already exists
-	if _, ok := b.Queues[name]; ok {
-		return nil, fmt.Errorf("queue %s already exists", name)
-	}
-
-	queue := &Queue{
-		Name:     name,
-		messages: make(chan Message, 100),
-	}
-	b.Queues[name] = queue
-	b.saveBrokerState()
-	return queue, nil
-}
-
-func (b *Broker) publish(exchangeName, routingKey, message string) (string, error) {
-	b.mu.Lock()
-	exchange, ok := b.Exchanges[exchangeName]
-	b.mu.Unlock()
-	if !ok {
-		log.Printf("Exchange %s not found", exchangeName)
-		return "", fmt.Errorf("Exchange %s not found", exchangeName)
-	}
-	msgID := uuid.New().String()
-	msg := Message{
-		ID:      msgID,
-		Content: message,
-	}
-
-	// Save message to file
-	err := b.saveMessage(routingKey, msg)
-	if err != nil {
-		log.Printf("Failed to save message to file: %v", err)
-		return "", err
-	}
-
-	switch exchange.Typ {
-	case DIRECT:
-		queues, ok := exchange.Bindings[routingKey]
-		if ok {
-			for _, queue := range queues {
-				queue.messages <- msg
-				log.Printf("Message %s sent to queue %s", msgID, queue.Name)
-			}
-			return msgID, nil
-		} else {
-			log.Printf("Routing key %s not found for exchange %s", routingKey, exchangeName)
-			return "", fmt.Errorf("Routing key %s not found for exchange %s", routingKey, exchangeName)
-		}
-	case FANOUT:
-		for _, queue := range exchange.Queues {
-			queue.messages <- msg
-			log.Printf("Message %s sent to queue %s", msgID, queue.Name)
-		}
-		return msgID, nil
-	}
-	return "", fmt.Errorf("Unknown exchange type")
-}
-
-// func (b *Broker) consume(queueName string) <-chan Message {
-func (b *Broker) consume(queueName string) *Message {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	queue, ok := b.Queues[queueName]
-	if !ok {
-		log.Printf("Queue %s not found", queueName)
-		return nil
-	}
-	select {
-	case msg := <-queue.messages:
-		return &msg
-	default:
-		log.Printf("No messages in queue %s", queueName)
-		return nil
-	}
-}
-
-func (b *Broker) deleteQueue(name string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// Check if the queue exists
-	_, ok := b.Queues[name]
-	if !ok {
-		return fmt.Errorf("queue %s not found", name)
-	}
-
-	delete(b.Queues, name)
-	b.saveBrokerState()
-	return nil
-}
-
-func (b *Broker) listQueues() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	queueNames := make([]string, 0, len(b.Queues))
-	for name := range b.Queues {
-		queueNames = append(queueNames, name)
-	}
-	return queueNames
-}
-
-func (b *Broker) createExchange(name string, typ ExchangeType) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// Check if the exchange already exists
-	if _, ok := b.Exchanges[name]; ok {
-		return fmt.Errorf("exchange %s already exists", name)
-	}
-
-	exchange := &Exchange{
-		Name:     name,
-		Typ:      typ,
-		Queues:   make(map[string]*Queue),
-		Bindings: make(map[string][]*Queue),
-	}
-	b.Exchanges[name] = exchange
-	return nil
-}
-
-func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if exchangeName == "" {
-		exchangeName = "default"
-	}
-
-	// Find the exchange
-	exchange, ok := b.Exchanges[exchangeName]
-	if !ok {
-		return fmt.Errorf("Exchange %s not found", exchangeName)
-	}
-
-	// Find the queue
-	queue, ok := b.Queues[queueName]
-	if !ok {
-		return fmt.Errorf("Queue %s not found", queueName)
-	}
-
-	switch exchange.Typ {
-	case DIRECT:
-		if exchangeName == "default" {
-			log.Printf("Binding queue %s to %s exchange", queueName, exchangeName)
-			routingKey = queueName
-		} else {
-			delete(exchange.Bindings, queueName)
-		}
-		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
-	case FANOUT:
-		exchange.Queues[queueName] = queue
-	}
-
-	// Persist the state
-	err := b.saveBrokerState()
-	if err != nil {
-		log.Printf("Failed to save broker state: %v", err)
-	}
-
-	return nil
-}
-
-func (b *Broker) listExchanges() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	exchangeNames := make([]string, 0, len(b.Exchanges))
-	for name := range b.Exchanges {
-		exchangeNames = append(exchangeNames, name)
-	}
-	return exchangeNames
-}
-
-func (b *Broker) listBindings(exchangeName string) map[string][]string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	exchange, ok := b.Exchanges[exchangeName]
-	if !ok {
-		return nil
-	}
-
-	switch exchange.Typ {
-	case DIRECT:
-		// bindings := make([]string, 0, len(exchange.Bindings))
-		bindings := make(map[string][]string)
-		for routingKey, queues := range exchange.Bindings {
-			var queuesStr []string
-			for _, queue := range queues {
-				queuesStr = append(queuesStr, queue.Name)
-			}
-			bindings[routingKey] = queuesStr
-		}
-		return bindings
-	case FANOUT:
-		// bindings := make([]string, 0, len(exchange.Queues))
-		bindings := make(map[string][]string)
-		var queues []string
-		for queueName := range exchange.Queues {
-			queues = append(queues, queueName)
-		}
-		bindings["fanout"] = queues
-		return bindings
-	}
-	return nil
-}
-
-func (b *Broker) DeletBinding(exchangeName, queueName, routingKey string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Find the exchange
-	exchange, ok := b.Exchanges[exchangeName]
-	if !ok {
-		return fmt.Errorf("exchange %s not found", exchangeName)
-	}
-
-	queues, ok := exchange.Bindings[routingKey]
-	if !ok {
-		return fmt.Errorf("Binding with routing key %s not found", routingKey)
-	}
-
-	// Find the queue
-	var index int
-	found := false
-	for i, q := range queues {
-		if q.Name == queueName {
-			index = i
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("Queue %s not found", queueName)
-	}
-
-	// Remove the queue from the bindings
-	exchange.Bindings[routingKey] = append(queues[:index], queues[index+1:]...)
-	if len(exchange.Bindings[routingKey]) == 0 {
-		delete(exchange.Bindings, routingKey)
-	}
-
-	// Persist the state
-	err := b.saveBrokerState()
-	if err != nil {
-		log.Printf("Failed to save broker state: %v", err)
-	}
-
-	return nil
-}
-
-func (b *Broker) countMessages(queueName string) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	queue, ok := b.Queues[queueName]
-	if !ok {
-		return 0, fmt.Errorf("Queue %s not found", queueName)
-	}
-
-	messageCount := len(queue.messages)
-	return messageCount, nil
-}
-
-func (b *Broker) deleteExchange(name string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// If the exchange is the default exchange, return an error
-	if name == "default" {
-		return fmt.Errorf("cannot delete default exchange")
-	}
-
-	// Check if the exchange exists
-	_, ok := b.Exchanges[name]
-	if !ok {
-		return fmt.Errorf("exchange %s not found", name)
-	}
-	delete(b.Exchanges, name)
-	b.saveBrokerState()
-	return nil
 }
