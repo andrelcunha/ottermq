@@ -1,5 +1,7 @@
 package config
 
 type Config struct {
-	Port string
+	Port              string
+	Host              string
+	HeartBeatInterval int
 }

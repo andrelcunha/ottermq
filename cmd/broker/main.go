@@ -5,23 +5,27 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/broker"
 )
 
 func main() {
-	log.Println("OtterMq is starting...")
-	b := broker.NewBroker()
+	config := &config.Config{
+		Port:              "5672",
+		Host:              "localhost",
+		HeartBeatInterval: 5,
+	}
+	b := broker.NewBroker(config)
 
-	go b.Start(":5672")
+	log.Println("OtterMq is starting...")
+	go b.Start()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
 	<-stop
 	log.Println("Shutting down OtterMq...")
-
-	// Perform any necessary cleanup or shutdown tasks here
-	// Example: b.Shytdown()
+	b.Shutdown()
 
 	log.Println("Server gracefully stopped.")
 }
