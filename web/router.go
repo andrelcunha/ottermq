@@ -3,6 +3,7 @@ package web
 import (
 	"net"
 	"os"
+	"time"
 
 	_ "github.com/andrelcunha/ottermq/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
@@ -16,13 +17,15 @@ import (
 )
 
 type WebServer struct {
-	brokerAddr string
-	conn       net.Conn
+	brokerAddr        string
+	conn              net.Conn
+	heartbeatInterval time.Duration
 }
 
 type Config struct {
-	BrokerHost string
-	BrokerPort string
+	BrokerHost        string
+	BrokerPort        string
+	HeartbeatInterval int
 }
 
 func (ws *WebServer) Close() {
@@ -36,8 +39,9 @@ func NewWebServer(config *Config) (*WebServer, error) {
 		return nil, err
 	}
 	return &WebServer{
-		brokerAddr: brokerAddr,
-		conn:       conn,
+		brokerAddr:        brokerAddr,
+		conn:              conn,
+		heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
 	}, nil
 }
 
@@ -62,6 +66,9 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	// Pass the connection to the utils package
 	utils.SetConn(ws.conn)
+
+	// set heartbeat
+	go utils.SendHeartbeat(ws.heartbeatInterval)
 
 	// API routes
 	apiGrp := app.Group("/api")

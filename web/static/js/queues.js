@@ -26,7 +26,7 @@ async function fetchQueues() {
         row.innerHTML = `
             <td>localhost</td>
             <td><b>${queue}</b></td>
-            <td>running</td>
+            <td><span class="small-green-square"> </span> running</td>
             <td>${count}</td>
             <td>0</td>
             <td>0</td>
