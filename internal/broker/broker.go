@@ -352,6 +352,13 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 		b.subscribe(consumerID, queueName)
 		return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Consumer %s subscribed to queue %s", consumerID, queueName)}, nil
 
+	case "LIST_CONNECTIONS":
+		if len(parts) != 1 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+		connections := b.listConnections()
+		return common.CommandResponse{Status: "OK", Data: connections}, nil
+
 	default:
 		return common.CommandResponse{Status: "ERROR", Message: fmt.Sprintf("Unknown command '%s'", parts[0])}, nil
 	}

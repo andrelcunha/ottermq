@@ -320,3 +320,13 @@ func (b *Broker) deleteExchange(name string) error {
 	b.saveBrokerState()
 	return nil
 }
+
+func (b *Broker) listConnections() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	connections := make([]string, 0, len(b.Consumers))
+	for id := range b.Consumers {
+		connections = append(connections, id)
+	}
+	return connections
+}
