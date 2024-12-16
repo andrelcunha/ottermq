@@ -20,8 +20,9 @@ func main() {
 	log.Println("Starting OtterMq Web Admin...")
 
 	config := web.Config{
-		BrokerHost: "localhost",
-		BrokerPort: "5672",
+		BrokerHost:        "localhost",
+		BrokerPort:        "5672",
+		HeartbeatInterval: 600,
 	}
 
 	webServer, err := web.NewWebServer(&config)

@@ -13,7 +13,7 @@ func main() {
 	config := &config.Config{
 		Port:              "5672",
 		Host:              "localhost",
-		HeartBeatInterval: 5,
+		HeartBeatInterval: 600,
 	}
 	b := broker.NewBroker(config)
 
