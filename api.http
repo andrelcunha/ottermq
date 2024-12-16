@@ -104,3 +104,9 @@ POST {{host}}/messages/59e6d30d-7395-4447-bd10-ab74ea74cd6b/ack
 Content-Type: application/json
 
 ###
+
+### List Connections
+GET {{host}}/connections
+Content-Type: application/json
+
+###

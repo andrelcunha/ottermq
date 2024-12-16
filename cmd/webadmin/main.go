@@ -19,8 +19,16 @@ func main() {
 
 	log.Println("Starting OtterMq Web Admin...")
 
-	brokerAddr := "localhost:5672"
-	webServer := web.NewWebServer(brokerAddr)
+	config := web.Config{
+		BrokerHost: "localhost",
+		BrokerPort: "5672",
+	}
+
+	webServer, err := web.NewWebServer(&config)
+	if err != nil {
+		log.Fatalf("failed to connect to broker: %v", err)
+	}
+	defer webServer.Close()
 	app := webServer.SetupApp(file)
 
 	//Handle gracefull shutdown

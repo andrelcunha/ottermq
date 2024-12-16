@@ -1,6 +1,7 @@
 package web
 
 import (
+	"net"
 	"os"
 
 	_ "github.com/andrelcunha/ottermq/docs"
@@ -16,12 +17,28 @@ import (
 
 type WebServer struct {
 	brokerAddr string
+	conn       net.Conn
 }
 
-func NewWebServer(brokerAddr string) *WebServer {
+type Config struct {
+	BrokerHost string
+	BrokerPort string
+}
+
+func (ws *WebServer) Close() {
+	ws.conn.Close()
+}
+
+func NewWebServer(config *Config) (*WebServer, error) {
+	brokerAddr := config.BrokerHost + ":" + config.BrokerPort
+	conn, err := net.Dial("tcp", brokerAddr)
+	if err != nil {
+		return nil, err
+	}
 	return &WebServer{
 		brokerAddr: brokerAddr,
-	}
+		conn:       conn,
+	}, nil
 }
 
 func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
@@ -43,6 +60,9 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 		Output: logFile,
 	}))
 
+	// Pass the connection to the utils package
+	utils.SetConn(ws.conn)
+
 	// API routes
 	apiGrp := app.Group("/api")
 	apiGrp.Get("/swagger/*", swagger.HandlerDefault)
@@ -59,11 +79,14 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	apiGrp.Get("/bindings/:exchange", api.ListBindings)
 	apiGrp.Post("/bindings", api.BindQueue)
 	apiGrp.Delete("/bindings", api.DeleteBinding)
+	apiGrp.Get("/connections", api.ListConnections)
 
 	// Web Interface Routes
 	webGrp := app.Group("/")
 	webGrp.Get("/", webui.Dashboard)
 	webGrp.Get("/overview", webui.Dashboard)
+	webGrp.Get("/connections", webui.ListConnections)
+
 	webGrp.Get("/exchanges", webui.ListExchanges)
 	webGrp.Get("/queues", webui.ListQueues)
 	// webGrp.Get("/settings", webui.Settings)

@@ -6,14 +6,15 @@ import (
 	"net"
 )
 
-func SendCommand(command string) (string, error) {
-	conn, err := net.Dial("tcp", ":5672")
-	if err != nil {
-		return "", fmt.Errorf("failed to connect to broker: %v", err)
-	}
-	defer conn.Close()
+var conn net.Conn
 
-	_, err = conn.Write([]byte(command + "\n"))
+func SetConn(c net.Conn) {
+	conn = c
+}
+
+func SendCommand(command string) (string, error) {
+
+	_, err := conn.Write([]byte(command + "\n"))
 	if err != nil {
 		return "", fmt.Errorf("failed to send command: %v", err)
 	}
