@@ -1,0 +1,25 @@
+{{ define "connections" }}
+<div>
+    <h1>{{.Title}}</h1>
+    <div class="container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Virtual Host</th>
+                    <th>Name</th>
+                    <th>User name</th>
+                    <th>State</th>
+                    <th>SSL/TLS</th>
+                    <th>Channels</th>
+                    <th>Heartbeat</th>
+                    <th>Connected at</th>
+                </tr>
+            </thead>
+            <tbody id="connections-list">
+                <!-- Connections will be populated here -->
+            </tbody>
+        </table>
+    </div>
+</div>
+<script src="./js/connections.js"></script>
+{{ end }}

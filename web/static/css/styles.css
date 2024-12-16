@@ -120,3 +120,35 @@ textarea {
 .hidden {
     display: none;
 }
+
+.small-green-square {
+    height: 5px; /* adjust to your desired character size */
+    width: 5px;
+    background-color: #0f0;
+    border: 1px solid lightslategray; /* optional */
+    padding: 2px; /* optional */
+    margin-right: 2px; /* optional */
+    display: inline-block; /* for inline rendering */
+}
+
+.small-red-square {
+    height: 5px; /* adjust to your desired character size */
+    width: 5px;
+    background-color: red;
+    border: 1px solid lightslategray; /* optional */
+    padding: 2px; /* optional */
+    margin-right: 2px; /* optional */
+    display: inline-block; /* for inline rendering */
+}
+
+.centered {
+    text-align: center;
+}
+
+.right {
+    text-align: right;
+}
+
+.left {
+    text-align: left;
+}
