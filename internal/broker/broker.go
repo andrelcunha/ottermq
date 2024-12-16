@@ -24,6 +24,7 @@ type Broker struct {
 	ConsumerUnackMsgs map[string]map[string]bool `json:"consumer_unacked_messages"`
 	HeartbeatInterval time.Duration              `json:"-"`
 	LastHeartbeat     map[net.Conn]time.Time     `json:"-"`
+	ConnectedAt       map[net.Conn]time.Time     `json:"-"`
 	config            *config.Config             `json:"-"`
 	mu                sync.Mutex                 `json:"-"`
 }
@@ -69,6 +70,7 @@ func NewBroker(config *config.Config) *Broker {
 		ConsumerUnackMsgs: make(map[string]map[string]bool),
 		HeartbeatInterval: time.Duration(config.HeartBeatInterval) * time.Second,
 		LastHeartbeat:     make(map[net.Conn]time.Time),
+		ConnectedAt:       make(map[net.Conn]time.Time),
 		config:            config,
 	}
 	b.loadBrokerState()
@@ -103,6 +105,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	b.mu.Lock()
 	b.Connections[conn] = true
 	b.LastHeartbeat[conn] = time.Now()
+	b.ConnectedAt[conn] = time.Now()
 	b.mu.Unlock()
 	log.Println("New connection established")
 
@@ -111,7 +114,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	b.registerConsumer(consumerID, "default", sessionID)
 
-	go b.sendHeartbeat(conn)
+	// go b.sendHeartbeat(conn)
 
 	reader := bufio.NewReader(conn)
 	for {

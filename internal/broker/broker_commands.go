@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	. "github.com/andrelcunha/ottermq/pkg/common"
 	"github.com/google/uuid"
 )
 
@@ -321,12 +322,18 @@ func (b *Broker) deleteExchange(name string) error {
 	return nil
 }
 
-func (b *Broker) listConnections() []string {
+func (b *Broker) listConnections() []ConnectionInfo {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	connections := make([]string, 0, len(b.Consumers))
-	for id := range b.Consumers {
-		connections = append(connections, id)
+
+	// connections := make([]string, 0, len(b.Consumers))
+	connections := make([]ConnectionInfo, 0, len(b.Consumers))
+	for conn := range b.Connections {
+		connections = append(connections, ConnectionInfo{
+			Name:          conn.RemoteAddr().String(),
+			LastHeartbeat: b.LastHeartbeat[conn],
+			ConnectedAt:   b.ConnectedAt[conn],
+		})
 	}
 	return connections
 }
