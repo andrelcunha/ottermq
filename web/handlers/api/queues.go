@@ -65,6 +65,11 @@ func CreateQueue(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
+	if request.QueueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "queue name is required",
+		})
+	}
 	command := fmt.Sprintf("CREATE_QUEUE %s", request.QueueName)
 	response, err := utils.SendCommand(command)
 	if err != nil {

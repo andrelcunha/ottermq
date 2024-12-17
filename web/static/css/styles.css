@@ -95,12 +95,12 @@ nav a.active {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 
 table th, table td {
     border: 1px solid #c0c0c0;
-    padding: 8px;
+    padding: 8px 4px;
 }
 
 textarea {
@@ -151,4 +151,25 @@ textarea {
 
 .left {
     text-align: left;
+}
+
+.show-time {
+    font-size: 1.0em;
+    margin-bottom: 2px;
+}
+
+.show-date {
+    font-size: 0.8em;
+    color: #999;
+    /* margin-bottom: 4px; */
+}
+
+.delete-button {
+    background-color: #e53e3e;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
 }

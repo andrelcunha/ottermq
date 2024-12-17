@@ -26,13 +26,13 @@ async function fetchQueues() {
         row.innerHTML = `
             <td>localhost</td>
             <td><b>${queue}</b></td>
-            <td>running</td>
+            <td><span class="small-green-square"> </span> running</td>
             <td>${count}</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
             <td>
-                <button onclick="deleteQueue('${queue}')">Delete</button>
+                <button class='delete-button' onclick="deleteQueue('${queue}')">Delete</button>
             </td>
         `;
         queuesList.appendChild(row);
@@ -46,10 +46,13 @@ async function CountMessages(name) {
 }
 
 async function addQueue(name) {
+    const queue = {
+        queue_name: name
+    }
     const response = await fetch('/api/queues', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
+        body: JSON.stringify(queue)
     });
     if (response.ok) fetchQueues();
 }

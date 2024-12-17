@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', function() {
     triangles.forEach(triangle => {
         triangle.addEventListener('click', function() {
             const sectionContent = triangle.parentElement.nextElementSibling;
-            console.log(sectionContent);
             if (sectionContent.classList.contains('hidden')) {
                 sectionContent.classList.remove('hidden');
                 this.textContent = '▾';

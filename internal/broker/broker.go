@@ -8,7 +8,9 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/pkg/common"
 )
 
@@ -20,6 +22,10 @@ type Broker struct {
 	Consumers         map[string]*Consumer       `json:"consumers"`
 	ConsumerSessions  map[string]string          `json:"consumer_sessions"`
 	ConsumerUnackMsgs map[string]map[string]bool `json:"consumer_unacked_messages"`
+	HeartbeatInterval time.Duration              `json:"-"`
+	LastHeartbeat     map[net.Conn]time.Time     `json:"-"`
+	ConnectedAt       map[net.Conn]time.Time     `json:"-"`
+	config            *config.Config             `json:"-"`
 	mu                sync.Mutex                 `json:"-"`
 }
 
@@ -53,7 +59,7 @@ type Consumer struct {
 	SessionID string `json:"session_id"`
 }
 
-func NewBroker() *Broker {
+func NewBroker(config *config.Config) *Broker {
 	b := &Broker{
 		Connections:       make(map[net.Conn]bool),
 		Exchanges:         make(map[string]*Exchange),
@@ -62,6 +68,10 @@ func NewBroker() *Broker {
 		Consumers:         make(map[string]*Consumer),
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]bool),
+		HeartbeatInterval: time.Duration(config.HeartBeatInterval) * time.Second,
+		LastHeartbeat:     make(map[net.Conn]time.Time),
+		ConnectedAt:       make(map[net.Conn]time.Time),
+		config:            config,
 	}
 	b.loadBrokerState()
 	b.createExchange("default", DIRECT)
@@ -70,7 +80,9 @@ func NewBroker() *Broker {
 	return b
 }
 
-func (b *Broker) Start(addr string) {
+func (b *Broker) Start() {
+	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
+
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("Failed to start broker: %v", err)
@@ -92,6 +104,8 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	defer conn.Close()
 	b.mu.Lock()
 	b.Connections[conn] = true
+	b.LastHeartbeat[conn] = time.Now()
+	b.ConnectedAt[conn] = time.Now()
 	b.mu.Unlock()
 	log.Println("New connection established")
 
@@ -100,12 +114,23 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	b.registerConsumer(consumerID, "default", sessionID)
 
+	go b.sendHeartbeat(conn)
+
 	reader := bufio.NewReader(conn)
 	for {
+		conn.SetReadDeadline(time.Now().Add(b.HeartbeatInterval * 2))
 		msg, err := reader.ReadString('\n')
 		if err != nil {
-			log.Println("Connection closed")
+			log.Println("Connection closed or heartbeat timeout: ", err)
 			break
+		}
+
+		if strings.TrimSpace(msg) == "HEARTBEAT" {
+			b.mu.Lock()
+			b.LastHeartbeat[conn] = time.Now()
+			b.mu.Unlock()
+			log.Println("Received heartbeat")
+			continue
 		}
 
 		log.Printf("Received: %s\n", msg)
@@ -131,8 +156,29 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	}
 	b.mu.Lock()
 	delete(b.Connections, conn)
+	delete(b.LastHeartbeat, conn)
 	b.handleConsumerDisconnection(sessionID)
 	b.mu.Unlock()
+}
+
+func (b *Broker) sendHeartbeat(conn net.Conn) {
+	ticker := time.NewTicker(b.HeartbeatInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		b.mu.Lock()
+		if _, ok := b.Connections[conn]; !ok {
+			b.mu.Unlock()
+			return
+		}
+		b.mu.Unlock()
+
+		_, err := conn.Write([]byte("HEARTBEAT\n"))
+		if err != nil {
+			log.Println("Failed to send heartbeat:", err)
+			return
+		}
+	}
 }
 
 func (b *Broker) registerConsumer(consumerID, queue, sessionID string) {

@@ -4,10 +4,19 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/andrelcunha/ottermq/config"
 )
 
+var conf = &config.Config{
+	Port:              "5672",
+	Host:              "localhost",
+	HeartBeatInterval: 5,
+}
+
 func TestSaveMessage(t *testing.T) {
-	b := NewBroker()
+
+	b := NewBroker(conf)
 	queueName := "testQueue"
 	msg := Message{
 		ID:      "testMessage1",
@@ -32,7 +41,7 @@ func TestLoadMessages(t *testing.T) {
 		t.Fatalf("Failed to remove data/queues directory: %v", err)
 	}
 
-	b := NewBroker()
+	b := NewBroker(conf)
 	queueName := "testQueue"
 	msg := Message{
 		ID:      "testMessage1",
@@ -54,7 +63,7 @@ func TestLoadMessages(t *testing.T) {
 }
 
 func TestSaveBrokerState(t *testing.T) {
-	b := NewBroker()
+	b := NewBroker(conf)
 	b.createQueue("testQueue")
 	err := b.saveBrokerState()
 	if err != nil {
@@ -69,7 +78,7 @@ func TestSaveBrokerState(t *testing.T) {
 }
 
 func TestLoadBrokerState(t *testing.T) {
-	b := NewBroker()
+	b := NewBroker(conf)
 	b.createQueue("testQueue")
 	err := b.saveBrokerState()
 	if err != nil {
@@ -77,7 +86,7 @@ func TestLoadBrokerState(t *testing.T) {
 	}
 
 	// Create a new broker instance and load the state
-	b2 := NewBroker()
+	b2 := NewBroker(conf)
 	err = b2.loadBrokerState()
 	if err != nil {
 		t.Fatalf("Failed to load broker state: %v", err)
