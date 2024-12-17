@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -96,23 +97,18 @@ func (b *Broker) Start() {
 			log.Println("Failed to accept connection:", err)
 			continue
 		}
+		log.Println("New client waiting for connection: ", conn.RemoteAddr())
 		go b.handleConnection(conn)
 	}
 }
 
 func (b *Broker) handleConnection(conn net.Conn) {
-	defer conn.Close()
-	b.mu.Lock()
-	b.Connections[conn] = true
-	b.LastHeartbeat[conn] = time.Now()
-	b.ConnectedAt[conn] = time.Now()
-	b.mu.Unlock()
-	log.Println("New connection established")
+	defer func() {
+		conn.Close()
+		b.cleanupConnection(conn)
+	}()
 
-	sessionID := generateSessionID()
-	consumerID := conn.RemoteAddr().String()
-
-	b.registerConsumer(consumerID, "default", sessionID)
+	consumerID := b.registerConnection(conn)
 
 	go b.sendHeartbeat(conn)
 
@@ -121,7 +117,11 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		conn.SetReadDeadline(time.Now().Add(b.HeartbeatInterval * 2))
 		msg, err := reader.ReadString('\n')
 		if err != nil {
-			log.Println("Connection closed or heartbeat timeout: ", err)
+			if err == io.EOF {
+				log.Println("Connection closed by client")
+			} else {
+				log.Println("Connection closed or heartbeat timeout: ", err)
+			}
 			break
 		}
 
@@ -154,11 +154,44 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			break
 		}
 	}
+}
+
+func (b *Broker) registerConnection(conn net.Conn) string {
+	b.mu.Lock()
+	b.Connections[conn] = true
+	b.LastHeartbeat[conn] = time.Now()
+	b.ConnectedAt[conn] = time.Now()
+	b.mu.Unlock()
+	sessionID := generateSessionID()
+	consumerID := conn.RemoteAddr().String()
+
+	b.registerConsumer(consumerID, "default", sessionID)
+	log.Println("New connection registered")
+	return consumerID
+}
+
+func (b *Broker) cleanupConnection(conn net.Conn) {
+	log.Println("Cleaning connection")
 	b.mu.Lock()
 	delete(b.Connections, conn)
 	delete(b.LastHeartbeat, conn)
-	b.handleConsumerDisconnection(sessionID)
+	delete(b.ConnectedAt, conn)
 	b.mu.Unlock()
+	consumerID, ok := b.getSessionID(conn)
+	if ok {
+		b.handleConsumerDisconnection(consumerID)
+	}
+}
+
+func (b *Broker) getSessionID(conn net.Conn) (string, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for sessionID, consumerID := range b.ConsumerSessions {
+		if conn.RemoteAddr().String() == consumerID {
+			return sessionID, true
+		}
+	}
+	return "", false
 }
 
 func (b *Broker) sendHeartbeat(conn net.Conn) {
