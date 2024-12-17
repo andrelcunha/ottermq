@@ -46,10 +46,13 @@ async function CountMessages(name) {
 }
 
 async function addQueue(name) {
+    const queue = {
+        queue_name: name
+    }
     const response = await fetch('/api/queues', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
+        body: JSON.stringify(queue)
     });
     if (response.ok) fetchQueues();
 }

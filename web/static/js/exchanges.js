@@ -45,10 +45,14 @@ async function fetchExchanges() {
 }
 
 async function addExchange(name) {
+    const exchange = {
+        exchange_name: name,
+        exchange_type: "direct"
+    }
     const response = await fetch('/api/exchanges', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
+        body: JSON.stringify(exchange)
     });
     if (response.ok) fetchExchanges();
 }
@@ -79,19 +83,29 @@ async function fetchBindings(exchange) {
 }
 
 async function addBinding(exchange, routingKey, queue) {
+    const binding = {
+        exchange_name: exchange,
+        routing_key: routingKey,
+        queue_name: queue,
+    }
     const response = await fetch('/api/bindings', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({exchange_name: exchange, routing_key: routingKey, queue_name: queue})
+        body: JSON.stringify(binding)
     });
     if (response.ok) fetchBindings(exchange);
 }
 
 async function deleteBinding(exchange, routingKey, queue) {
+    const binding = {
+        exchange_name: exchange,
+        routing_key: routingKey,
+        queue_name: queue,
+    }
     const response = await fetch('/api/bindings', {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({exchange_name: exchange, routing_key: routingKey, queue_name: queue})
+        body: JSON.stringify(binding)
     });
     if (response.ok) fetchBindings(exchange);
 }
@@ -100,7 +114,7 @@ async function publishMessage(exchange, routingKey, message) {
     const response = await fetch('/api/messages', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({exchange_name: exchange, routing_key: routingKey, message})
+        body: JSON.stringify({exchange_name: exchange, routing_key: routingKey, message: message})
     });
     if (response.ok) alert('Message published successfully!');
 }

@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
@@ -66,7 +65,11 @@ func CreateQueue(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
-	log.Printf("Request Body: %+v", request)
+	if request.QueueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "queue name is required",
+		})
+	}
 	command := fmt.Sprintf("CREATE_QUEUE %s", request.QueueName)
 	response, err := utils.SendCommand(command)
 	if err != nil {
