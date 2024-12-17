@@ -37,7 +37,7 @@ async function fetchExchanges() {
             <td><b>${exchange}<b></td>
             <td>direct</td>
             <td>
-                <button onclick="deleteExchange('${exchange}')">Delete</button>
+                <button class='delete-button' onclick="deleteExchange('${exchange}')">Delete</button>
             </td>
         `;
         exchangesList.appendChild(row);

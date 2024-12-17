@@ -15,21 +15,25 @@ async function fetchConnections() {
         const fmt_date = formatDate(date)
 
         const row = document.createElement('tr');
-        const activeSSL = false
-        const sslChar = activeSSL? '●': '○'
+        const fmt_ssl = formatIsSSL(false);
         row.onclick = () => selectConnection(connInfo);
         row.innerHTML = `
             <td>localhost</td>
             <td><b>${connInfo.name}</b></td>
             <td>admin</td>
             <td><span class="small-green-square"> </span> running</td>
-            <td class='centered'>${sslChar}</td>
+            <td class='centered'>${fmt_ssl}</td>
             <td class='right'>1</td>
             <td class='right'>${heartbeat_in_seconds}s</td>
             <td class='right'><span class='show-time'>${fmt_time}</span></br><span class='show-date'>${fmt_date}</span></td>
         `;
         connectionsList.appendChild(row);
     };
+}
+
+function formatIsSSL(activeSSL) {
+    const sslChar = activeSSL ? '●' : '○';
+    return sslChar;
 }
 
 function getLastHeatbeatInSecs(last_heartbeat) {

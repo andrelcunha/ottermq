@@ -3,14 +3,17 @@ package utils
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"time"
 )
 
 var conn net.Conn
+var commandResponse = make(chan string)
 
 func SetConn(c net.Conn) {
 	conn = c
+	go listenForMessages()
 }
 
 func SendCommand(command string) (string, error) {
@@ -20,11 +23,26 @@ func SendCommand(command string) (string, error) {
 		return "", fmt.Errorf("failed to send command: %v", err)
 	}
 
-	response, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %v", err)
-	}
+	response := <-commandResponse
 	return response, nil
+}
+
+func listenForMessages() {
+	reader := bufio.NewReader(conn)
+	for {
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Failed to read message: ", err)
+			return
+		}
+
+		if message == "HEARTBEAT\n" {
+			log.Println("Received heartbeat")
+			continue
+		}
+
+		commandResponse <- message
+	}
 }
 
 func SendHeartbeat(heartbeatInterval time.Duration) {
@@ -34,20 +52,8 @@ func SendHeartbeat(heartbeatInterval time.Duration) {
 	for range ticker.C {
 		_, err := conn.Write([]byte("HEARTBEAT\n"))
 		if err != nil {
-			fmt.Println("Failed to send heartbeat:", err)
+			log.Println("Failed to send heartbeat:", err)
 			return
 		}
 	}
-
-	// // Get heartbeat from server
-	// buffer := make([]byte, 1024)
-	// for {
-	// 	n, err := conn.Read(buffer)
-	// 	if err != nil {
-	// 		fmt.Println("Connection closed:", err)
-	// 		return
-	// 	}
-	// 	message := string(buffer[:n])
-	// 	fmt.Println("Received:", message)
-	// }
 }

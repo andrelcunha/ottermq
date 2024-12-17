@@ -32,7 +32,7 @@ async function fetchQueues() {
             <td>0</td>
             <td>0</td>
             <td>
-                <button onclick="deleteQueue('${queue}')">Delete</button>
+                <button class='delete-button' onclick="deleteQueue('${queue}')">Delete</button>
             </td>
         `;
         queuesList.appendChild(row);

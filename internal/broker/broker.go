@@ -114,7 +114,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	b.registerConsumer(consumerID, "default", sessionID)
 
-	// go b.sendHeartbeat(conn)
+	go b.sendHeartbeat(conn)
 
 	reader := bufio.NewReader(conn)
 	for {
@@ -129,6 +129,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			b.mu.Lock()
 			b.LastHeartbeat[conn] = time.Now()
 			b.mu.Unlock()
+			log.Println("Received heartbeat")
 			continue
 		}
 
