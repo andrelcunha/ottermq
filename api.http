@@ -1,8 +1,19 @@
+@username = guest
+@password = guest
 @host = http://localhost:3000/api
 @queue_name = testQueue
 @exchange_name = testExchange
 @routing_key = testkey
 @message_id = cea37d9d-bd83-47aa-b29a-fc4554457b2c
+
+### Authenticate
+POST {{host}}/authenticate
+Content-Type: application/json
+
+{
+    "username": "{{username}}",
+    "password": "{{password}}"
+}
 
 ### List Queues
 GET {{host}}/queues

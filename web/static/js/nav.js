@@ -9,4 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
             link.classList.remove('active');
         }
     });
+    const username = document.getElementById('username');
+    const logoutContainer = document.querySelector('.logout-container');
+    if (username.textContent === '') {
+        logoutContainer.style.display = 'none'
+    }
 });

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -8,6 +9,7 @@ import (
 	_ "github.com/andrelcunha/ottermq/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
+	"github.com/andrelcunha/ottermq/web/middleware"
 
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
@@ -20,12 +22,15 @@ type WebServer struct {
 	brokerAddr        string
 	conn              net.Conn
 	heartbeatInterval time.Duration
+	config            *Config
 }
 
 type Config struct {
 	BrokerHost        string
 	BrokerPort        string
 	HeartbeatInterval int
+	Username          string
+	Password          string
 }
 
 func (ws *WebServer) Close() {
@@ -42,6 +47,7 @@ func NewWebServer(config *Config) (*WebServer, error) {
 		brokerAddr:        brokerAddr,
 		conn:              conn,
 		heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
+		config:            config,
 	}, nil
 }
 
@@ -66,13 +72,24 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	// Pass the connection to the utils package
 	utils.SetConn(ws.conn)
+	auth_command := fmt.Sprintf("AUTH %s %s",
+		ws.config.Username,
+		ws.config.Password,
+	)
+	utils.SendCommand(auth_command)
 
 	// set heartbeat
 	go utils.SendHeartbeat(ws.heartbeatInterval)
 
+	app.Get("/login", webui.LoginPage)
+	app.Post("/login", webui.Authenticate)
+
 	// API routes
 	apiGrp := app.Group("/api")
 	apiGrp.Get("/swagger/*", swagger.HandlerDefault)
+
+	apiGrp.Post("/authenticate", api.Authenticate)
+
 	apiGrp.Get("/queues", api.ListQueues)
 	apiGrp.Post("/queues", api.CreateQueue)
 	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
@@ -89,11 +106,11 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	apiGrp.Get("/connections", api.ListConnections)
 
 	// Web Interface Routes
-	webGrp := app.Group("/")
+	webGrp := app.Group("/", middleware.AuthRequired)
 	webGrp.Get("/", webui.Dashboard)
+	webGrp.Get("/logout", webui.Logout)
 	webGrp.Get("/overview", webui.Dashboard)
 	webGrp.Get("/connections", webui.ListConnections)
-
 	webGrp.Get("/exchanges", webui.ListExchanges)
 	webGrp.Get("/queues", webui.ListQueues)
 	// webGrp.Get("/settings", webui.Settings)

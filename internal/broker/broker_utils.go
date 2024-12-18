@@ -11,3 +11,7 @@ func (b *Broker) Shutdown() {
 		conn.Close()
 	}
 }
+
+func (b *Broker) authenticate(username, password string) bool {
+	return username == b.config.Username && password == b.config.Password
+}

@@ -107,12 +107,48 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		conn.Close()
 		b.cleanupConnection(conn)
 	}()
+	reader := bufio.NewReader(conn)
 
-	consumerID := b.registerConnection(conn)
+	b.registerConnection(conn)
+	for isAuthenticated := false; !isAuthenticated; {
+		msg, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Failed to read message:", err)
+			return
+		}
+		msg = strings.TrimSpace(msg)
+		parts := strings.Fields(msg)
+		if len(parts) != 3 || parts[0] != "AUTH" {
+			conn.Write([]byte("Invalid handshake\n"))
+			continue
+		}
+		username, password := parts[1], parts[2]
+		isAuthenticated = b.authenticate(username, password)
+		var response common.CommandResponse
+		if isAuthenticated {
+			response = common.CommandResponse{
+				Status:  "OK",
+				Message: fmt.Sprintf("User '%s' authenticated successfully", username),
+			}
+		} else {
+			response = common.CommandResponse{
+				Status:  "ERROR",
+				Message: "Invalid credentials",
+			}
+		}
+		responseJSON, err := json.Marshal(response)
+		if err != nil {
+			log.Println("Failed to marshal response:", err)
+			return
+		}
+		conn.Write(append(responseJSON, '\n'))
+	}
+
+	consumerID := b.registerSessionAndConsummer(conn)
 
 	go b.sendHeartbeat(conn)
 
-	reader := bufio.NewReader(conn)
+	// reader := bufio.NewReader(conn)
 	for {
 		conn.SetReadDeadline(time.Now().Add(b.HeartbeatInterval * 2))
 		msg, err := reader.ReadString('\n')
@@ -156,12 +192,15 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn) string {
+func (b *Broker) registerConnection(conn net.Conn) {
 	b.mu.Lock()
 	b.Connections[conn] = true
 	b.LastHeartbeat[conn] = time.Now()
 	b.ConnectedAt[conn] = time.Now()
 	b.mu.Unlock()
+}
+
+func (b *Broker) registerSessionAndConsummer(conn net.Conn) string {
 	sessionID := generateSessionID()
 	consumerID := conn.RemoteAddr().String()
 
@@ -262,9 +301,29 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 	}
 
 	switch parts[0] {
+	case "AUTH":
+		if len(parts) != 3 {
+			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+		}
+
+		username, password := parts[1], parts[2]
+		isAuthenticated := b.authenticate(username, password)
+		var response common.CommandResponse
+		if isAuthenticated {
+			response = common.CommandResponse{
+				Status:  "OK",
+				Message: fmt.Sprintf("User '%s' authenticated successfully", username),
+			}
+		} else {
+			response = common.CommandResponse{
+				Status:  "ERROR",
+				Message: "Invalid credentials",
+			}
+		}
+		return response, nil
+
 	case "CREATE_EXCHANGE":
 		if len(parts) != 3 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]
@@ -277,7 +336,6 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 
 	case "CREATE_QUEUE":
 		if len(parts) != 2 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		queueName := parts[1]
@@ -294,7 +352,6 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 
 	case "BIND_QUEUE":
 		if len(parts) < 3 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]
@@ -311,7 +368,6 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 
 	case "PUBLISH":
 		if len(parts) < 4 {
-			// return "", fmt.Errorf("Invalid %s command", parts[0])
 			return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 		}
 		exchangeName := parts[1]

@@ -10,11 +10,10 @@
     <header>
         <nav>
             <div class="text-2xl">OtterMQ</div>
-            <form>
-                <input type="text" placeholder="Username">
-                <input type="password" placeholder="Password">
-                <button type="submit">Login</button>
-            </form>
+            <div class="logout-container">
+                <p>User: <span id="username">{{.Username}}</span></p>
+                <a class="logout-button" href="/logout">Logout</a>
+            </div>
         </nav>
     </header>
     <nav class="bg-gray-700">

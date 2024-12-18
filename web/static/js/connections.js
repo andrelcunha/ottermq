@@ -45,10 +45,6 @@ function getLastHeatbeatInSecs(last_heartbeat) {
     return seconds;
 }
 
-function formatConnectedAt(connected_at) {
-    const date = new Date(connected_at)
-}
-
 function formatTime(date) {
     const hours = date.getHours().toString().padStart(2, '0')
     const minutes = date.getMinutes().toString().padStart(2, '0')
@@ -63,10 +59,8 @@ function formatDate(date) {
     return `${year}-${month}-${day}`
 }
 
-
 function selectConnection(connection) {
     document.getElementById('selected-connection').value = connection;
-    // document.getElementById('get-message').style.display = 'block';
 }
 
-setInterval(fetchConnections, 15000)
+setInterval(fetchConnections, 3000)

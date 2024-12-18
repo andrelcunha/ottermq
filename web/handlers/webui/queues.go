@@ -5,7 +5,10 @@ import (
 )
 
 func ListQueues(c *fiber.Ctx) error {
+	// get username from cookie
+	username := c.Cookies("username")
 	return c.Render("queues", fiber.Map{
-		"Title": "Queues",
+		"Title":    "Queues",
+		"Username": username,
 	})
 }

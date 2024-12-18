@@ -173,3 +173,30 @@ textarea {
     cursor: pointer;
     font-size: 0.8em;
 }
+
+.logout-button {
+    background-color: #ccc;
+    color: black;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+.logout-button:hover {
+    background-color: #ddd;
+    color: #333;
+}
+
+.logout-container {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
+
+.error-message {
+    color: red;
+    font-size: 0.8em;
+    margin-top: 4px;
+}

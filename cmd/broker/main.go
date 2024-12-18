@@ -14,6 +14,8 @@ func main() {
 		Port:              "5672",
 		Host:              "localhost",
 		HeartBeatInterval: 600,
+		Username:          "guest",
+		Password:          "guest",
 	}
 	b := broker.NewBroker(config)
 

@@ -22,7 +22,9 @@ func main() {
 	config := web.Config{
 		BrokerHost:        "localhost",
 		BrokerPort:        "5672",
-		HeartbeatInterval: 600,
+		HeartbeatInterval: 60,
+		Username:          "guest",
+		Password:          "guest",
 	}
 
 	webServer, err := web.NewWebServer(&config)
