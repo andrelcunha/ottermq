@@ -1,4 +1,4 @@
-**Main:**[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml) **Dev:**[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go_dev.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go_dev.yml)
+[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml)
 
 # OtterMq
 
