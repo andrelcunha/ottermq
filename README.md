@@ -1,4 +1,4 @@
-[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml)
+[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml) [![Docker Image CI](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml/badge.svg)](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml)
 
 # OtterMq
 
