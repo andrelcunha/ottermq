@@ -31,9 +31,11 @@ WORKDIR /app
 # Copy the built binaries from the builder stage
 COPY --from=builder /app/bin/ottermq .
 COPY --from=builder /app/bin/ottermq-webadmin .
+COPY --from=builder /app/web/static ./web/static
+COPY --from=builder /app/web/templates ./web/templates
 
-# Expose ports 8081 for the web admin and 5672 for the broker
-EXPOSE 8081
+# Expose ports 3000 for the web admin and 5672 for the broker
+EXPOSE 3000
 EXPOSE 5672
 
 # Command to run both broker and web admin binaries

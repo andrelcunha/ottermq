@@ -3,7 +3,6 @@ package webui
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/andrelcunha/ottermq/pkg/common"
 	"github.com/andrelcunha/ottermq/web/utils"
@@ -11,7 +10,6 @@ import (
 )
 
 func LoginPage(c *fiber.Ctx) error {
-	log.Println("Rendering login page")
 	return c.Render("login", fiber.Map{
 		"Title":   "Login",
 		"Message": "",
@@ -29,7 +27,6 @@ func Authenticate(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
-	log.Println("Response: ", response)
 	var commandResponse common.CommandResponse
 	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -46,10 +43,8 @@ func Authenticate(c *fiber.Ctx) error {
 			Name:  "username",
 			Value: username,
 		})
-		log.Println("Authentication successful, redirecting to /")
 		return c.Redirect("/")
 	} else {
-		log.Println("Authentication failed, rendering login page with error message")
 		return c.Render("login", fiber.Map{
 			"Title":   "Login",
 			"Message": commandResponse.Message,

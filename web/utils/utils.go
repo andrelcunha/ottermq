@@ -3,7 +3,6 @@ package utils
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"time"
 )
@@ -32,12 +31,10 @@ func listenForMessages() {
 	for {
 		message, err := reader.ReadString('\n')
 		if err != nil {
-			log.Println("Failed to read message: ", err)
 			return
 		}
 
 		if message == "HEARTBEAT\n" {
-			log.Println("Received heartbeat")
 			continue
 		}
 
@@ -52,7 +49,6 @@ func SendHeartbeat(heartbeatInterval time.Duration) {
 	for range ticker.C {
 		_, err := conn.Write([]byte("HEARTBEAT\n"))
 		if err != nil {
-			log.Println("Failed to send heartbeat:", err)
 			return
 		}
 	}

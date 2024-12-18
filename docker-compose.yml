@@ -3,7 +3,7 @@ services:
   ottermq:
     build: .
     ports:
-      - "8081:8081"
+      - "3000:3000"
       - "5672:5672"
     volumes:
       - data:/app/data

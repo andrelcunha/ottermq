@@ -67,7 +67,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	app.Use(utils.CORSMiddleware())
 
 	app.Use(logger.New(logger.Config{
-		Output: logFile,
+		// Output: logFile,
 	}))
 
 	// Pass the connection to the utils package
