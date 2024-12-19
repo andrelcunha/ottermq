@@ -11,7 +11,7 @@ import (
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body persistdb.UserCreateDtO true "User details"
+// @Param user body persistdb.UserCreateDTO true "User details"
 // @Success 200 {object} fiber.Map
 // @Security ApiKeyAuth
 // @Router /api/admin/users [post]

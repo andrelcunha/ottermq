@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/andrelcunha/ottermq/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
@@ -37,7 +36,7 @@ func (ws *WebServer) Close() {
 
 func NewWebServer(config *Config) (*WebServer, error) {
 	brokerAddr := config.BrokerHost + ":" + config.BrokerPort
-	conn, err := net.Dial("tcp", brokerAddr)
+	conn, err := getConnection(brokerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +60,12 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	swaggerCfg := swagger.Config{
 		BasePath: "/api/",
-		FilePath: "./docs/swagger.json",
+		FilePath: "./web/static/docs/swagger.json",
 		Path:     "docs",
 		Title:    "OtterMQ API",
 	}
 	swaggerHandler := swagger.New(swaggerCfg)
 	app.Use(swaggerHandler)
-	// apiGrp.Get("/swagger/*", swaggerHandler)
 
 	apiGrp.Post("/authenticate", api.Authenticate)
 
