@@ -4,11 +4,14 @@ CLIENT_BINARY_NAME=ottermq-client
 WEBADMIN_BINARY_NAME=ottermq-webadmin
 BUILD_DIR=bin
 
-build:
+build: docs
 	@mkdir -p $(BUILD_DIR)
 	@go build -ldflags "-X got_it/cmd.version=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./cmd/broker/main.go
 	@go build -o ./$(BUILD_DIR)/$(CLIENT_BINARY_NAME) ./cmd/cli/main.go
 	@go build -o ./$(BUILD_DIR)/$(WEBADMIN_BINARY_NAME) ./cmd/webadmin/main.go
+
+docs:
+	@swag init --parseInternal  -g ../../../cmd/webadmin/main.go --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/static/docs -ot json
 
 install:
 	@mkdir -p $(shell go env GOPATH)/bin
@@ -22,4 +25,4 @@ run: build
 clean:
 	@rm -f $(BUILD_DIR)/$(BINARY_NAME) $(BUILD_DIR)/$(CLIENT_BINARY_NAME) $(BUILD_DIR)/$(WEBADMIN_BINARY_NAME)
 
-.PHONY: build install clean run
+.PHONY: build install clean run docs
