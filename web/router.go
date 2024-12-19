@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"time"
@@ -12,11 +11,9 @@ import (
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
 	"github.com/andrelcunha/ottermq/web/middleware"
 
-	"github.com/andrelcunha/ottermq/web/utils"
+	jwtware "github.com/gofiber/contrib/jwt"
+	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/swagger"
-	"github.com/gofiber/template/html/v2"
 )
 
 type WebServer struct {
@@ -53,41 +50,24 @@ func NewWebServer(config *Config) (*WebServer, error) {
 }
 
 func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
-	engine := html.New("./web/templates", ".html")
-
-	config := fiber.Config{
-		Prefork:               false,
-		AppName:               "ottermq-webadmin",
-		Views:                 engine,
-		ViewsLayout:           "layout",
-		DisableStartupMessage: false,
-	}
-	app := fiber.New(config)
-
-	// Enable CORS
-	app.Use(utils.CORSMiddleware())
-
-	app.Use(logger.New(logger.Config{
-		// Output: logFile,
-	}))
-
-	// Pass the connection to the utils package
-	utils.SetConn(ws.conn)
-	auth_command := fmt.Sprintf("AUTH %s %s",
-		ws.config.Username,
-		ws.config.Password,
-	)
-	utils.SendCommand(auth_command)
-
-	// set heartbeat
-	go utils.SendHeartbeat(ws.heartbeatInterval)
+	ws.configBrokerClient()
+	app := ws.configServer()
 
 	app.Get("/login", webui.LoginPage)
 	app.Post("/login", webui.Authenticate)
 
 	// API routes
-	apiGrp := app.Group("/api")
-	apiGrp.Get("/swagger/*", swagger.HandlerDefault)
+	apiGrp := app.Group("/api/")
+
+	swaggerCfg := swagger.Config{
+		BasePath: "/api/",
+		FilePath: "./docs/swagger.json",
+		Path:     "docs",
+		Title:    "OtterMQ API",
+	}
+	swaggerHandler := swagger.New(swaggerCfg)
+	app.Use(swaggerHandler)
+	// apiGrp.Get("/swagger/*", swaggerHandler)
 
 	apiGrp.Post("/authenticate", api.Authenticate)
 
@@ -108,7 +88,11 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	apiGrp.Post("/login", api_admin.Login)
 
+	// Admin API routes
 	apiAdminGrp := apiGrp.Group("/admin")
+	apiAdminGrp.Use(jwtware.New(jwtware.Config{
+		SigningKey: jwtware.SigningKey{Key: []byte("secret")},
+	}))
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
 

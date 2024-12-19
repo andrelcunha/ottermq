@@ -11,16 +11,20 @@ import (
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body User true "User details"
+// @Param user body persistdb.UserCreateDtO true "User details"
 // @Success 200 {object} fiber.Map
-// @Failure 400 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
+// @Security ApiKeyAuth
 // @Router /api/admin/users [post]
 func AddUser(c *fiber.Ctx) error {
-	var user persistdb.User
+	var user persistdb.UserCreateDTO
 	if err := c.BodyParser(&user); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
+		})
+	}
+	if user.Password != user.ConfirmPassword {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Passwords do not match",
 		})
 	}
 	err := persistdb.OpenDB()
@@ -47,7 +51,7 @@ func AddUser(c *fiber.Ctx) error {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Success 200 {object} []User
+// @Success 200 {object} []persistdb.User
 // @Failure 500 {object} fiber.Map
 // @Router /api/admin/users [get]
 func GetUsers(c *fiber.Ctx) error {
@@ -73,7 +77,7 @@ func GetUsers(c *fiber.Ctx) error {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body User true "User details"
+// @Param user body persistdb.User true "User details"
 // @Success 200 {object} fiber.Map
 // @Failure 401 {object} fiber.Map
 // @Failure 500 {object} fiber.Map

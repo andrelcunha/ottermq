@@ -44,9 +44,94 @@ definitions:
       routing_key:
         type: string
     type: object
+  persistdb.User:
+    properties:
+      id:
+        type: integer
+      password:
+        type: string
+      role_id:
+        type: integer
+      username:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
+  /api/admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Login
+      parameters:
+      - description: User details
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/persistdb.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Login
+      tags:
+      - users
+  /api/admin/users:
+    get:
+      consumes:
+      - application/json
+      description: Get all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/persistdb.User'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: Get all users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Add a user
+      parameters:
+      - description: User details
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/persistdb.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a user
+      tags:
+      - users
   /api/bindings:
     delete:
       consumes:
@@ -135,6 +220,25 @@ paths:
       summary: List all bindings for an exchange
       tags:
       - bindings
+  /api/connections:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all connections
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      summary: List all connections
+      tags:
+      - connections
   /api/exchanges:
     get:
       consumes:

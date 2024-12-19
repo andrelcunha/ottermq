@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func AddUser(user User) error {
+func AddUser(user UserCreateDTO) error {
 	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
 		log.Printf("Failed to hash password: %v\n", err)
@@ -51,23 +51,23 @@ func GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func GetUserByUsername(username string) (UserDTO, error) {
+func GetUserByUsername(username string) (UserListDTO, error) {
 	var user User
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
 		log.Printf("Failed to query user: %v\n", err)
-		return UserDTO{}, err
+		return UserListDTO{}, err
 	}
 
 	return mapUserToUserDTO(user)
 }
 
-func mapUserToUserDTO(user User) (UserDTO, error) {
+func mapUserToUserDTO(user User) (UserListDTO, error) {
 	role, err := GetRoleByID(user.RoleID)
 	if err != nil {
-		return UserDTO{}, err
+		return UserListDTO{}, err
 	}
-	return UserDTO{
+	return UserListDTO{
 		ID:          user.ID,
 		Username:    user.Username,
 		HasPassword: true,
@@ -75,7 +75,7 @@ func mapUserToUserDTO(user User) (UserDTO, error) {
 	}, nil
 }
 
-func GenerateJWTToken(user UserDTO) (string, error) {
+func GenerateJWTToken(user UserListDTO) (string, error) {
 	// convert user to json
 	jsonUser, err := json.Marshal(user)
 	if err != nil {

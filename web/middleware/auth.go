@@ -13,6 +13,8 @@ func AuthRequired(c *fiber.Ctx) error {
 	if strings.HasPrefix(currentPath, "/static/") ||
 		strings.HasPrefix(currentPath, "/css/") ||
 		strings.HasPrefix(currentPath, "/js/") ||
+		strings.HasPrefix(currentPath, "/images/") ||
+		strings.HasPrefix(currentPath, "/api/") ||
 		currentPath == "/favicon.ico" ||
 		currentPath == "/login" {
 		return c.Next()
