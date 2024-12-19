@@ -9,13 +9,16 @@ import (
 
 var db *sql.DB
 
+const dbPath = "./data/ottermq.db"
+
 func InitDB() {
 	var err error
-	db, err = sql.Open("sqlite3", "./data/ottermq.db")
+	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	createTables()
+	db.Close()
 }
 
 func createTables() {
@@ -70,4 +73,13 @@ func createTables() {
 
 func CloseDB() {
 	db.Close()
+}
+
+func OpenDB() error {
+	var err error
+	db, err = sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Println("Error opening database: ", err.Error())
+	}
+	return err
 }

@@ -23,3 +23,10 @@ type RolePermission struct {
 	RoleID       int `json:"role_id"`
 	PermissionID int `json:"permission_id"`
 }
+
+type UserDTO struct {
+	ID          int    `json:"id"`
+	Username    string `json:"username"`
+	HasPassword bool   `json:"has_password"`
+	Role        string `json:"role"`
+}

@@ -19,3 +19,13 @@ func AddDefaultRoles() {
 		}
 	}
 }
+
+func GetRoleByID(id int) (Role, error) {
+	var role Role
+	err := db.QueryRow("SELECT id, name, description FROM roles WHERE id = ?", id).Scan(&role.ID, &role.Name, &role.Description)
+	if err != nil {
+		log.Printf("Failed to query role: %v\n", err)
+		return Role{}, err
+	}
+	return role, nil
+}
