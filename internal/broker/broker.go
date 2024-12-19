@@ -296,7 +296,6 @@ func (b *Broker) handleConsumerDisconnection(sessionID string) {
 func (b *Broker) processCommand(command, consumerID string) (common.CommandResponse, error) {
 	parts := strings.Fields(command)
 	if len(parts) == 0 {
-		// return "", fmt.Errorf("Invalid command")
 		return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 	}
 

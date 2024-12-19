@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/andrelcunha/ottermq/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
+	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
 	"github.com/andrelcunha/ottermq/web/middleware"
 
@@ -104,6 +105,12 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	apiGrp.Post("/bindings", api.BindQueue)
 	apiGrp.Delete("/bindings", api.DeleteBinding)
 	apiGrp.Get("/connections", api.ListConnections)
+
+	apiGrp.Post("/login", api_admin.Login)
+
+	apiAdminGrp := apiGrp.Group("/admin")
+	apiAdminGrp.Get("/users", api_admin.GetUsers)
+	apiAdminGrp.Post("/users", api_admin.AddUser)
 
 	// Web Interface Routes
 	webGrp := app.Group("/", middleware.AuthRequired)

@@ -45,6 +45,7 @@ func Authenticate(c *fiber.Ctx) error {
 		})
 		return c.Redirect("/")
 	} else {
+		c.Status(fiber.StatusUnauthorized)
 		return c.Render("login", fiber.Map{
 			"Title":   "Login",
 			"Message": commandResponse.Message,

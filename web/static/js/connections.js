@@ -63,4 +63,4 @@ function selectConnection(connection) {
     document.getElementById('selected-connection').value = connection;
 }
 
-setInterval(fetchConnections, 3000)
+setInterval(fetchConnections, 15000)

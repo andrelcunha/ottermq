@@ -121,3 +121,18 @@ GET {{host}}/connections
 Content-Type: application/json
 
 ###
+
+###################### Admin ######################
+GET {{host}}/admin/users
+Content-Type: application/json
+
+###
+
+### Login JWT
+POST {{host}}/login
+Content-Type: application/json
+
+{
+    "username": "{{username}}",
+    "password": "{{password}}"
+}
