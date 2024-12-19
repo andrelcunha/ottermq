@@ -2,7 +2,9 @@
 FROM golang:1.23-alpine AS builder
 
 # Install build tools
-RUN apk add --no-cache make git
+RUN apk add --no-cache make git gcc g++
+
+ENV CGO_ENABLED 1
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -13,8 +15,14 @@ COPY go.mod go.sum ./
 # Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
 
+# Download swaggo for generating swagger docs
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
 # Copy the source from the current directory to the Working Directory inside the container
 COPY . .
+
+# Generate swagger docs
+RUN make docs
 
 # Build the Go app using the Makefile
 RUN make build
