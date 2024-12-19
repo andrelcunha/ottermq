@@ -28,7 +28,7 @@ func main() {
 		persistdb.InitDB()
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
-		user := persistdb.User{Username: "guest", Password: "guest", RoleID: 1}
+		user := persistdb.UserCreateDTO{Username: "guest", Password: "guest", RoleID: 1}
 		persistdb.AddUser(user)
 		persistdb.CloseDB()
 	}
