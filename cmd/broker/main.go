@@ -7,6 +7,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/broker"
+	"github.com/andrelcunha/ottermq/pkg/persistdb"
 )
 
 func main() {
@@ -20,6 +21,17 @@ func main() {
 	b := broker.NewBroker(config)
 
 	log.Println("OtterMq is starting...")
+
+	// verify if the database file exists
+	if _, err := os.Stat("./data/ottermq.db"); os.IsNotExist(err) {
+		log.Println("Database file not found. Creating a new one...")
+		persistdb.InitDB()
+		persistdb.AddDefaultRoles()
+		persistdb.AddDefaultPermissions()
+		user := persistdb.User{Username: "guest", Password: "guest", RoleID: 1}
+		persistdb.AddUser(user)
+		persistdb.CloseDB()
+	}
 	go b.Start()
 
 	stop := make(chan os.Signal, 1)
