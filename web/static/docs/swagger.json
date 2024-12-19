@@ -105,7 +105,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/persistdb.User"
+                            "$ref": "#/definitions/persistdb.UserCreateDTO"
                         }
                     }
                 ],
@@ -775,6 +775,23 @@
                     "type": "string"
                 },
                 "role_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "persistdb.UserCreateDTO": {
+            "type": "object",
+            "properties": {
+                "confirm_password": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "role": {
                     "type": "integer"
                 },
                 "username": {
