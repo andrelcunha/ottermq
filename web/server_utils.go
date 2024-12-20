@@ -11,12 +11,14 @@ func getConnection(brokerAddr string) (net.Conn, error) {
 	var conn net.Conn
 	err := error(nil)
 	tries := 1
+	log.Printf("Connecting to %s\n", brokerAddr)
 	for {
 		if tries > 3 {
 			return nil, fmt.Errorf("Broker did not respond after 3 retries")
 		}
 		conn, err = net.Dial("tcp", brokerAddr)
 		if err == nil {
+			log.Println("Connected.")
 			break
 		}
 		wait := 3 * tries

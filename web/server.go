@@ -10,7 +10,6 @@ import (
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
 	"github.com/andrelcunha/ottermq/web/middleware"
 
-	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
 )
@@ -28,6 +27,7 @@ type Config struct {
 	HeartbeatInterval int
 	Username          string
 	Password          string
+	JwtKey            string
 }
 
 func (ws *WebServer) Close() {
@@ -62,13 +62,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	ws.AddApi(app)
 
-	// Admin API routes
-	apiAdminGrp := app.Group("/api/admin")
-	apiAdminGrp.Use(jwtware.New(jwtware.Config{
-		SigningKey: jwtware.SigningKey{Key: []byte("secret")},
-	}))
-	apiAdminGrp.Get("/users", api_admin.GetUsers)
-	apiAdminGrp.Post("/users", api_admin.AddUser)
+	ws.AddAdminApi(app)
 
 	ws.AddUI(app)
 
@@ -117,4 +111,12 @@ func (ws *WebServer) AddUI(app *fiber.App) {
 	webGrp.Get("/exchanges", webui.ListExchanges)
 	webGrp.Get("/queues", webui.ListQueues)
 	// webGrp.Get("/settings", webui.Settings)
+}
+
+func (ws *WebServer) AddAdminApi(app *fiber.App) {
+	// Admin API routes
+	apiAdminGrp := app.Group("/api/admin")
+	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
+	apiAdminGrp.Get("/users", api_admin.GetUsers)
+	apiAdminGrp.Post("/users", api_admin.AddUser)
 }
