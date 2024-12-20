@@ -4,7 +4,7 @@ CLIENT_BINARY_NAME=ottermq-client
 WEBADMIN_BINARY_NAME=ottermq-webadmin
 BUILD_DIR=bin
 
-build: docs
+build: 
 	@mkdir -p $(BUILD_DIR)
 	@go build -ldflags "-X got_it/cmd.version=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./cmd/broker/main.go
 	@go build -o ./$(BUILD_DIR)/$(CLIENT_BINARY_NAME) ./cmd/cli/main.go

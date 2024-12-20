@@ -2,14 +2,16 @@ package web
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/andrelcunha/ottermq/web/middleware"
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/template/html/v2"
 )
 
-func (ws *WebServer) configServer() *fiber.App {
+func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 	engine := html.New("./web/templates", ".html")
 
 	config := fiber.Config{
@@ -17,15 +19,15 @@ func (ws *WebServer) configServer() *fiber.App {
 		AppName:               "ottermq-webadmin",
 		Views:                 engine,
 		ViewsLayout:           "layout",
-		DisableStartupMessage: false,
+		DisableStartupMessage: true,
 	}
 	app := fiber.New(config)
 
 	// Enable CORS
-	app.Use(utils.CORSMiddleware())
+	app.Use(middleware.CORSMiddleware())
 
 	app.Use(logger.New(logger.Config{
-		// Output: logFile,
+		Output: logFile,
 	}))
 	return app
 }

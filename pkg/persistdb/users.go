@@ -12,6 +12,8 @@ import (
 )
 
 func AddUser(user UserCreateDTO) error {
+	OpenDB()
+	defer CloseDB()
 	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
 		log.Printf("Failed to hash password: %v\n", err)
@@ -25,12 +27,9 @@ func AddUser(user UserCreateDTO) error {
 	return nil
 }
 
-func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
 func GetUsers() ([]User, error) {
+	OpenDB()
+	defer CloseDB()
 	rows, err := db.Query("SELECT id, username, role_id FROM users")
 	if err != nil {
 		log.Printf("Failed to query users: %v\n", err)
@@ -52,6 +51,8 @@ func GetUsers() ([]User, error) {
 }
 
 func GetUserByUsername(username string) (UserListDTO, error) {
+	OpenDB()
+	defer CloseDB()
 	var user User
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
@@ -60,19 +61,6 @@ func GetUserByUsername(username string) (UserListDTO, error) {
 	}
 
 	return mapUserToUserDTO(user)
-}
-
-func mapUserToUserDTO(user User) (UserListDTO, error) {
-	role, err := GetRoleByID(user.RoleID)
-	if err != nil {
-		return UserListDTO{}, err
-	}
-	return UserListDTO{
-		ID:          user.ID,
-		Username:    user.Username,
-		HasPassword: true,
-		Role:        role.Name,
-	}, nil
 }
 
 func GenerateJWTToken(user UserListDTO) (string, error) {
@@ -98,4 +86,22 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte("secret"))
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func mapUserToUserDTO(user User) (UserListDTO, error) {
+	role, err := GetRoleByID(user.RoleID)
+	if err != nil {
+		return UserListDTO{}, err
+	}
+	return UserListDTO{
+		ID:          user.ID,
+		Username:    user.Username,
+		HasPassword: true,
+		Role:        role.Name,
+	}, nil
 }

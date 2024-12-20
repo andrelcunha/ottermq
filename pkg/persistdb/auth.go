@@ -7,6 +7,8 @@ import (
 )
 
 func AuthenticateUser(username, password string) (bool, error) {
+	OpenDB()
+	defer CloseDB()
 	var storedPassword string
 	err := db.QueryRow("SELECT password FROM users WHERE username = ?", username).Scan(&storedPassword)
 	if err != nil {

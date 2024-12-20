@@ -25,6 +25,7 @@ func main() {
 		HeartbeatInterval: 60,
 		Username:          "guest",
 		Password:          "guest",
+		JwtKey:            "secret",
 	}
 
 	webServer, err := web.NewWebServer(&config)
