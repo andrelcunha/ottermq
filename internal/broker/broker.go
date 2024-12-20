@@ -15,6 +15,8 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common"
 )
 
+const default_exchange = "_OTTERMQ_DEFAULT_EXCHANGE_"
+
 type Broker struct {
 	Connections       map[net.Conn]bool          `json:"-"`
 	Exchanges         map[string]*Exchange       `json:"exchanges"`
@@ -75,9 +77,7 @@ func NewBroker(config *config.Config) *Broker {
 		config:            config,
 	}
 	b.loadBrokerState()
-	b.createExchange("default", DIRECT)
-	b.createQueue("default")
-	b.bindQueue("default", "default", "default")
+	b.createExchange(default_exchange, DIRECT)
 	return b
 }
 
@@ -165,7 +165,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			b.mu.Lock()
 			b.LastHeartbeat[conn] = time.Now()
 			b.mu.Unlock()
-			log.Println("Received heartbeat")
+			// log.Println("Received heartbeat")
 			continue
 		}
 
@@ -343,7 +343,7 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
 		// Bind the queue to the default exchange with the same name as the queue
-		err = b.bindQueue("default", queueName, queueName)
+		err = b.bindToDefaultExchange(queueName)
 		if err != nil {
 			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
@@ -372,6 +372,7 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 		exchangeName := parts[1]
 		routingKey := parts[2]
 		message := strings.Join(parts[3:], " ")
+		fmt.Printf("DEBUG: Publishing to exchange '%s', routing key '%s', msg '%s' \n", exchangeName, routingKey, message)
 		msgId, err := b.publish(exchangeName, routingKey, message)
 		if err != nil {
 			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil

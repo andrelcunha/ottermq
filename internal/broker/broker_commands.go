@@ -167,7 +167,7 @@ func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if exchangeName == "" {
-		exchangeName = "default"
+		exchangeName = default_exchange
 	}
 
 	// Find the exchange
@@ -184,12 +184,12 @@ func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 
 	switch exchange.Typ {
 	case DIRECT:
-		if exchangeName == "default" {
-			log.Printf("Binding queue %s to %s exchange", queueName, exchangeName)
-			routingKey = queueName
-		} else {
-			delete(exchange.Bindings, queueName)
+		for _, q := range exchange.Bindings[routingKey] {
+			if q.Name == queueName {
+				return fmt.Errorf("Queue %s already binded to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+			}
 		}
+
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
 	case FANOUT:
 		exchange.Queues[queueName] = queue
@@ -202,6 +202,11 @@ func (b *Broker) bindQueue(exchangeName, queueName, routingKey string) error {
 	}
 
 	return nil
+}
+
+// bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
+func (b *Broker) bindToDefaultExchange(queueName string) error {
+	return b.bindQueue(default_exchange, queueName, queueName)
 }
 
 func (b *Broker) listExchanges() []string {
