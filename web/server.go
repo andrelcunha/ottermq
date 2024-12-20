@@ -52,23 +52,33 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	ws.configBrokerClient()
 	app := ws.configServer()
 
+	ws.AddSwagger(app)
+
+	// Serve static files
+	app.Static("/", "./web/static")
+
 	app.Get("/login", webui.LoginPage)
 	app.Post("/login", webui.Authenticate)
 
+	ws.AddApi(app)
+
+	// Admin API routes
+	apiAdminGrp := app.Group("/api/admin")
+	apiAdminGrp.Use(jwtware.New(jwtware.Config{
+		SigningKey: jwtware.SigningKey{Key: []byte("secret")},
+	}))
+	apiAdminGrp.Get("/users", api_admin.GetUsers)
+	apiAdminGrp.Post("/users", api_admin.AddUser)
+
+	ws.AddUI(app)
+
+	return app
+}
+
+func (ws *WebServer) AddApi(app *fiber.App) {
 	// API routes
 	apiGrp := app.Group("/api/")
-
-	swaggerCfg := swagger.Config{
-		BasePath: "/api/",
-		FilePath: "./web/static/docs/swagger.json",
-		Path:     "docs",
-		Title:    "OtterMQ API",
-	}
-	swaggerHandler := swagger.New(swaggerCfg)
-	app.Use(swaggerHandler)
-
 	apiGrp.Post("/authenticate", api.Authenticate)
-
 	apiGrp.Get("/queues", api.ListQueues)
 	apiGrp.Post("/queues", api.CreateQueue)
 	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
@@ -83,17 +93,21 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	apiGrp.Post("/bindings", api.BindQueue)
 	apiGrp.Delete("/bindings", api.DeleteBinding)
 	apiGrp.Get("/connections", api.ListConnections)
-
 	apiGrp.Post("/login", api_admin.Login)
+}
 
-	// Admin API routes
-	apiAdminGrp := apiGrp.Group("/admin")
-	apiAdminGrp.Use(jwtware.New(jwtware.Config{
-		SigningKey: jwtware.SigningKey{Key: []byte("secret")},
-	}))
-	apiAdminGrp.Get("/users", api_admin.GetUsers)
-	apiAdminGrp.Post("/users", api_admin.AddUser)
+func (ws *WebServer) AddSwagger(app *fiber.App) {
+	swaggerCfg := swagger.Config{
+		BasePath: "/api/",
+		FilePath: "./web/static/docs/swagger.json",
+		Path:     "docs",
+		Title:    "OtterMQ API",
+	}
+	swaggerHandler := swagger.New(swaggerCfg)
+	app.Use(swaggerHandler)
+}
 
+func (ws *WebServer) AddUI(app *fiber.App) {
 	// Web Interface Routes
 	webGrp := app.Group("/", middleware.AuthRequired)
 	webGrp.Get("/", webui.Dashboard)
@@ -103,9 +117,4 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	webGrp.Get("/exchanges", webui.ListExchanges)
 	webGrp.Get("/queues", webui.ListQueues)
 	// webGrp.Get("/settings", webui.Settings)
-
-	// Serve static files
-	app.Static("/", "./web/static")
-
-	return app
 }

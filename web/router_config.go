@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 
+	"github.com/andrelcunha/ottermq/web/middleware"
 	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -17,12 +18,12 @@ func (ws *WebServer) configServer() *fiber.App {
 		AppName:               "ottermq-webadmin",
 		Views:                 engine,
 		ViewsLayout:           "layout",
-		DisableStartupMessage: false,
+		DisableStartupMessage: true,
 	}
 	app := fiber.New(config)
 
 	// Enable CORS
-	app.Use(utils.CORSMiddleware())
+	app.Use(middleware.CORSMiddleware())
 
 	app.Use(logger.New(logger.Config{
 		// Output: logFile,
