@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/andrelcunha/ottermq/web/middleware"
 	"github.com/andrelcunha/ottermq/web/utils"
@@ -10,7 +11,7 @@ import (
 	"github.com/gofiber/template/html/v2"
 )
 
-func (ws *WebServer) configServer() *fiber.App {
+func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 	engine := html.New("./web/templates", ".html")
 
 	config := fiber.Config{
@@ -26,7 +27,7 @@ func (ws *WebServer) configServer() *fiber.App {
 	app.Use(middleware.CORSMiddleware())
 
 	app.Use(logger.New(logger.Config{
-		// Output: logFile,
+		Output: logFile,
 	}))
 	return app
 }

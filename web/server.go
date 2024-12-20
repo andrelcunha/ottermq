@@ -50,7 +50,7 @@ func NewWebServer(config *Config) (*WebServer, error) {
 
 func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	ws.configBrokerClient()
-	app := ws.configServer()
+	app := ws.configServer(logFile)
 
 	ws.AddSwagger(app)
 
