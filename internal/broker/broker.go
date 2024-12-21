@@ -18,10 +18,10 @@ import (
 const default_exchange = "_OTTERMQ_DEFAULT_EXCHANGE_"
 
 type Broker struct {
-	Connections       map[net.Conn]bool          `json:"-"`
-	Exchanges         map[string]*Exchange       `json:"exchanges"`
-	Queues            map[string]*Queue          `json:"queues"`
-	UnackMsgs         map[string]map[string]bool `json:"unacked_messages"`
+	Connections map[net.Conn]bool    `json:"-"`
+	Exchanges   map[string]*Exchange `json:"exchanges"`
+	Queues      map[string]*Queue    `json:"queues"`
+	// UnackMsgs         map[string]map[string]bool `json:"unacked_messages"`
 	Consumers         map[string]*Consumer       `json:"consumers"`
 	ConsumerSessions  map[string]string          `json:"consumer_sessions"`
 	ConsumerUnackMsgs map[string]map[string]bool `json:"consumer_unacked_messages"`
@@ -46,16 +46,6 @@ const (
 	FANOUT ExchangeType = "fanout"
 )
 
-type Queue struct {
-	Name     string       `json:"name"`
-	messages chan Message `json:"-"`
-}
-
-type Message struct {
-	ID      string `json:"id"`
-	Content string `json:"content"`
-}
-
 type Consumer struct {
 	ID        string `json:"id"`
 	Queue     string `json:"queue"`
@@ -64,10 +54,10 @@ type Consumer struct {
 
 func NewBroker(config *config.Config) *Broker {
 	b := &Broker{
-		Connections:       make(map[net.Conn]bool),
-		Exchanges:         make(map[string]*Exchange),
-		Queues:            make(map[string]*Queue),
-		UnackMsgs:         make(map[string]map[string]bool),
+		Connections: make(map[net.Conn]bool),
+		Exchanges:   make(map[string]*Exchange),
+		Queues:      make(map[string]*Queue),
+		// UnackMsgs:         make(map[string]map[string]bool),
 		Consumers:         make(map[string]*Consumer),
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]bool),
@@ -282,9 +272,11 @@ func (b *Broker) handleConsumerDisconnection(sessionID string) {
 		return
 	}
 
+	// requeue unacknowledged messages
 	for msgID := range b.ConsumerUnackMsgs[consumerID] {
 		if queue, ok := b.Queues[consumer.Queue]; ok {
-			queue.messages <- Message{ID: msgID}
+			// queue.messages <- Message{ID: msgID}
+			queue.ReQueue(Message{ID: msgID})
 		}
 	}
 
@@ -372,12 +364,10 @@ func (b *Broker) processCommand(command, consumerID string) (common.CommandRespo
 		exchangeName := parts[1]
 		routingKey := parts[2]
 		message := strings.Join(parts[3:], " ")
-		fmt.Printf("DEBUG: Publishing to exchange '%s', routing key '%s', msg '%s' \n", exchangeName, routingKey, message)
 		msgId, err := b.publish(exchangeName, routingKey, message)
 		if err != nil {
 			return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 		}
-		// create type message response with message id
 		var data struct {
 			MessageID string `json:"message_id"`
 		}

@@ -25,15 +25,15 @@ func (b *Broker) acknowledge(queueName, consumerID, msgID string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.UnackMsgs[queueName] == nil {
-		return fmt.Errorf("no unack messages for queue %s", queueName)
-	}
-	if _, ok := b.UnackMsgs[queueName][msgID]; !ok {
-		return fmt.Errorf("Message ID %s not found in unack messages", msgID)
-	}
-	delete(b.UnackMsgs[queueName], msgID)
+	// if b.UnackMsgs[queueName] == nil {
+	// 	return fmt.Errorf("no unack messages for queue %s", queueName)
+	// }
+	// if _, ok := b.UnackMsgs[queueName][msgID]; !ok {
+	// 	return fmt.Errorf("Message ID %s not found in unack messages", msgID)
+	// }
+	// delete(b.UnackMsgs[queueName], msgID)
 	delete(b.ConsumerUnackMsgs[consumerID], msgID)
-	// b.saveBrokerState()
+	b.saveBrokerState()
 	return nil
 }
 
@@ -45,10 +45,7 @@ func (b *Broker) createQueue(name string) (*Queue, error) {
 		return nil, fmt.Errorf("queue %s already exists", name)
 	}
 
-	queue := &Queue{
-		Name:     name,
-		messages: make(chan Message, 100),
-	}
+	queue := NewQueue(name)
 	b.Queues[name] = queue
 	b.saveBrokerState()
 	return queue, nil
@@ -80,8 +77,7 @@ func (b *Broker) publish(exchangeName, routingKey, message string) (string, erro
 		queues, ok := exchange.Bindings[routingKey]
 		if ok {
 			for _, queue := range queues {
-				queue.messages <- msg
-				log.Printf("Message %s sent to queue %s", msgID, queue.Name)
+				queue.Push(msg)
 			}
 			return msgID, nil
 		} else {
@@ -90,8 +86,7 @@ func (b *Broker) publish(exchangeName, routingKey, message string) (string, erro
 		}
 	case FANOUT:
 		for _, queue := range exchange.Queues {
-			queue.messages <- msg
-			log.Printf("Message %s sent to queue %s", msgID, queue.Name)
+			queue.Push(msg)
 		}
 		return msgID, nil
 	}
@@ -107,18 +102,31 @@ func (b *Broker) consume(queueName, consumerID string) *Message {
 		log.Printf("Queue %s not found", queueName)
 		return nil
 	}
-	select {
-	case msg := <-queue.messages:
-		if b.UnackMsgs[queueName] == nil {
-			b.UnackMsgs[queueName] = make(map[string]bool)
-		}
-		b.UnackMsgs[queueName][msg.ID] = true
-		b.ConsumerUnackMsgs[consumerID][msg.ID] = true
-		return &msg
-	default:
+	// select {
+	// case msg := <-queue.messages:
+	// 	if b.UnackMsgs[queueName] == nil {
+	// 		b.UnackMsgs[queueName] = make(map[string]bool)
+	// 	}
+	// 	b.UnackMsgs[queueName][msg.ID] = true
+	// 	b.ConsumerUnackMsgs[consumerID][msg.ID] = true
+	// 	return &msg
+	// default:
+	// 	log.Printf("No messages in queue %s", queueName)
+	// 	return nil
+	// }
+
+	msg := queue.Pop()
+	if msg == nil {
 		log.Printf("No messages in queue %s", queueName)
 		return nil
 	}
+
+	// if b.UnackMsgs[queueName] == nil {
+	// 	b.UnackMsgs[queueName] = make(map[string]bool)
+	// }
+	b.ConsumerUnackMsgs[consumerID][msg.ID] = true
+
+	return msg
 }
 
 func (b *Broker) deleteQueue(name string) error {
@@ -305,7 +313,8 @@ func (b *Broker) countMessages(queueName string) (int, error) {
 		return 0, fmt.Errorf("Queue %s not found", queueName)
 	}
 
-	messageCount := len(queue.messages)
+	// messageCount := len(queue.messages)
+	messageCount := queue.Len()
 	return messageCount, nil
 }
 
