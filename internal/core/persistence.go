@@ -1,10 +1,4 @@
-package broker
-
-import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-)
+package core
 
 func (b *Broker) saveMessage(queueName string, msg Message) error {
 	// wd, err := os.Getwd()
@@ -44,15 +38,16 @@ func (b *Broker) loadMessages(queueName string) ([]Message, error) {
 }
 
 func (b *Broker) saveBrokerState() error {
-	data, err := json.Marshal(b)
-	if err != nil {
-		return err
-	}
-	// get the current directory
-	wd, err := os.Getwd()
-	brokerFile := filepath.Join(wd, "data", "broker_state.json")
-	err = os.MkdirAll(filepath.Dir(brokerFile), 0755)
-	return os.WriteFile(brokerFile, data, 0644)
+	// data, err := json.Marshal(b)
+	// if err != nil {
+	// 	return err
+	// }
+	// // get the current directory
+	// wd, err := os.Getwd()
+	// brokerFile := filepath.Join(wd, "data", "broker_state.json")
+	// err = os.MkdirAll(filepath.Dir(brokerFile), 0755)
+	// return os.WriteFile(brokerFile, data, 0644)
+	return nil
 }
 
 func (b *Broker) loadBrokerState() error {

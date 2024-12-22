@@ -1,4 +1,4 @@
-package broker
+package core
 
 import (
 	"bufio"
