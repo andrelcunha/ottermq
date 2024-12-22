@@ -8,36 +8,18 @@ import (
 	"net"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
 
-const (
-	AMQP_PROTOCOL_HEADER = "AMQP\x00\x00\x09\x01"
-)
-
-type ProtocolHandler struct {
+type ServerConnectionHandler struct {
 	conn net.Conn
 }
 
-func NewProtocolHandler(conn net.Conn) *ProtocolHandler {
-	return &ProtocolHandler{conn: conn}
+func NewServerConnectionHandler(conn net.Conn) *ServerConnectionHandler {
+	return &ServerConnectionHandler{conn: conn}
 }
 
-func (ph *ProtocolHandler) SendProtocolHeader() error {
-	header := []byte(AMQP_PROTOCOL_HEADER)
-	_, err := ph.conn.Write(header)
-	return err
-}
-
-func (ph *ProtocolHandler) ReadProtocolHeader() ([]byte, error) {
-	header := make([]byte, 8)
-	_, err := io.ReadFull(ph.conn, header)
-	if err != nil {
-		return nil, err
-	}
-	return header, nil
-}
-
-func (ph *ProtocolHandler) ReadFrame() ([]byte, error) {
+func (ph *ServerConnectionHandler) ReadFrame() ([]byte, error) {
 	// all frames starts with a 7-octet header
 	frameHeader := make([]byte, 7)
 	_, err := io.ReadFull(ph.conn, frameHeader)
@@ -77,21 +59,21 @@ func (ph *ProtocolHandler) ReadFrame() ([]byte, error) {
 	return append(frameHeader, framePayload...), nil
 }
 
-func (ph *ProtocolHandler) SendFrame(frame []byte) error {
+func (ph *ServerConnectionHandler) SendFrame(frame []byte) error {
 	_, err := ph.conn.Write(frame)
 	return err
 }
 
-func (ph *ProtocolHandler) ConnectionHandshake() error {
+func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	// read the protocol header from the client
-	clientHeader, err := ph.ReadProtocolHeader()
+	clientHeader, err := shared.ReadProtocolHeader(ph.conn)
 	if err != nil {
 		return err
 	}
 
-	expectedHeader := []byte(AMQP_PROTOCOL_HEADER)
+	expectedHeader := []byte(constants.AMQP_PROTOCOL_HEADER)
 	if !bytes.Equal(clientHeader, expectedHeader) {
-		if err := ph.SendProtocolHeader(); err != nil {
+		if err := shared.SendProtocolHeader(ph.conn); err != nil {
 			return err
 		}
 		return fmt.Errorf("invalid protocol header")
@@ -140,18 +122,20 @@ func (ph *ProtocolHandler) ConnectionHandshake() error {
 }
 
 func createConnectionTuneFrame() []byte {
-	panic("unimplemented")
+	var buf bytes.Buffer
+	buf.Write([]byte{1, 0, 0, 0, 0, 0, 4, 0, 10, 0, 30})
+	buf.WriteByte(0xCE)
+	return buf.Bytes()
 }
 
 func createConnectionOpenFrame() []byte {
-	panic("unimplemented")
+	var buf bytes.Buffer
+	buf.Write([]byte{1, 0, 0, 0, 0, 0, 4, 0, 10, 0, 40})
+	buf.WriteByte(0xCE)
+	return buf.Bytes()
 }
 
 func createConnectionStartFrame() []byte {
-	panic("not implemented")
-}
-
-func createConnectionStartOkFrame() []byte {
 	var payloadBuf bytes.Buffer
 
 	serverProperties := map[string]interface{}{
@@ -164,7 +148,7 @@ func createConnectionStartOkFrame() []byte {
 	payloadBuf.WriteByte(0) // version-major
 	payloadBuf.WriteByte(9) // version-minor
 
-	propertiesBuf := encodeTable(serverProperties)
+	propertiesBuf := shared.EncodeTable(serverProperties)
 	payloadBuf.Write(propertiesBuf)
 
 	// Payload: Mechanisms
@@ -186,88 +170,6 @@ func createConnectionStartOkFrame() []byte {
 	frame = append(frame, 0xCE) // frame-end
 
 	return frame
-}
-
-// encodeTable encodes a proper AMQP field table
-func encodeTable(table map[string]interface{}) []byte {
-	var buf bytes.Buffer
-
-	for key, value := range table {
-		// Field name
-		buf.WriteByte(byte(len(key)))
-		buf.WriteString(key)
-
-		// Field value type and value
-		switch v := value.(type) {
-		case string:
-			buf.WriteByte('S') // Field value type 'S' (string)
-			binary.Write(&buf, binary.BigEndian, uint32(len(v)))
-			buf.WriteString(v)
-		case int:
-			buf.WriteByte('I') // Field value type 'I' (int)
-			binary.Write(&buf, binary.BigEndian, int32(v))
-			// Add cases for other types as needed
-		}
-	}
-	return buf.Bytes()
-}
-
-// decodeTable decodes an AMQP field table from a byte slice
-func decodeTable(data []byte) (map[string]interface{}, error) {
-
-	table := make(map[string]interface{})
-	buf := bytes.NewBuffer(data)
-
-	for buf.Len() > 0 {
-		// Read field name
-		fieldNameLength, err := buf.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		fieldName := make([]byte, fieldNameLength)
-		_, err = buf.Read(fieldName)
-		if err != nil {
-			return nil, err
-		}
-
-		// Read field value type
-		fieldType, err := buf.ReadByte()
-		if err != nil {
-			return nil, err
-		}
-
-		// Read field value based on the type
-		switch fieldType {
-		case 'S': // String
-			var strLength uint32
-			if err := binary.Read(buf, binary.BigEndian, &strLength); err != nil {
-				return nil, err
-			}
-
-			strValue := make([]byte, strLength)
-			_, err := buf.Read(strValue)
-			if err != nil {
-				return nil, err
-			}
-
-			table[string(fieldName)] = string(strValue)
-
-		case 'I': // Integer (simplified, normally long-int should be used)
-			var intValue int32
-			if err := binary.Read(buf, binary.BigEndian, &intValue); err != nil {
-				return nil, err
-			}
-
-			table[string(fieldName)] = intValue
-
-		// Add cases for other types as needed
-
-		default:
-			return nil, fmt.Errorf("unknown field type: %c", fieldType)
-		}
-	}
-	return table, nil
 }
 
 func formatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {

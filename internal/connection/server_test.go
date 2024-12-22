@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+
+	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
 
 func TestEncodeDecodeTable(t *testing.T) {
@@ -14,8 +16,8 @@ func TestEncodeDecodeTable(t *testing.T) {
 		"information": "https://github.com/andrelcunha/ottermq",
 	}
 
-	encodedTable := encodeTable(originalTable)
-	decodedTable, err := decodeTable(encodedTable)
+	encodedTable := shared.EncodeTable(originalTable)
+	decodedTable, err := shared.DecodeTable(encodedTable)
 	if err != nil {
 		t.Fatalf("Error decoding table: %v", err)
 	}
@@ -97,7 +99,7 @@ func TestCreateConnectionStartOkFrame(t *testing.T) {
 	expected = append(expected, payload...)
 	expected = append(expected, frame_end...)
 
-	frame := createConnectionStartOkFrame()
+	frame := createConnectionStartFrame()
 
 	if !bytes.Equal(frame, expected) {
 		t.Errorf("createConnectionStartOkFrame() = %x; want %x", frame, expected)
