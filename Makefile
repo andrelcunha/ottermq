@@ -6,7 +6,7 @@ BUILD_DIR=bin
 
 build: 
 	@mkdir -p $(BUILD_DIR)
-	@go build -ldflags "-X got_it/cmd.version=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./cmd/broker/main.go
+	@go build -ldflags "-X ottermq/cmd/main.version=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./cmd/broker/main.go
 	@go build -o ./$(BUILD_DIR)/$(CLIENT_BINARY_NAME) ./cmd/cli/main.go
 	@go build -o ./$(BUILD_DIR)/$(WEBADMIN_BINARY_NAME) ./cmd/webadmin/main.go
 

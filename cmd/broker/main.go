@@ -6,8 +6,12 @@ import (
 	"os/signal"
 
 	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/broker"
+	broker "github.com/andrelcunha/ottermq/internal/core"
 	"github.com/andrelcunha/ottermq/pkg/persistdb"
+)
+
+var (
+	version = "0.6.0-alpha"
 )
 
 func main() {
