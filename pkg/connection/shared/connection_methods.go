@@ -14,24 +14,81 @@ type ConnectionStartOkFrame struct {
 	Locale           string
 }
 
+type ConnectionTuneOkFrame struct {
+	ChannelMax int16
+	FrameMax   int32
+	Heartbeat  int16
+}
+
+type ConnectionOpenFrame struct {
+	VirtualHost  string
+	Capabilities string
+	Properties   map[string]interface{}
+}
+
 func parseConnectionMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(constants.CONNECTION_START_OK):
 		fmt.Printf("Received CONNECTION_START_OK frame \n")
 		return parseConnectionStartOkFrame(payload)
+	case uint16(constants.CONNECTION_TUNE_OK):
+		fmt.Printf("Received CONNECTION_TUNE_OK frame \n")
+		return parseConnectionTuneOkFrame(payload)
+	case uint16(constants.CONNECTION_OPEN):
+		fmt.Printf("Received CONNECTION_OPEN frame \n")
+		return parseConnectionOpenFrame(payload)
+
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseConnectionOpenFrame(payload []byte) (interface{}, error) {
+	if len(payload) < 1 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	virtualHost, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode virtual host: %v", err)
+	}
+	return &ConnectionOpenFrame{
+		VirtualHost: virtualHost,
+	}, nil
+
+}
+
+func parseConnectionTuneOkFrame(payload []byte) (interface{}, error) {
+	if len(payload) < 6 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	channelMax, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode channel max: %v", err)
+	}
+
+	frameMax, err := DecodeLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode frame max: %v", err)
+	}
+	heartbeat, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode heartbeat: %v", err)
+	}
+	return &ConnectionTuneOkFrame{
+		ChannelMax: channelMax,
+		FrameMax:   frameMax,
+		Heartbeat:  heartbeat,
+	}, nil
 }
 
 func parseConnectionStartOkFrame(payload []byte) (*ConnectionStartOkFrame, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
-	fmt.Printf("Payload size :  %d\n", len(payload))
 
 	buf := bytes.NewReader(payload)
-	fmt.Printf("Buffer size :  %d\n", buf.Len())
 
 	clientPropertiesStr, err := DecodeLongStr(buf)
 	if err != nil {

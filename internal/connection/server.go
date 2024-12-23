@@ -53,11 +53,11 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	if err != nil {
 		return err
 	}
-	shared.ParseFrame(frame)
-	// fmt.Printf("Received connection.start-ok: %x\n", frame)
+	startOk, err := shared.ParseFrame(frame)
+	fmt.Printf("Received connection.start-ok: %+v\n", startOk)
 
 	// send connection.tune frame
-	tuneFrame := createConnectionTuneFrame()
+	tuneFrame := createConnectionTuneFrame(0, 0, 0)
 	if err := ph.SendFrame(tuneFrame); err != nil {
 		return err
 	}
@@ -67,76 +67,56 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Received connection.tune-ok: %x\n", frame)
-
-	//send connection.open frame
-	frame = createConnectionOpenFrame()
-	if err := ph.SendFrame(frame); err != nil {
+	tuneOk, err := shared.ParseFrame(frame)
+	if err != nil {
 		return err
 	}
+	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOk)
 
-	// read connection.open-ok frame
+	// read connection.open frame
 	frame, err = shared.ReadFrame(ph.conn)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Received connection.open-ok: %x\n", frame)
+	open, err := shared.ParseFrame(frame)
+	fmt.Printf("Received connection.open: %+v\n", open)
+
+	//send connection.open-ok frame
+	frame = createConnectionOpenOkFrame()
+	// if err := ph.SendFrame(frame); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
 
-func createConnectionTuneFrame() []byte {
-	var buf bytes.Buffer
-	buf.Write([]byte{1, 0, 0, 0, 0, 0, 4, 0, 10, 0, 30})
-	buf.WriteByte(0xCE)
-	return buf.Bytes()
+func createConnectionTuneFrame(channelMax uint16, frameMax uint32, heartbeat uint16) []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_TUNE
+
+	binary.Write(&payloadBuf, binary.BigEndian, channelMax)
+	binary.Write(&payloadBuf, binary.BigEndian, frameMax)
+	binary.Write(&payloadBuf, binary.BigEndian, heartbeat)
+
+	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	return frame
 }
 
-func createConnectionOpenFrame() []byte {
-	var buf bytes.Buffer
-	buf.Write([]byte{1, 0, 0, 0, 0, 0, 4, 0, 10, 0, 40})
-	buf.WriteByte(0xCE)
-	return buf.Bytes()
+func createConnectionOpenOkFrame() []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_OPEN_OK
+
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(0)) // reserved
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(0)) // reserved
+	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	return frame
 }
 
 func createConnectionStartFrame() []byte {
-	// class := constants.CONNECTION
-	// method := constants.CONNECTION_START
-
-	// var payloadBuf bytes.Buffer
-
-	// serverProperties := map[string]interface{}{
-	// 	"product": "OtterMQ",
-	// }
-
-	// binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
-	// binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
-
-	// payloadBuf.WriteByte(0) // version-major
-	// payloadBuf.WriteByte(9) // version-minor
-
-	// propertiesBuf := shared.EncodeTable(serverProperties)
-	// payloadBuf.Write(propertiesBuf)
-
-	// // Payload: Mechanisms
-	// payloadBuf.Write([]byte{'P', 'L', 'A', 'I', 'N', 0})
-
-	// // Payload: Locales
-	// payloadBuf.Write([]byte("en_US"))
-
-	// // Calculate the size of the payload
-	// payloadSize := uint32(payloadBuf.Len())
-
-	// // Buffer for the frame header
-	// frameType := uint8(constants.TYPE_METHOD) // METHOD frame type
-	// channelNum := uint16(0)                   // Channel number
-	// headerBuf := shared.FormatHeader(frameType, channelNum, payloadSize)
-
-	// frame := append(headerBuf, payloadBuf.Bytes()...)
-
-	// frame = append(frame, 0xCE) // frame-end
-
-	// return frame
 	var payloadBuf bytes.Buffer
 	channelNum := uint16(0)
 	classID := constants.CONNECTION

@@ -244,6 +244,24 @@ func DecodeShortStr(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
+func DecodeShortInt(buf *bytes.Reader) (int16, error) {
+	var value int16
+	err := binary.Read(buf, binary.BigEndian, &value)
+	if err != nil {
+		return 0, err
+	}
+	return value, nil
+}
+
+func DecodeLongInt(buf *bytes.Reader) (int32, error) {
+	var value int32
+	err := binary.Read(buf, binary.BigEndian, &value)
+	if err != nil {
+		return 0, err
+	}
+	return value, nil
+}
+
 func DecodeBoolean(buf *bytes.Reader) (bool, error) {
 	var value uint8
 	err := binary.Read(buf, binary.BigEndian, &value)
@@ -289,7 +307,6 @@ func ParseFrame(frame []byte) (interface{}, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
-	fmt.Printf("Frame Size: %d\n", len(frame))
 
 	frameType := frame[0]
 	channel := binary.BigEndian.Uint16(frame[1:3])
