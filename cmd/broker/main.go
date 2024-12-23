@@ -6,7 +6,7 @@ import (
 	"os/signal"
 
 	"github.com/andrelcunha/ottermq/config"
-	broker "github.com/andrelcunha/ottermq/internal/core"
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/pkg/persistdb"
 )
 
@@ -22,6 +22,7 @@ func main() {
 		Username:          "guest",
 		Password:          "guest",
 	}
+
 	b := broker.NewBroker(config)
 
 	log.Println("OtterMq is starting...")
@@ -36,6 +37,16 @@ func main() {
 		persistdb.AddUser(user)
 		persistdb.CloseDB()
 	}
+	persistdb.OpenDB()
+	user, err := persistdb.GetUserByUsername(config.Username)
+	if err != nil {
+		log.Fatalf("Failed to get user: %v", err)
+	}
+	if user.RoleID != 1 {
+		log.Fatalf("User is not an admin")
+	}
+	persistdb.CloseDB()
+	b.VHosts["/"].Users[user.Username] = &user
 	go b.Start()
 
 	stop := make(chan os.Signal, 1)

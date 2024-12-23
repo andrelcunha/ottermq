@@ -109,13 +109,19 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 	// get user
-	userdto, err := persistdb.GetUserByUsername(user.Username)
+	persistedUser, err := persistdb.GetUserByUsername(user.Username)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
+	userdto, err := persistdb.MaapUserToUserDTO(persistedUser)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 	token, err := persistdb.GenerateJWTToken(userdto)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

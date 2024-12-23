@@ -50,17 +50,19 @@ func GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func GetUserByUsername(username string) (UserListDTO, error) {
+func GetUserByUsername(username string) (User, error) {
 	OpenDB()
 	defer CloseDB()
 	var user User
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
 		log.Printf("Failed to query user: %v\n", err)
-		return UserListDTO{}, err
+		// return UserListDTO{}, err
+		return User{}, err
 	}
 
-	return mapUserToUserDTO(user)
+	// return mapUserToUserDTO(user)
+	return user, nil
 }
 
 func GenerateJWTToken(user UserListDTO) (string, error) {
@@ -93,7 +95,7 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func mapUserToUserDTO(user User) (UserListDTO, error) {
+func MaapUserToUserDTO(user User) (UserListDTO, error) {
 	role, err := GetRoleByID(user.RoleID)
 	if err != nil {
 		return UserListDTO{}, err

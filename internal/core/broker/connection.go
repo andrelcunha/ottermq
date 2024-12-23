@@ -1,4 +1,4 @@
-package connection
+package broker
 
 import (
 	"bytes"
@@ -11,109 +11,75 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
 
-type ServerConnectionHandler struct {
-	conn net.Conn
-}
-
-func NewServerConnectionHandler(conn net.Conn) *ServerConnectionHandler {
-	return &ServerConnectionHandler{conn: conn}
-}
-
-func (ph *ServerConnectionHandler) SendFrame(frame []byte) error {
-	_, err := ph.conn.Write(frame)
-	return err
-}
-
-func (ph *ServerConnectionHandler) ConnectionHandshake() error {
+func (b *Broker) connectionHandshake(conn net.Conn) error {
 	// read the protocol header from the client
-	clientHeader, err := shared.ReadProtocolHeader(ph.conn)
+	clientHeader, err := shared.ReadProtocolHeader(conn)
 	if err != nil {
 		return err
 	}
 
 	expectedHeader := []byte(constants.AMQP_PROTOCOL_HEADER)
 	if !bytes.Equal(clientHeader, expectedHeader) {
-		err := shared.SendProtocolHeader(ph.conn)
+		err := shared.SendProtocolHeader(conn)
 		if err != nil {
 			return err
 		}
 
-		return fmt.Errorf("bad protocol: %x (%s -> %s)\n", clientHeader, ph.conn.RemoteAddr().String(), ph.conn.LocalAddr().String())
+		return fmt.Errorf("bad protocol: %x (%s -> %s)\n", clientHeader, conn.RemoteAddr().String(), conn.LocalAddr().String())
 	}
-	log.Printf("accepting AMQP connection (%s -> %s)\n", ph.conn.RemoteAddr().String(), ph.conn.LocalAddr().String())
+	log.Printf("accepting AMQP connection (%s -> %s)\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 	// send connection.start frame
 	startFrame := createConnectionStartFrame()
-	if err := ph.SendFrame(startFrame); err != nil {
+	if err := b.sendFrame(conn, startFrame); err != nil {
 		return err
 	}
 
 	// read connecion.start-ok frame
-	frame, err := shared.ReadFrame(ph.conn)
+	frame, err := shared.ReadFrame(conn)
 	if err != nil {
 		return err
 	}
-	startOk, err := shared.ParseFrame(frame)
+	startOk, err := b.ParseFrame(conn, frame)
 	fmt.Printf("Received connection.start-ok: %+v\n", startOk)
 
 	// send connection.tune frame
 	tuneFrame := createConnectionTuneFrame(0, 0, 0)
-	if err := ph.SendFrame(tuneFrame); err != nil {
+	if err := b.sendFrame(conn, tuneFrame); err != nil {
 		return err
 	}
 
 	// read connection.tune-ok frame
-	frame, err = shared.ReadFrame(ph.conn)
+	frame, err = shared.ReadFrame(conn)
 	if err != nil {
 		return err
 	}
-	tuneOk, err := shared.ParseFrame(frame)
+	tuneOk, err := b.ParseFrame(conn, frame)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOk)
 
 	// read connection.open frame
-	frame, err = shared.ReadFrame(ph.conn)
+	frame, err = shared.ReadFrame(conn)
 	if err != nil {
 		return err
 	}
-	open, err := shared.ParseFrame(frame)
+	open, err := b.ParseFrame(conn, frame)
 	fmt.Printf("Received connection.open: %+v\n", open)
 
 	//send connection.open-ok frame
 	frame = createConnectionOpenOkFrame()
-	// if err := ph.SendFrame(frame); err != nil {
-	// 	return err
-	// }
+	if err := b.sendFrame(conn, frame); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func createConnectionTuneFrame(channelMax uint16, frameMax uint32, heartbeat uint16) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := constants.CONNECTION
-	methodID := constants.CONNECTION_TUNE
-
-	binary.Write(&payloadBuf, binary.BigEndian, channelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, frameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, heartbeat)
-
-	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionOpenOkFrame() []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := constants.CONNECTION
-	methodID := constants.CONNECTION_OPEN_OK
-
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(0)) // reserved
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(0)) // reserved
-	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
+func (b *Broker) sendFrame(conn net.Conn, frame []byte) error {
+	_, err := conn.Write(frame)
+	return err
 }
 
 func createConnectionStartFrame() []byte {
@@ -135,12 +101,36 @@ func createConnectionStartFrame() []byte {
 
 	payloadBuf.Write(shared.EncodeLongStr([]byte("en_US")))
 
-	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
 
 	return frame
 }
 
-func FormatMethodFrame(channelNum uint16, class constants.TypeClass, method constants.TypeMethod, methodPayload []byte) []byte {
+func createConnectionTuneFrame(channelMax uint16, frameMax uint32, heartbeat uint16) []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_TUNE
+
+	binary.Write(&payloadBuf, binary.BigEndian, channelMax)
+	binary.Write(&payloadBuf, binary.BigEndian, frameMax)
+	binary.Write(&payloadBuf, binary.BigEndian, heartbeat)
+
+	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	return frame
+}
+
+func createConnectionOpenOkFrame() []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_OPEN_OK
+
+	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	return frame
+}
+
+func formatMethodFrame(channelNum uint16, class constants.TypeClass, method constants.TypeMethod, methodPayload []byte) []byte {
 	var payloadBuf bytes.Buffer
 
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))

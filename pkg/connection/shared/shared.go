@@ -303,29 +303,7 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
-func ParseFrame(frame []byte) (interface{}, error) {
-	if len(frame) < 7 {
-		return nil, fmt.Errorf("frame too short")
-	}
-
-	frameType := frame[0]
-	channel := binary.BigEndian.Uint16(frame[1:3])
-	payloadSize := binary.BigEndian.Uint32(frame[3:7])
-	if len(frame) < int(7+payloadSize) {
-		return nil, fmt.Errorf("frame too short")
-	}
-	payload := frame[7:]
-
-	switch frameType {
-	case byte(constants.TYPE_METHOD):
-		fmt.Printf("Received METHOD frame on channel %d\n", channel)
-		return parseMethodFrame(channel, payload)
-	default:
-		return nil, fmt.Errorf("unknown frame type: %d", frameType)
-	}
-}
-
-func parseMethodFrame(channel uint16, payload []byte) (interface{}, error) {
+func ParseMethodFrame(channel uint16, payload []byte) (interface{}, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
