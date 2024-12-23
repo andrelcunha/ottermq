@@ -65,7 +65,7 @@ func TestFormatHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("Testing formatHeader", func(t *testing.T) {
-			result := formatHeader(tt.frameType, tt.channel, tt.payloadSize)
+			result := shared.FormatHeader(tt.frameType, tt.channel, tt.payloadSize)
 			if !bytes.Equal(result, tt.expected) {
 				t.Errorf("formatHeader(%d, %d, %d) = %x; want %x",
 					tt.frameType, tt.channel, tt.payloadSize, result, tt.expected)
@@ -76,20 +76,22 @@ func TestFormatHeader(t *testing.T) {
 	return
 }
 
-// TestCreateConnectionStartOkFrame tests the createConnectionStartOkFrame function
-func TestCreateConnectionStartOkFrame(t *testing.T) {
+// TestCreateConnectionStartFrame tests the createConnectionStartOkFrame function
+func TestCreateConnectionStartFrame(t *testing.T) {
 	var expected []byte
 	header := []byte{
-		1, 0, 0, 0, 0, 0, 125, // Frame header
+		1, 0, 0, 0, 0, 0, 48, // Frame header
 	}
 	payload := []byte{
+		0, 10, 0, 10, // class, method
 		0, 9, // version-major, version-minor
-		7, 'p', 'r', 'o', 'd', 'u', 'c', 't', 'S', 0, 0, 0, 7, 'O', 't', 't', 'e', 'r', 'M', 'Q', // Seerver properties
-		7, 'v', 'e', 'r', 's', 'i', 'o', 'n', 'S', 0, 0, 0, 5, '0', '.', '1', '.', '0',
-		8, 'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'S', 0, 0, 0, 5, 'L', 'i', 'n', 'u', 'x',
-		11, 'i', 'n', 'f', 'o', 'r', 'm', 'a', 't', 'i', 'o', 'n', 'S', 0, 0, 0, 38,
-		'h', 't', 't', 'p', 's', ':', '/', '/', 'g', 'i', 't', 'h', 'u', 'b', '.', 'c', 'o', 'm', '/',
-		'a', 'n', 'd', 'r', 'e', 'l', 'c', 'u', 'n', 'h', 'a', '/', 'o', 't', 't', 'e', 'r', 'm', 'q', 'P', 'L', 'A', 'I', 'N', 0, 'e', 'n', '_', 'U', 'S', // Mechanisms and Locales
+		0, 0, 0, 20, // Size of the server properties table
+		// Server properties
+		7, 'p', 'r', 'o', 'd', 'u', 'c', 't', 'S', 0, 0, 0, 7, 'O', 't', 't', 'e', 'r', 'M', 'Q',
+		0, 0, 0, 5, // Size of mechanisms
+		'P', 'L', 'A', 'I', 'N', // Mechanisms
+		0, 0, 0, 5, // Size of locales
+		'e', 'n', '_', 'U', 'S', // Mechanisms
 	}
 	frame_end := []byte{
 		0xCE, // frame-end
@@ -102,6 +104,6 @@ func TestCreateConnectionStartOkFrame(t *testing.T) {
 	frame := createConnectionStartFrame()
 
 	if !bytes.Equal(frame, expected) {
-		t.Errorf("createConnectionStartOkFrame() = %x; want %x", frame, expected)
+		t.Errorf("createConnectionStartFrame() = %x; want %x", frame, expected)
 	}
 }

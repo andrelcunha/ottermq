@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
+	"log"
 	"net"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
@@ -17,46 +17,6 @@ type ServerConnectionHandler struct {
 
 func NewServerConnectionHandler(conn net.Conn) *ServerConnectionHandler {
 	return &ServerConnectionHandler{conn: conn}
-}
-
-func (ph *ServerConnectionHandler) ReadFrame() ([]byte, error) {
-	// all frames starts with a 7-octet header
-	frameHeader := make([]byte, 7)
-	_, err := io.ReadFull(ph.conn, frameHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	// fist octet is the type of frame
-	// frameType := binary.BigEndian.Uint16(frameHeader[0:1])
-
-	// 2nd and 3rd octets (short) are the channel number
-	// channelNum := binary.BigEndian.Uint16(frameHeader[1:3])
-
-	// 4th to 7th octets (long) are the size of the payload
-	payloadSize := binary.BigEndian.Uint32(frameHeader[3:])
-
-	// read the framePayload
-	framePayload := make([]byte, payloadSize)
-	_, err = io.ReadFull(ph.conn, framePayload)
-	if err != nil {
-		return nil, err
-	}
-
-	// frame-end is a 1-octet after the payload
-	frameEnd := make([]byte, 1)
-	_, err = io.ReadFull(ph.conn, frameEnd)
-	if err != nil {
-		return nil, err
-	}
-
-	// check if the frame-end is correct (0xCE)
-	if frameEnd[0] != 0xCE {
-		// return nil, ErrInvalidFrameEnd
-		return nil, fmt.Errorf("invalid frame end octet")
-	}
-
-	return append(frameHeader, framePayload...), nil
 }
 
 func (ph *ServerConnectionHandler) SendFrame(frame []byte) error {
@@ -73,11 +33,14 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 
 	expectedHeader := []byte(constants.AMQP_PROTOCOL_HEADER)
 	if !bytes.Equal(clientHeader, expectedHeader) {
-		if err := shared.SendProtocolHeader(ph.conn); err != nil {
+		err := shared.SendProtocolHeader(ph.conn)
+		if err != nil {
 			return err
 		}
-		return fmt.Errorf("invalid protocol header")
+
+		return fmt.Errorf("bad protocol: %x (%s -> %s)\n", clientHeader, ph.conn.RemoteAddr().String(), ph.conn.LocalAddr().String())
 	}
+	log.Printf("accepting AMQP connection (%s -> %s)\n", ph.conn.RemoteAddr().String(), ph.conn.LocalAddr().String())
 
 	// send connection.start frame
 	startFrame := createConnectionStartFrame()
@@ -86,11 +49,12 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	}
 
 	// read connecion.start-ok frame
-	frame, err := ph.ReadFrame()
+	frame, err := shared.ReadFrame(ph.conn)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Received connection.start-ok: %x\n", frame)
+	shared.ParseFrame(frame)
+	// fmt.Printf("Received connection.start-ok: %x\n", frame)
 
 	// send connection.tune frame
 	tuneFrame := createConnectionTuneFrame()
@@ -99,7 +63,7 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	}
 
 	// read connection.tune-ok frame
-	frame, err = ph.ReadFrame()
+	frame, err = shared.ReadFrame(ph.conn)
 	if err != nil {
 		return err
 	}
@@ -112,7 +76,7 @@ func (ph *ServerConnectionHandler) ConnectionHandshake() error {
 	}
 
 	// read connection.open-ok frame
-	frame, err = ph.ReadFrame()
+	frame, err = shared.ReadFrame(ph.conn)
 	if err != nil {
 		return err
 	}
@@ -136,34 +100,82 @@ func createConnectionOpenFrame() []byte {
 }
 
 func createConnectionStartFrame() []byte {
-	var payloadBuf bytes.Buffer
+	// class := constants.CONNECTION
+	// method := constants.CONNECTION_START
 
-	serverProperties := map[string]interface{}{
-		"product":     "OtterMQ",
-		"version":     "0.1.0",
-		"platform":    "Linux",
-		"information": "https://github.com/andrelcunha/ottermq",
-	}
+	// var payloadBuf bytes.Buffer
+
+	// serverProperties := map[string]interface{}{
+	// 	"product": "OtterMQ",
+	// }
+
+	// binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
+	// binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
+
+	// payloadBuf.WriteByte(0) // version-major
+	// payloadBuf.WriteByte(9) // version-minor
+
+	// propertiesBuf := shared.EncodeTable(serverProperties)
+	// payloadBuf.Write(propertiesBuf)
+
+	// // Payload: Mechanisms
+	// payloadBuf.Write([]byte{'P', 'L', 'A', 'I', 'N', 0})
+
+	// // Payload: Locales
+	// payloadBuf.Write([]byte("en_US"))
+
+	// // Calculate the size of the payload
+	// payloadSize := uint32(payloadBuf.Len())
+
+	// // Buffer for the frame header
+	// frameType := uint8(constants.TYPE_METHOD) // METHOD frame type
+	// channelNum := uint16(0)                   // Channel number
+	// headerBuf := shared.FormatHeader(frameType, channelNum, payloadSize)
+
+	// frame := append(headerBuf, payloadBuf.Bytes()...)
+
+	// frame = append(frame, 0xCE) // frame-end
+
+	// return frame
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_START
 
 	payloadBuf.WriteByte(0) // version-major
 	payloadBuf.WriteByte(9) // version-minor
 
-	propertiesBuf := shared.EncodeTable(serverProperties)
-	payloadBuf.Write(propertiesBuf)
+	serverProperties := map[string]interface{}{
+		"product": "OtterMQ",
+	}
+	encodedProperties := shared.EncodeTable(serverProperties)
+	payloadBuf.Write(shared.EncodeLongStr(encodedProperties))
 
-	// Payload: Mechanisms
-	payloadBuf.Write([]byte{'P', 'L', 'A', 'I', 'N', 0})
+	payloadBuf.Write(shared.EncodeLongStr([]byte("PLAIN")))
 
-	// Payload: Locales
-	payloadBuf.Write([]byte("en_US"))
+	payloadBuf.Write(shared.EncodeLongStr([]byte("en_US")))
+
+	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+
+	return frame
+}
+
+func FormatMethodFrame(channelNum uint16, class constants.TypeClass, method constants.TypeMethod, methodPayload []byte) []byte {
+	var payloadBuf bytes.Buffer
+
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
+
+	// payloadBuf.WriteByte(binary.BigEndian.AppendUint16()[])
+
+	payloadBuf.Write(methodPayload)
 
 	// Calculate the size of the payload
 	payloadSize := uint32(payloadBuf.Len())
 
 	// Buffer for the frame header
 	frameType := uint8(constants.TYPE_METHOD) // METHOD frame type
-	channelNum := uint16(0)                   // Channel number
-	headerBuf := formatHeader(frameType, channelNum, payloadSize)
+	headerBuf := shared.FormatHeader(frameType, channelNum, payloadSize)
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 
@@ -172,11 +184,14 @@ func createConnectionStartFrame() []byte {
 	return frame
 }
 
-func formatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
-	header := make([]byte, 7)
-	header[0] = frameType
-	binary.BigEndian.PutUint16(header[1:3], channel)
-	binary.BigEndian.PutUint32(header[3:7], uint32(payloadSize))
-	fmt.Printf("header: %x\n", header)
-	return header
+func FormatContentFrame(channelNum uint16, class constants.TypeClass, method constants.TypeMethod, methodPayload []byte) []byte {
+	panic("Not implemented")
+}
+
+func FormatHeartbeatFrame() []byte {
+	panic("Not implemented")
+}
+
+func FormatArgument(key, value, string, valueType any) []byte {
+	panic("not implemented")
 }

@@ -2,9 +2,7 @@ package client
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"net"
 
@@ -20,52 +18,6 @@ func NewProtocolHandler(conn net.Conn) *ClientConnetion {
 	return &ClientConnetion{conn: conn}
 }
 
-func (cc *ClientConnetion) SendProtocolHeader() error {
-	header := []byte(constants.AMQP_PROTOCOL_HEADER)
-	_, err := cc.conn.Write(header)
-	return err
-}
-
-func (cc *ClientConnetion) ReadFrame() ([]byte, error) {
-	// all frames starts with a 7-octet header
-	frameHeader := make([]byte, 7)
-	_, err := io.ReadFull(cc.conn, frameHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	// fist octet is the type of frame
-	// frameType := binary.BigEndian.Uint16(frameHeader[0:1])
-
-	// 2nd and 3rd octets (short) are the channel number
-	// channelNum := binary.BigEndian.Uint16(frameHeader[1:3])
-
-	// 4th to 7th octets (long) are the size of the payload
-	payloadSize := binary.BigEndian.Uint32(frameHeader[3:])
-
-	// read the framePayload
-	framePayload := make([]byte, payloadSize)
-	_, err = io.ReadFull(cc.conn, framePayload)
-	if err != nil {
-		return nil, err
-	}
-
-	// frame-end is a 1-octet after the payload
-	frameEnd := make([]byte, 1)
-	_, err = io.ReadFull(cc.conn, frameEnd)
-	if err != nil {
-		return nil, err
-	}
-
-	// check if the frame-end is correct (0xCE)
-	if frameEnd[0] != 0xCE {
-		// return nil, ErrInvalidFrameEnd
-		return nil, fmt.Errorf("invalid frame end octet")
-	}
-
-	return append(frameHeader, framePayload...), nil
-}
-
 func (cc *ClientConnetion) SendFrame(frame []byte) error {
 	_, err := cc.conn.Write(frame)
 	return err
@@ -73,12 +25,14 @@ func (cc *ClientConnetion) SendFrame(frame []byte) error {
 
 func (cc *ClientConnetion) ConnectionHandshake() error {
 	// Send Protocol Header
-	if err := cc.SendProtocolHeader(); err != nil {
+	if err := shared.SendProtocolHeader(cc.conn); err != nil {
 		log.Fatalf("Failed to send protocol header: %v", err)
 	}
 
 	// Read connection.start frame
-	frame, err := cc.ReadFrame()
+	frame, err := shared.ReadFrame(cc.conn)
+	cc.parseConnectionStartOK(frame)
+
 	if err != nil {
 		log.Fatalf("Failed to read connection.start frame: %v", err)
 	}
@@ -91,7 +45,7 @@ func (cc *ClientConnetion) ConnectionHandshake() error {
 	}
 
 	// Read connection.tune frame
-	frame, err = cc.ReadFrame()
+	frame, err = shared.ReadFrame(cc.conn)
 	if err != nil {
 		log.Fatalf("Failed to read connection.tune frame: %v", err)
 	}
@@ -103,7 +57,7 @@ func (cc *ClientConnetion) ConnectionHandshake() error {
 		log.Fatalf("Failed to send connection.tune-ok frame: %v", err)
 	}
 
-	frame, err = cc.ReadFrame()
+	frame, err = shared.ReadFrame(cc.conn)
 	if err != nil {
 		log.Fatalf("Failed to read connection.open frame: %v", err)
 	}
@@ -146,7 +100,7 @@ func createConnectionStartOkFrame() []byte {
 	// Buffer for the frame header
 	frameType := uint8(constants.TYPE_METHOD) // METHOD frame type
 	channelNum := uint16(0)                   // Channel number
-	headerBuf := FormatHeader(frameType, channelNum, payloadSize)
+	headerBuf := shared.FormatHeader(frameType, channelNum, payloadSize)
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 
@@ -154,15 +108,6 @@ func createConnectionStartOkFrame() []byte {
 
 	return frame
 
-}
-
-func FormatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
-	header := make([]byte, 7)
-	header[0] = frameType
-	binary.BigEndian.PutUint16(header[1:3], channel)
-	binary.BigEndian.PutUint32(header[3:7], uint32(payloadSize))
-	fmt.Printf("header: %x\n", header)
-	return header
 }
 
 func createConnectionTuneOkFrame() []byte {
@@ -177,4 +122,21 @@ func createOpenOkFrame() []byte {
 	buf.Write([]byte{1, 0, 0, 0, 0, 0, 4, 0, 10, 0, 41})
 	buf.WriteByte(0xCE)
 	return buf.Bytes()
+}
+
+func (cc *ClientConnetion) parseConnectionStartOK(frame []byte) error {
+
+	if isAMQPVersionResponse(frame) {
+		// print the frame and close the connection
+		buf := bytes.NewBuffer(frame)
+		log.Println("Received:", buf.String())
+		// cc.conn.Close()
+		return fmt.Errorf("Version not supporte by the server")
+	}
+
+	return nil
+}
+
+func isAMQPVersionResponse(frame []byte) bool {
+	return bytes.Equal(frame[:4], []byte("AMQP"))
 }

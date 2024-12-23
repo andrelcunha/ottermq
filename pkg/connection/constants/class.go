@@ -1,13 +1,13 @@
 package constants
 
-type Class int
+type TypeClass int
 
 // Class constants
 const (
-	CONNECTION Class = 10
-	CHANNEL    Class = 20
-	EXCHANGE   Class = 40
-	QUEUE      Class = 50
-	BASIC      Class = 60
-	TX         Class = 90
+	CONNECTION TypeClass = 10
+	CHANNEL    TypeClass = 20
+	EXCHANGE   TypeClass = 40
+	QUEUE      TypeClass = 50
+	BASIC      TypeClass = 60
+	TX         TypeClass = 90
 )
