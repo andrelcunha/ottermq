@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )
 
-//type FieldTable
+// type FieldTable
+type ClientConfig struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+	Vhost    string
+}
 
 type AMQP_Key struct {
 	Key  string
@@ -62,6 +70,24 @@ func EncodeTable(table map[string]interface{}) []byte {
 			buf.WriteByte('I') // Field value type 'I' (int)
 			binary.Write(&buf, binary.BigEndian, int32(v))
 			// Add cases for other types as needed
+
+		// In the case map[string]interface:
+		case map[string]interface{}:
+			// Recursively encode the nested map
+			buf.WriteByte('F') // Field value type 'F' (field table)
+			encodedTable := EncodeTable(v)
+			buf.Write(EncodeLongStr(encodedTable))
+
+		case bool:
+			buf.WriteByte('t')
+			if v {
+				buf.WriteByte(1)
+			} else {
+				buf.WriteByte(0)
+			}
+
+		default:
+			buf.WriteByte('U')
 		}
 	}
 	return buf.Bytes()
@@ -212,6 +238,19 @@ func EncodeShortStr(data string) []byte {
 	return buf.Bytes()
 }
 
+func EncodeSecurityPlain(securityStr string) []byte {
+	// Concatenate username, null byte, and password
+	// securityStr := username + "\x00" + password
+	// Replace spaces with null bytes
+	encodedStr := strings.ReplaceAll(securityStr, " ", "\x00")
+	// Encode length as a uint32 and append the encoded string
+	length := uint32(len(encodedStr))
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, length)
+	buf.WriteString(encodedStr)
+	return buf.Bytes()
+}
+
 func DecodeLongStr(buf *bytes.Reader) (string, error) {
 	var strLen uint32
 	err := binary.Read(buf, binary.BigEndian, &strLen)
@@ -244,8 +283,8 @@ func DecodeShortStr(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
-func DecodeShortInt(buf *bytes.Reader) (int16, error) {
-	var value int16
+func DecodeShortInt(buf *bytes.Reader) (uint16, error) {
+	var value uint16
 	err := binary.Read(buf, binary.BigEndian, &value)
 	if err != nil {
 		return 0, err
@@ -253,8 +292,8 @@ func DecodeShortInt(buf *bytes.Reader) (int16, error) {
 	return value, nil
 }
 
-func DecodeLongInt(buf *bytes.Reader) (int32, error) {
-	var value int32
+func DecodeLongInt(buf *bytes.Reader) (uint32, error) {
+	var value uint32
 	err := binary.Read(buf, binary.BigEndian, &value)
 	if err != nil {
 		return 0, err
@@ -303,7 +342,38 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
-func ParseMethodFrame(channel uint16, payload []byte) (interface{}, error) {
+func ParseFrame(config *ClientConfig, frame []byte) (interface{}, error) {
+	if len(frame) < 7 {
+		return nil, fmt.Errorf("frame too short")
+	}
+
+	frameType := frame[0]
+	channel := binary.BigEndian.Uint16(frame[1:3])
+	payloadSize := binary.BigEndian.Uint32(frame[3:7])
+	if len(frame) < int(7+payloadSize) {
+		return nil, fmt.Errorf("frame too short")
+	}
+	payload := frame[7:]
+
+	switch frameType {
+	case byte(constants.TYPE_METHOD):
+		fmt.Printf("Received METHOD frame on channel %d\n", channel)
+		return parseMethodFrame(config, channel, payload)
+	case byte(constants.TYPE_HEARTBEAT):
+		err := processHeartbeat(channel)
+		return frame, err
+	default:
+		return nil, fmt.Errorf("unknown frame type: %d", frameType)
+	}
+}
+
+func processHeartbeat(channel uint16) error {
+	// TODO: Implement heartbeat processing
+	fmt.Printf("Received HEARTBEAT frame on channel %d\n", channel)
+	return nil
+}
+
+func parseMethodFrame(config *ClientConfig, channel uint16, payload []byte) (interface{}, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -315,7 +385,7 @@ func ParseMethodFrame(channel uint16, payload []byte) (interface{}, error) {
 	switch classID {
 	case uint16(constants.CONNECTION):
 		fmt.Printf("Received CONNECTION frame on channel %d\n", channel)
-		return parseConnectionMethod(methodID, methodPayload)
+		return parseConnectionMethod(config, methodID, methodPayload)
 	default:
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
