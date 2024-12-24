@@ -361,10 +361,12 @@ func (b *Broker) ParseFrame(conn net.Conn, frame []byte) (interface{}, error) {
 	case byte(constants.TYPE_METHOD):
 		fmt.Printf("Received METHOD frame on channel %d\n", channel)
 		return shared.ParseMethodFrame(channel, payload)
+
 	case byte(constants.TYPE_HEARTBEAT):
 		log.Printf("Received HEARTBEAT frame on channel %d\n", channel)
 		err := b.handleHeartbeat(conn, 0, frame)
 		return nil, err
+
 	default:
 		fmt.Printf("Received: %x\n", frame)
 		return nil, fmt.Errorf("unknown frame type: %d", frameType)

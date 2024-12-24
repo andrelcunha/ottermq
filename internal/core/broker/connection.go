@@ -17,6 +17,7 @@ func (b *Broker) connectionHandshake(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("\nreceived: %x\n", clientHeader)
 
 	expectedHeader := []byte(constants.AMQP_PROTOCOL_HEADER)
 	if !bytes.Equal(clientHeader, expectedHeader) {
@@ -40,6 +41,7 @@ func (b *Broker) connectionHandshake(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("\nreceived: %x\n", frame)
 	startOk, err := b.ParseFrame(conn, frame)
 	fmt.Printf("Received connection.start-ok: %+v\n", startOk)
 
@@ -54,6 +56,7 @@ func (b *Broker) connectionHandshake(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("\nreceived: %x\n", frame)
 	tuneOk, err := b.ParseFrame(conn, frame)
 	if err != nil {
 		return err
@@ -65,12 +68,13 @@ func (b *Broker) connectionHandshake(conn net.Conn) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("\nreceived: %x\n", frame)
 	open, err := b.ParseFrame(conn, frame)
 	fmt.Printf("Received connection.open: %+v\n", open)
 
 	//send connection.open-ok frame
-	frame = createConnectionOpenOkFrame()
-	if err := b.sendFrame(conn, frame); err != nil {
+	openOkFrame := createConnectionOpenOkFrame()
+	if err := b.sendFrame(conn, openOkFrame); err != nil {
 		return err
 	}
 
