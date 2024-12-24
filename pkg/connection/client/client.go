@@ -9,6 +9,15 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
 
+var (
+	version = "0.6.0-alpha"
+)
+
+const (
+	platform = "golang"
+	product  = "OtterMQ Client"
+)
+
 type Client struct {
 	conn   net.Conn
 	config *shared.ClientConfig
@@ -30,13 +39,30 @@ func (c *Client) Start() {
 	}
 	c.conn = conn
 	defer conn.Close()
-	ClientHandshake(conn, c.config)
 
-}
+	capabilities := map[string]interface{}{
+		"basic.nack":             true,
+		"connection.blocked":     true,
+		"consumer_cancel_notify": true,
+		"publisher_confirms":     true,
+	}
 
-func SendFrame(conn net.Conn, frame []byte) error {
-	_, err := conn.Write(frame)
-	return err
+	clientProperties := map[string]interface{}{
+		"capabilities": capabilities,
+		"product":      product,
+		"version":      version,
+		"platform":     platform,
+	}
+	configurations := map[string]interface{}{
+		"username":         c.config.Username,
+		"password":         c.config.Password,
+		"vhost":            c.config.Vhost,
+		"clientProperties": clientProperties,
+		"mechanism":        "PLAIN",
+		"locale":           "en_US",
+	}
+	ClientHandshake(configurations, conn)
+
 }
 
 // Client sends ProtocolHeader
@@ -46,7 +72,7 @@ func SendFrame(conn net.Conn, frame []byte) error {
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func ClientHandshake(conn net.Conn, config *shared.ClientConfig) error {
+func ClientHandshake(configurations map[string]interface{}, conn net.Conn) error {
 	log.Printf("Starting connection handshake")
 	// Send Protocol Header
 	if err := shared.SendProtocolHeader(conn); err != nil {
@@ -64,17 +90,20 @@ func ClientHandshake(conn net.Conn, config *shared.ClientConfig) error {
 		log.Printf("Received AMQP version response: %s", frame)
 		return nil
 	}
-	untypedResp, err := shared.ParseFrame(config, frame)
+
+	//TODO: Refactor - remove processing from ParseFrame
+	// This processing is concerned to the client only.
+	untypedResp, err := shared.ParseFrame(configurations, frame)
 	if err != nil {
 		err = fmt.Errorf("Failed to parse connection.start frame: %v", err)
 		return err
 	}
 	startOkResponse, ok := untypedResp.([]byte)
 	if !ok {
-		err = fmt.Errorf("Type assertion ConnectionStartFrame failed")
+		err = fmt.Errorf("Type assertion failed")
 		return err
 	}
-	if err := SendFrame(conn, startOkResponse); err != nil {
+	if err := shared.SendFrame(conn, startOkResponse); err != nil {
 		err = fmt.Errorf("Failed to send connection.start-ok frame: %v", err)
 		return err
 	}
@@ -86,20 +115,21 @@ func ClientHandshake(conn net.Conn, config *shared.ClientConfig) error {
 		err = fmt.Errorf("Failed to read connection.tune frame: %v", err)
 		return err
 	}
-	untypedResp, err = shared.ParseFrame(config, frame)
+	untypedResp, err = shared.ParseFrame(configurations, frame)
 	tuneOkResponse, ok := untypedResp.([]byte)
 	if !ok {
 		err = fmt.Errorf("Type assertion ConnectionTuneOkFrame failed")
 		return err
 	}
-	if err := SendFrame(conn, tuneOkResponse); err != nil {
+	if err := shared.SendFrame(conn, tuneOkResponse); err != nil {
 		log.Fatalf("Failed to send connection.tune-ok frame: %v", err)
 	}
 	/** end of connection.tune **/
 
 	/** connection.open **/
-	openOkFrame := shared.CreateConnectionOpenFrame(config.Vhost)
-	if err := SendFrame(conn, openOkFrame); err != nil {
+	vhost := configurations["vhost"].(string)
+	openOkFrame := shared.CreateConnectionOpenFrame(vhost)
+	if err := shared.SendFrame(conn, openOkFrame); err != nil {
 		log.Fatalf("Failed to send connection.open-ok frame: %v", err)
 	}
 
@@ -108,7 +138,7 @@ func ClientHandshake(conn net.Conn, config *shared.ClientConfig) error {
 		log.Fatalf("Failed to read frame: %v", err)
 	}
 	fmt.Printf("Received connection.open-ok: %x\n", frame)
-	_, err = shared.ParseFrame(config, frame)
+	_, err = shared.ParseFrame(configurations, frame)
 
 	// Parse open-ok frame
 
