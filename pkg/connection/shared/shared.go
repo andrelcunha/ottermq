@@ -342,7 +342,7 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
-func ParseFrame(configurations map[string]interface{}, frame []byte) (interface{}, error) {
+func ParseFrame(configurations *map[string]interface{}, frame []byte) (interface{}, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
@@ -373,7 +373,7 @@ func processHeartbeat(channel uint16) error {
 	return nil
 }
 
-func ParseMethodFrame(configurations map[string]interface{}, channel uint16, payload []byte) (interface{}, error) {
+func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, payload []byte) (interface{}, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -394,4 +394,12 @@ func ParseMethodFrame(configurations map[string]interface{}, channel uint16, pay
 func SendFrame(conn net.Conn, frame []byte) error {
 	_, err := conn.Write(frame)
 	return err
+}
+
+func CreateHeartbeatFrame() []byte {
+	frame := make([]byte, 7)
+	frame[0] = byte(constants.TYPE_HEARTBEAT)
+	binary.BigEndian.PutUint16(frame[1:3], 0)
+	binary.BigEndian.PutUint32(frame[3:7], 0)
+	return frame
 }

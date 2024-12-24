@@ -32,12 +32,19 @@ type ConnectionTuneFrame struct {
 }
 
 type ConnectionOpenFrame struct {
-	VirtualHost  string
-	Capabilities string
-	Properties   map[string]interface{}
+	VirtualHost string
+	// Capabilities string
+	// Properties   map[string]interface{}
 }
 
-func parseConnectionMethod(configurations map[string]interface{}, methodID uint16, payload []byte) (interface{}, error) {
+type ConnectionCloseFrame struct {
+	ReplyCode uint16
+	ReplyText string
+}
+
+type ConnectionCloseOkFrame struct{}
+
+func parseConnectionMethod(configurations *map[string]interface{}, methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(constants.CONNECTION_START):
 		fmt.Printf("Received CONNECTION_START frame \n")
@@ -54,7 +61,7 @@ func parseConnectionMethod(configurations map[string]interface{}, methodID uint1
 		return startOkFrame, nil
 
 	case uint16(constants.CONNECTION_START_OK):
-		fmt.Printf("[DEBUG] Received connection.start-ok: %+v\n", payload)
+		fmt.Printf("[DEBUG] Received connection.start-ok: %x\n", payload)
 
 		return parseConnectionStartOkFrame(payload)
 
@@ -79,9 +86,38 @@ func parseConnectionMethod(configurations map[string]interface{}, methodID uint1
 		fmt.Printf("Received CONNECTION_OPEN frame \n")
 		return parseConnectionOpenOkFrame(payload)
 
+	case uint16(constants.CONNECTION_CLOSE):
+		fmt.Printf("Received CONNECTION_CLOSE frame \n")
+		return parseConnectionCloseFrame(payload)
+
+	case uint16(constants.CONNECTION_CLOSE_OK):
+		fmt.Printf("Received CONNECTION_CLOSE_OK frame \n")
+		return parseConnectionCloseOkFrame(payload)
+
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseConnectionCloseFrame(payload []byte) (*ConnectionCloseFrame, error) {
+	if len(payload) < 12 {
+		return nil, fmt.Errorf("frame too short")
+	}
+
+	replyCode := binary.BigEndian.Uint16(payload[0:2])
+	replyTextLen := payload[2]
+	replyText := string(payload[3 : 3+replyTextLen])
+
+	frame := &ConnectionCloseFrame{
+		ReplyCode: replyCode,
+		ReplyText: replyText,
+	}
+
+	return frame, nil
+}
+
+func parseConnectionCloseOkFrame(payload []byte) (*ConnectionCloseOkFrame, error) {
+	return &ConnectionCloseOkFrame{}, nil
 }
 
 func parseConnectionOpenFrame(payload []byte) (interface{}, error) {
@@ -281,10 +317,9 @@ func CreateConnectionStartFrame() []byte {
 	return frame
 }
 
-func createConnectionStartOkPayload(configurations map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
+func createConnectionStartOkPayload(configurations *map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
 
-	// capabilities := configurations["capabilities"].(map[string]interface{})
-	clientProperties := configurations["clientProperties"].(map[string]interface{})
+	clientProperties := (*configurations)["clientProperties"].(map[string]interface{})
 	fmt.Printf("[DEBUG] clientProperties: %+v\n", clientProperties)
 
 	mecanismsStr := startFrameResponse.Mechanisms
@@ -295,7 +330,7 @@ func createConnectionStartOkPayload(configurations map[string]interface{}, start
 	}
 
 	// find 'PLAIN' in mechanismsList
-	mechanism := configurations["mechanism"].(string)
+	mechanism := (*configurations)["mechanism"].(string)
 	if !mechanismsMap[mechanism] {
 		// mechanism = "PLAIN"
 		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported mechanism: %s", mechanism)
@@ -303,8 +338,8 @@ func createConnectionStartOkPayload(configurations map[string]interface{}, start
 	fmt.Printf("mechanism: %s\n", mechanism)
 
 	// fmt.Printf("mechanismsList: %+v\n", mechanismsList)
-	username := configurations["username"].(string)
-	password := configurations["password"].(string)
+	username := (*configurations)["username"].(string)
+	password := (*configurations)["password"].(string)
 
 	securityStr := fmt.Sprintf(" %s %s", username, password)
 	// find 'en_US' in localesList
@@ -314,7 +349,7 @@ func createConnectionStartOkPayload(configurations map[string]interface{}, start
 	for _, l := range localesList {
 		localesMap[l] = true
 	}
-	locale := configurations["locale"].(string)
+	locale := (*configurations)["locale"].(string)
 	if !localesMap[locale] {
 		// locale = "en_US"
 		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported locale: %s", locale)

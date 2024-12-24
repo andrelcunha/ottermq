@@ -19,7 +19,7 @@ import (
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func ServerHandshake(configurations map[string]interface{}, conn net.Conn) error {
+func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) error {
 	// read the protocol header from the client
 	clientHeader, err := shared.ReadProtocolHeader(conn)
 	if err != nil {
@@ -60,7 +60,7 @@ func ServerHandshake(configurations map[string]interface{}, conn net.Conn) error
 		err = fmt.Errorf("Type assertion ConnectionStartOkFrame failed")
 		return err
 	}
-	err = processStartOkContent(startOkFrame)
+	err = processStartOkContent(configurations, startOkFrame)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,14 @@ func ServerHandshake(configurations map[string]interface{}, conn net.Conn) error
 		return err
 	}
 	fmt.Printf("\nreceived: %x\n", frame)
-	open, err := shared.ParseFrame(configurations, frame)
+	// set vhost on configurations
+
+	response, err = shared.ParseFrame(configurations, frame)
+	if err != nil {
+		return err
+	}
+	open, ok := response.(*shared.ConnectionOpenFrame)
+	(*configurations)["vhost"] = open.VirtualHost
 	fmt.Printf("Received connection.open: %+v\n", open)
 
 	//send connection.open-ok frame
@@ -106,7 +113,7 @@ func ServerHandshake(configurations map[string]interface{}, conn net.Conn) error
 	return nil
 }
 
-func processStartOkContent(startOkFrame *shared.ConnectionStartOkFrame) error {
+func processStartOkContent(configurations *map[string]interface{}, startOkFrame *shared.ConnectionStartOkFrame) error {
 	mechanism := startOkFrame.Mechanism
 	if mechanism != "PLAIN" {
 		return fmt.Errorf("Mechanism invalid or %s not suported", mechanism)
@@ -128,6 +135,8 @@ func processStartOkContent(startOkFrame *shared.ConnectionStartOkFrame) error {
 	if !authOk {
 		return fmt.Errorf("Authentication failed")
 	}
+	// set username to configurations
+	(*configurations)["username"] = username
 
 	return nil
 }

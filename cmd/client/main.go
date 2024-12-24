@@ -11,7 +11,7 @@ var (
 )
 
 const (
-	PORT      = "5673"
+	PORT      = "5672"
 	HOST      = "localhost"
 	HEARTBEAT = 10
 	USERNAME  = "guest"

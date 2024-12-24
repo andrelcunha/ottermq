@@ -61,7 +61,7 @@ func (c *Client) Start() {
 		"mechanism":        "PLAIN",
 		"locale":           "en_US",
 	}
-	ClientHandshake(configurations, conn)
+	ClientHandshake(&configurations, conn)
 
 }
 
@@ -72,7 +72,7 @@ func (c *Client) Start() {
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func ClientHandshake(configurations map[string]interface{}, conn net.Conn) error {
+func ClientHandshake(configurations *map[string]interface{}, conn net.Conn) error {
 	log.Printf("Starting connection handshake")
 	// Send Protocol Header
 	if err := shared.SendProtocolHeader(conn); err != nil {
@@ -127,7 +127,7 @@ func ClientHandshake(configurations map[string]interface{}, conn net.Conn) error
 	/** end of connection.tune **/
 
 	/** connection.open **/
-	vhost := configurations["vhost"].(string)
+	vhost := (*configurations)["vhost"].(string)
 	openOkFrame := shared.CreateConnectionOpenFrame(vhost)
 	if err := shared.SendFrame(conn, openOkFrame); err != nil {
 		log.Fatalf("Failed to send connection.open-ok frame: %v", err)

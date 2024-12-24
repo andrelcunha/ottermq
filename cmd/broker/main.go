@@ -16,11 +16,13 @@ var (
 
 func main() {
 	config := &config.Config{
-		Port:              "5672",
-		Host:              "localhost",
-		HeartBeatInterval: 600,
-		Username:          "guest",
-		Password:          "guest",
+		Port:                 "5672",
+		Host:                 "localhost",
+		Username:             "guest",
+		Password:             "guest",
+		HeartbeatIntervalMax: 600,
+		ChannelMax:           100,
+		FrameMax:             131072,
 	}
 
 	b := broker.NewBroker(config)

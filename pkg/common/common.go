@@ -20,4 +20,5 @@ type ConnectionInfo struct {
 	LastHeartbeat     time.Time `json:"last_heartbeat"`
 	ConnectedAt       time.Time `json:"connected_at"`
 	Conn              net.Conn  `json:"-"`
+	Done              chan struct{}
 }

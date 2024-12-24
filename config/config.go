@@ -1,9 +1,11 @@
 package config
 
 type Config struct {
-	Port              string
-	Host              string
-	HeartBeatInterval int
-	Username          string
-	Password          string
+	Port                 string
+	Host                 string
+	Username             string
+	Password             string
+	HeartbeatIntervalMax uint16
+	ChannelMax           uint16
+	FrameMax             uint32
 }
