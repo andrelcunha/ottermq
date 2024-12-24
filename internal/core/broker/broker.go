@@ -9,37 +9,60 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/config"
-	// "github.com/andrelcunha/ottermq/internal/connection"
 	"github.com/andrelcunha/ottermq/internal/core/vhost"
+	. "github.com/andrelcunha/ottermq/pkg/common"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/pkg/connection/server"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 	_ "github.com/andrelcunha/ottermq/pkg/persistdb"
 )
 
+var (
+	version = "0.6.0-alpha"
+)
+
+const (
+	platform = "golang"
+	product  = "OtterMQ"
+)
+
 type Broker struct {
-	VHosts            map[string]*vhost.VHost
-	config            *config.Config         `json:"-"`
-	HeartbeatInterval time.Duration          `json:"-"`
-	Connections       map[net.Conn]bool      `json:"-"`
-	ConnectedAt       map[net.Conn]time.Time `json:"-"`
-	LastHeartbeat     map[net.Conn]time.Time `json:"-"`
-	mu                sync.Mutex             `json:"-"`
+	VHosts      map[string]*vhost.VHost
+	config      *config.Config               `json:"-"`
+	Connections map[net.Conn]*ConnectionInfo `json:"-"`
+	mu          sync.Mutex                   `json:"-"`
 }
 
 func NewBroker(config *config.Config) *Broker {
 	b := &Broker{
-		VHosts:            make(map[string]*vhost.VHost),
-		Connections:       make(map[net.Conn]bool),
-		config:            config,
-		LastHeartbeat:     make(map[net.Conn]time.Time),
-		ConnectedAt:       make(map[net.Conn]time.Time),
-		HeartbeatInterval: time.Duration(config.HeartBeatInterval) * time.Second,
+		VHosts:      make(map[string]*vhost.VHost),
+		Connections: make(map[net.Conn]*ConnectionInfo),
+		config:      config,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")
 	return b
 }
 
 func (b *Broker) Start() {
+	capabilities := map[string]interface{}{
+		"basic.nack":             true,
+		"connection.blocked":     true,
+		"consumer_cancel_notify": true,
+		"publisher_confirms":     true,
+	}
+
+	serverProperties := map[string]interface{}{
+		"capabilities": capabilities,
+		"product":      product,
+		"version":      version,
+		"platform":     platform,
+	}
+	configurations := map[string]interface{}{
+		"mechanisms":       []string{"PLAIN"},
+		"locales":          []string{"en_US"},
+		"serverProperties": serverProperties,
+	}
+
 	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
 
 	listener, err := net.Listen("tcp", addr)
@@ -56,18 +79,18 @@ func (b *Broker) Start() {
 			continue
 		}
 		log.Println("New client waiting for connection: ", conn.RemoteAddr())
-		go b.handleConnection(conn)
+		go b.handleConnection(configurations, conn)
 	}
 }
 
-func (b *Broker) handleConnection(conn net.Conn) {
+func (b *Broker) handleConnection(configurations map[string]interface{}, conn net.Conn) {
 	defer func() {
 		conn.Close()
 		b.cleanupConnection(conn)
 	}()
+	channelNum := uint16(0)
 
-	// handler := connection.NewConnectionHandler(conn)
-	if err := b.connectionHandshake(conn); err != nil {
+	if err := server.ServerHandshake(configurations, conn); err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
@@ -82,44 +105,41 @@ func (b *Broker) handleConnection(conn net.Conn) {
 			return
 		}
 		fmt.Printf("received: %+v\n", frame)
-		_, err = b.ParseFrame(conn, frame)
+		// Verify if it is a heartbeat
+
+		_, err = b.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR: %v", err.Error())
 		}
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn) {
+func (b *Broker) registerConnection(conn net.Conn, username, vhost string, heartbeatInterval uint16) {
 	b.mu.Lock()
-	b.Connections[conn] = true
-	b.LastHeartbeat[conn] = time.Now()
-	b.ConnectedAt[conn] = time.Now()
+	b.Connections[conn] = &ConnectionInfo{
+		User:              username,
+		VHost:             vhost,
+		HeartbeatInterval: heartbeatInterval,
+		ConnectedAt:       time.Now(),
+		LastHeartbeat:     time.Now(),
+		Conn:              conn,
+	}
 	b.mu.Unlock()
 }
-
-// func (b *Broker) registerSessionAndConsummer(conn net.Conn) string {
-// 	sessionID := generateSessionID()
-// 	consumerID := conn.RemoteAddr().String()
-
-// 	b.registerConsumer(consumerID, "default", sessionID)
-// 	log.Println("New connection registered")
-// 	return consumerID
-// }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	log.Println("Cleaning connection")
 	b.mu.Lock()
 	delete(b.Connections, conn)
-	delete(b.LastHeartbeat, conn)
-	delete(b.ConnectedAt, conn)
 	b.mu.Unlock()
 	for _, vhost := range b.VHosts {
 		vhost.CleanupConnection(conn)
 	}
 }
 
-func (b *Broker) sendHeartbeat(conn net.Conn) {
-	ticker := time.NewTicker(b.HeartbeatInterval)
+func (b *Broker) sendHeartbeat(conn net.Conn, heartbeatInterval uint16) {
+	duration := time.Duration(heartbeatInterval) * time.Second
+	ticker := time.NewTicker(duration)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -344,7 +364,7 @@ func (b *Broker) sendHeartbeat(conn net.Conn) {
 // }
 */
 
-func (b *Broker) ParseFrame(conn net.Conn, frame []byte) (interface{}, error) {
+func (b *Broker) ParseFrame(configurations map[string]interface{}, conn net.Conn, currentChannel uint16, frame []byte) (interface{}, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
@@ -355,12 +375,15 @@ func (b *Broker) ParseFrame(conn net.Conn, frame []byte) (interface{}, error) {
 	if len(frame) < int(7+payloadSize) {
 		return nil, fmt.Errorf("frame too short")
 	}
+	if channel != currentChannel {
+		return nil, fmt.Errorf("unexpected channel: %d", channel)
+	}
 	payload := frame[7:]
 
 	switch frameType {
 	case byte(constants.TYPE_METHOD):
 		fmt.Printf("Received METHOD frame on channel %d\n", channel)
-		return shared.ParseMethodFrame(channel, payload)
+		return shared.ParseMethodFrame(configurations, channel, payload)
 
 	case byte(constants.TYPE_HEARTBEAT):
 		log.Printf("Received HEARTBEAT frame on channel %d\n", channel)
@@ -374,7 +397,7 @@ func (b *Broker) ParseFrame(conn net.Conn, frame []byte) (interface{}, error) {
 }
 
 func (b *Broker) handleHeartbeat(conn net.Conn, channel int, frame []byte) error {
-	if err := b.sendFrame(conn, frame); err != nil {
+	if err := shared.SendFrame(conn, frame); err != nil {
 		log.Printf("Error sending heartbeat response: %v", err)
 		return err
 	}

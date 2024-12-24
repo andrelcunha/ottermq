@@ -342,7 +342,7 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	return string(strData), nil
 }
 
-func ParseFrame(config *ClientConfig, frame []byte) (interface{}, error) {
+func ParseFrame(configurations map[string]interface{}, frame []byte) (interface{}, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
@@ -358,7 +358,7 @@ func ParseFrame(config *ClientConfig, frame []byte) (interface{}, error) {
 	switch frameType {
 	case byte(constants.TYPE_METHOD):
 		fmt.Printf("Received METHOD frame on channel %d\n", channel)
-		return parseMethodFrame(config, channel, payload)
+		return ParseMethodFrame(configurations, channel, payload)
 	case byte(constants.TYPE_HEARTBEAT):
 		err := processHeartbeat(channel)
 		return frame, err
@@ -373,7 +373,7 @@ func processHeartbeat(channel uint16) error {
 	return nil
 }
 
-func parseMethodFrame(config *ClientConfig, channel uint16, payload []byte) (interface{}, error) {
+func ParseMethodFrame(configurations map[string]interface{}, channel uint16, payload []byte) (interface{}, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -385,8 +385,13 @@ func parseMethodFrame(config *ClientConfig, channel uint16, payload []byte) (int
 	switch classID {
 	case uint16(constants.CONNECTION):
 		fmt.Printf("Received CONNECTION frame on channel %d\n", channel)
-		return parseConnectionMethod(config, methodID, methodPayload)
+		return parseConnectionMethod(configurations, methodID, methodPayload)
 	default:
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
+}
+
+func SendFrame(conn net.Conn, frame []byte) error {
+	_, err := conn.Write(frame)
+	return err
 }

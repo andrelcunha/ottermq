@@ -1,6 +1,9 @@
 package common
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type CommandResponse struct {
 	Status  string      `json:"status"`
@@ -11,7 +14,10 @@ type CommandResponse struct {
 type FiberMap map[string]interface{}
 
 type ConnectionInfo struct {
-	Name          string    `json:"name"`
-	LastHeartbeat time.Time `json:"last_heartbeat"`
-	ConnectedAt   time.Time `json:"connected_at"`
+	User              string    `json:"user"`
+	VHost             string    `json:"vhost"`
+	HeartbeatInterval uint16    `json:"heartbeat_interval"`
+	LastHeartbeat     time.Time `json:"last_heartbeat"`
+	ConnectedAt       time.Time `json:"connected_at"`
+	Conn              net.Conn  `json:"-"`
 }

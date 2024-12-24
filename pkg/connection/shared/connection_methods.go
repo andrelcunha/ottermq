@@ -25,7 +25,7 @@ type ConnectionStartOkFrame struct {
 	Locale           string
 }
 
-type ConnectionTuneOkFrame struct {
+type ConnectionTuneFrame struct {
 	ChannelMax uint16
 	FrameMax   uint32
 	Heartbeat  uint16
@@ -37,7 +37,7 @@ type ConnectionOpenFrame struct {
 	Properties   map[string]interface{}
 }
 
-func parseConnectionMethod(config *ClientConfig, methodID uint16, payload []byte) (interface{}, error) {
+func parseConnectionMethod(configurations map[string]interface{}, methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(constants.CONNECTION_START):
 		fmt.Printf("Received CONNECTION_START frame \n")
@@ -46,12 +46,16 @@ func parseConnectionMethod(config *ClientConfig, methodID uint16, payload []byte
 			return nil, fmt.Errorf("Failed to parse connection.start frame: %v", err)
 		}
 
-		startOkRequest := createConnectionStartOkRequest(config, startResponse)
+		startOkRequest, err := createConnectionStartOkPayload(configurations, startResponse)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create connection.start-ok frame: %v", err)
+		}
 		startOkFrame := createConnectionStartOkFrame(&startOkRequest)
 		return startOkFrame, nil
 
 	case uint16(constants.CONNECTION_START_OK):
-		fmt.Printf("Received CONNECTION_START_OK frame \n")
+		fmt.Printf("[DEBUG] Received connection.start-ok: %+v\n", payload)
+
 		return parseConnectionStartOkFrame(payload)
 
 	case uint16(constants.CONNECTION_TUNE):
@@ -105,7 +109,7 @@ func parseConnectionOpenOkFrame(payload []byte) (interface{}, error) {
 
 }
 
-func parseConnectionTuneFrame(payload []byte) (*ConnectionTuneOkFrame, error) {
+func parseConnectionTuneFrame(payload []byte) (*ConnectionTuneFrame, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -123,7 +127,7 @@ func parseConnectionTuneFrame(payload []byte) (*ConnectionTuneOkFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode heartbeat: %v", err)
 	}
-	return &ConnectionTuneOkFrame{
+	return &ConnectionTuneFrame{
 		ChannelMax: channelMax,
 		FrameMax:   frameMax,
 		Heartbeat:  heartbeat,
@@ -148,7 +152,7 @@ func parseConnectionTuneOkFrame(payload []byte) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode heartbeat: %v", err)
 	}
-	return &ConnectionTuneOkFrame{
+	return &ConnectionTuneFrame{
 		ChannelMax: channelMax,
 		FrameMax:   frameMax,
 		Heartbeat:  heartbeat,
@@ -253,42 +257,67 @@ func parseConnectionStartOkFrame(payload []byte) (*ConnectionStartOkFrame, error
 	}, nil
 }
 
-func createConnectionStartOkRequest(config *ClientConfig, startFrameResponse *ConnectionStartFrame) ConnectionStartOkFrame {
-	capabilities := map[string]interface{}{
-		"basic.nack":             true,
-		"connection.blocked":     true,
-		"consumer_cancel_notify": true,
-		"publisher_confirms":     true,
+func CreateConnectionStartFrame() []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_START
+
+	payloadBuf.WriteByte(0) // version-major
+	payloadBuf.WriteByte(9) // version-minor
+
+	serverProperties := map[string]interface{}{
+		"product": "OtterMQ",
 	}
-	clientProperties := map[string]interface{}{
-		"capabilities": capabilities,
-		"product":      "Ottermq Client",
-		"version":      "0.6.0-alpha",
-		"platform":     "golang",
-	}
-	fmt.Printf("clientProperties: %+v\n", clientProperties)
+	encodedProperties := EncodeTable(serverProperties)
+	payloadBuf.Write(EncodeLongStr(encodedProperties))
+
+	payloadBuf.Write(EncodeLongStr([]byte("PLAIN")))
+
+	payloadBuf.Write(EncodeLongStr([]byte("en_US")))
+
+	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+
+	return frame
+}
+
+func createConnectionStartOkPayload(configurations map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
+
+	// capabilities := configurations["capabilities"].(map[string]interface{})
+	clientProperties := configurations["clientProperties"].(map[string]interface{})
+	fmt.Printf("[DEBUG] clientProperties: %+v\n", clientProperties)
+
 	mecanismsStr := startFrameResponse.Mechanisms
-	localesStr := startFrameResponse.Locales
 	mechanismsList := strings.Split(mecanismsStr, ",")
-	fmt.Printf("mechanismsList: %+v\n", mechanismsList)
-	securityStr := fmt.Sprintf(" %s %s", config.Username, config.Password)
-	localesList := strings.Split(localesStr, ",")
-	// find 'PLAIN' in mechanismsList
-	mechanism := "PLAIN"
+	mechanismsMap := make(map[string]bool)
 	for _, m := range mechanismsList {
-		if m == "PLAIN" {
-			mechanism = m
-			break
-		}
+		mechanismsMap[m] = true
+	}
+
+	// find 'PLAIN' in mechanismsList
+	mechanism := configurations["mechanism"].(string)
+	if !mechanismsMap[mechanism] {
+		// mechanism = "PLAIN"
+		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported mechanism: %s", mechanism)
 	}
 	fmt.Printf("mechanism: %s\n", mechanism)
+
+	// fmt.Printf("mechanismsList: %+v\n", mechanismsList)
+	username := configurations["username"].(string)
+	password := configurations["password"].(string)
+
+	securityStr := fmt.Sprintf(" %s %s", username, password)
 	// find 'en_US' in localesList
-	locale := "en_US"
+	localesStr := startFrameResponse.Locales
+	localesList := strings.Split(localesStr, ",")
+	localesMap := make(map[string]bool)
 	for _, l := range localesList {
-		if l == "en_US" {
-			locale = l
-			break
-		}
+		localesMap[l] = true
+	}
+	locale := configurations["locale"].(string)
+	if !localesMap[locale] {
+		// locale = "en_US"
+		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported locale: %s", locale)
 	}
 	startOk := ConnectionStartOkFrame{
 		ClientProperties: clientProperties,
@@ -296,7 +325,7 @@ func createConnectionStartOkRequest(config *ClientConfig, startFrameResponse *Co
 		Response:         securityStr,
 		Locale:           locale,
 	}
-	return startOk
+	return startOk, nil
 }
 
 func createConnectionStartOkFrame(startOk *ConnectionStartOkFrame) []byte {
@@ -343,7 +372,21 @@ func FormatMethodFrame(channelNum uint16, class constants.TypeClass, method cons
 	return frame
 }
 
-func createConnectionTuneOkFrame(tune *ConnectionTuneOkFrame) []byte {
+func CreateConnectionTuneFrame(tune *ConnectionTuneFrame) []byte {
+	var payloadBuf bytes.Buffer
+	channelNum := uint16(0)
+	classID := constants.CONNECTION
+	methodID := constants.CONNECTION_TUNE
+
+	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
+	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
+	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
+
+	frame := FormatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
+	return frame
+}
+
+func createConnectionTuneOkFrame(tune *ConnectionTuneFrame) []byte {
 	var payloadBuf bytes.Buffer
 	channelNum := uint16(0)
 	classID := constants.CONNECTION
@@ -389,7 +432,7 @@ func CreateConnectionOpenOkFrame() []byte {
 	return frame
 }
 
-func fineTune(tune *ConnectionTuneOkFrame) *ConnectionTuneOkFrame {
+func fineTune(tune *ConnectionTuneFrame) *ConnectionTuneFrame {
 	// TODO: get values from config
 	tune.ChannelMax = getSmalestShortInt(2047, tune.ChannelMax)
 	tune.FrameMax = getSmalestLongInt(131072, tune.FrameMax)
