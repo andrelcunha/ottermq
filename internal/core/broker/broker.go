@@ -12,7 +12,12 @@ import (
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/vhost"
 	. "github.com/andrelcunha/ottermq/pkg/common"
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/exchange"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/queue"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/server"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 	_ "github.com/andrelcunha/ottermq/pkg/persistdb"
@@ -124,12 +129,50 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 		fmt.Printf("[DEBUG]received: %x\n", frame)
 
 		//Process frame
-		_, err = b.ParseFrame(configurations, conn, channelNum, frame)
+		requestInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
+		if requestInterface != nil {
+			request, ok := requestInterface.(*amqp.RequestMethodMessage)
+			if !ok {
+				log.Fatalf("Failed to cast request to amqp.Message")
+			}
+			if request.ClassID == uint16(constants.CONNECTION) {
+				switch request.MethodID {
+				case uint16(constants.CONNECTION_CLOSE):
+					b.cleanupConnection(conn)
+					// send close-ok
+					// closeOk := amqp.NewFrame(amqp.MethodMessage{
+					// 	Channel:  0,
+					// 	ClassID:  uint16(constants.CONNECTION),
+					// 	MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+					// 	Content:  nil,
+					// })
+					frame := amqp.ResponseMethodMessage{
+						Channel:  0,
+						ClassID:  uint16(constants.CONNECTION),
+						MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+						Content:  amqp.ContentList{},
+					}.FormatMethodFrame()
+					shared.SendFrame(conn, frame)
+				}
+				continue
+			}
+			b.executeRequest(request)
+		}
 	}
 }
+
+// func sendResponse(conn net.Conn, response amqp.ResponseMethodMessage) error {
+// 	frame := []byte{}
+// 	err :=
+// 	if err != nil {
+// 		return fmt.Errorf("failed to send response: %v", err)
+// 	}
+
+// 	return shared.SendFrame(conn, frame)
+// }
 
 func (b *Broker) registerConnection(conn net.Conn, username, vhost string, heartbeatInterval uint16) {
 	b.mu.Lock()
@@ -235,4 +278,166 @@ func (b *Broker) sendHeartbeat(conn net.Conn) {
 		}
 
 	}
+}
+
+func (b *Broker) executeRequest(request *amqp.RequestMethodMessage) (interface{}, error) {
+	switch request.ClassID {
+
+	case uint16(constants.CHANNEL):
+		// Handle channel-related commands
+	case uint16(constants.EXCHANGE):
+		switch request.MethodID {
+		case uint16(exchange.DECLARE):
+			// // Handle exchange declaration
+			// exchangeName := parts[1]
+			// typ := parts[2]
+			// err := b.createExchange(exchangeName, ExchangeType(typ))
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ)}, nil
+		case uint16(exchange.DELETE):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// err := b.deleteExchange(exchangeName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s deleted", exchangeName)}, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+		// Handle exchange-related commands
+	case uint16(constants.QUEUE):
+		switch request.MethodID {
+		case uint16(queue.DECLARE):
+			// Handle queue declaration
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// _, err := b.createQueue(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// // Bind the queue to the default exchange with the same name as the queue
+			// err = b.bindToDefaultExchange(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s created", queueName)}, nil
+		case uint16(queue.BIND):
+			// if len(parts) < 3 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// queueName := parts[2]
+			// routingKey := ""
+			// if len(parts) == 4 {
+			// 	routingKey = parts[3]
+			// }
+			// err := b.bindQueue(exchangeName, queueName, routingKey)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName)}, err
+		case uint16(queue.DELETE):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// err := b.deleteQueue(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
+
+		case uint16(queue.UNBIND):
+			// if len(parts) != 4 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// queueName := parts[2]
+			// routingKey := parts[3]
+			// b.DeletBinding(exchangeName, queueName, routingKey)
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Binding deleted")}, nil
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	case uint16(constants.BASIC):
+		switch request.MethodID {
+		case uint16(basic.QOS):
+		case uint16(basic.CONSUME):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// fmt.Println("Consuming from queue:", queueName)
+			// msg := b.consume(queueName, consumerID)
+			// if msg == nil {
+			// 	return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Data: msg}, nil
+		case uint16(basic.CANCEL):
+		case uint16(basic.PUBLISH):
+			// if len(parts) < 4 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// routingKey := parts[2]
+			// message := strings.Join(parts[3:], " ")
+			// msgId, err := b.publish(exchangeName, routingKey, message)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// var data struct {
+			// 	MessageID string `json:"message_id"`
+			// }
+			// data.MessageID = msgId
+			// return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
+		case uint16(basic.RETURN):
+		case uint16(basic.DELIVER):
+		case uint16(basic.GET):
+		case uint16(basic.GET_EMPTY):
+			// Handle message retrieval
+		case uint16(basic.ACK):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// msgID := parts[1]
+			// // get queue from consumerID
+			// consumer, ok := b.Consumers[consumerID]
+			// if !ok {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Consumer not found"}, nil
+			// }
+			// queue := consumer.Queue
+			// b.acknowledge(queue, consumerID, msgID)
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
+
+		case uint16(basic.REJECT):
+		case uint16(basic.RECOVER_ASYNC):
+		case uint16(basic.RECOVER):
+		case uint16(basic.RECOVER_OK):
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	case uint16(constants.TX):
+		// Handle transaction-related commands
+		switch request.MethodID {
+		case uint16(tx.SELECT):
+			// Handle transaction selection
+		case uint16(tx.COMMIT):
+			// Handle transaction commit
+		case uint16(tx.ROLLBACK):
+			// Handle transaction rollback
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
 }

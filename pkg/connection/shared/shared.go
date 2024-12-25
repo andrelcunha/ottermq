@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )
 
@@ -385,7 +386,20 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 	switch classID {
 	case uint16(constants.CONNECTION):
 		fmt.Printf("Received CONNECTION frame on channel %d\n", channel)
-		return parseConnectionMethod(configurations, methodID, methodPayload)
+		request, err := parseConnectionMethod(configurations, methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			msg, ok := request.(amqp.RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				return msg, nil
+			}
+		}
+
+		return request, nil
 	default:
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}

@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"math"
 	"strings"
+
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )
@@ -33,16 +37,7 @@ type ConnectionTuneFrame struct {
 
 type ConnectionOpenFrame struct {
 	VirtualHost string
-	// Capabilities string
-	// Properties   map[string]interface{}
 }
-
-type ConnectionCloseFrame struct {
-	ReplyCode uint16
-	ReplyText string
-}
-
-type ConnectionCloseOkFrame struct{}
 
 func parseConnectionMethod(configurations *map[string]interface{}, methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
@@ -88,7 +83,18 @@ func parseConnectionMethod(configurations *map[string]interface{}, methodID uint
 
 	case uint16(constants.CONNECTION_CLOSE):
 		fmt.Printf("Received CONNECTION_CLOSE frame \n")
-		return parseConnectionCloseFrame(payload)
+		request, err := parseConnectionCloseFrame(payload)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse connection.close frame: %v", err)
+		}
+		request.MethodID = uint16(constants.CONNECTION_CLOSE_OK)
+		fmt.Printf("[DEBUG] connection close request: %+v\n", request)
+		content, ok := request.Content.(*message.ConnectionCloseMessage)
+		if !ok {
+			return nil, fmt.Errorf("Invalid message content type")
+		}
+		log.Printf("Received connection.close: (%d) '%s'\n", content.ReplyCode, content.ReplyText)
+		return request, nil
 
 	case uint16(constants.CONNECTION_CLOSE_OK):
 		fmt.Printf("Received CONNECTION_CLOSE_OK frame \n")
@@ -99,25 +105,36 @@ func parseConnectionMethod(configurations *map[string]interface{}, methodID uint
 	}
 }
 
-func parseConnectionCloseFrame(payload []byte) (*ConnectionCloseFrame, error) {
+func parseConnectionCloseFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	if len(payload) < 12 {
 		return nil, fmt.Errorf("frame too short")
 	}
 
-	replyCode := binary.BigEndian.Uint16(payload[0:2])
-	replyTextLen := payload[2]
-	replyText := string(payload[3 : 3+replyTextLen])
-
-	frame := &ConnectionCloseFrame{
+	index := uint16(0)
+	replyCode := binary.BigEndian.Uint16(payload[index : index+2])
+	index += 2
+	replyTextLen := payload[index]
+	index++
+	replyText := string(payload[index : index+uint16(replyTextLen)])
+	index += uint16(replyTextLen)
+	classID := binary.BigEndian.Uint16(payload[index : index+2])
+	index += 2
+	methodID := binary.BigEndian.Uint16(payload[index : index+2])
+	msg := &message.ConnectionCloseMessage{
 		ReplyCode: replyCode,
 		ReplyText: replyText,
+		ClassID:   classID,
+		MethodID:  methodID,
 	}
-
-	return frame, nil
+	request := &amqp.RequestMethodMessage{
+		Content: msg,
+	}
+	fmt.Printf("[DEBUG] connection close request: %+v\n", request)
+	return request, nil
 }
 
-func parseConnectionCloseOkFrame(payload []byte) (*ConnectionCloseOkFrame, error) {
-	return &ConnectionCloseOkFrame{}, nil
+func parseConnectionCloseOkFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
+	return &amqp.RequestMethodMessage{Content: payload}, nil
 }
 
 func parseConnectionOpenFrame(payload []byte) (interface{}, error) {
