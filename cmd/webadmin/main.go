@@ -1,48 +1,48 @@
 package main
 
-import (
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
+// import (
+// 	"log"
+// 	"os"
+// 	"os/signal"
+// 	"syscall"
 
-	"github.com/andrelcunha/ottermq/web"
-)
+// 	"github.com/andrelcunha/ottermq/web"
+// )
 
-func main() {
-	// Logger
-	file, err := os.OpenFile("server.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer file.Close()
+// func main() {
+// 	// Logger
+// 	file, err := os.OpenFile("server.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+// 	if err != nil {
+// 		log.Fatalf("error opening file: %v", err)
+// 	}
+// 	defer file.Close()
 
-	log.Println("Starting OtterMq Web Admin...")
+// 	log.Println("Starting OtterMq Web Admin...")
 
-	config := web.Config{
-		BrokerHost:        "localhost",
-		BrokerPort:        "5672",
-		HeartbeatInterval: 60,
-		Username:          "guest",
-		Password:          "guest",
-		JwtKey:            "secret",
-	}
+// 	config := web.Config{
+// 		BrokerHost:        "localhost",
+// 		BrokerPort:        "5672",
+// 		HeartbeatInterval: 60,
+// 		Username:          "guest",
+// 		Password:          "guest",
+// 		JwtKey:            "secret",
+// 	}
 
-	webServer, err := web.NewWebServer(&config)
-	if err != nil {
-		log.Fatalf("failed to connect to broker: %v", err)
-	}
-	defer webServer.Close()
-	app := webServer.SetupApp(file)
+// 	webServer, err := web.NewWebServer(&config, nil)
+// 	if err != nil {
+// 		log.Fatalf("failed to connect to broker: %v", err)
+// 	}
+// 	defer webServer.Close()
+// 	app := webServer.SetupApp(file)
 
-	//Handle gracefull shutdown
-	channel := make(chan os.Signal, 1)
-	signal.Notify(channel, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-channel
-		file.Close()
-		app.Shutdown()
-	}()
+// 	//Handle gracefull shutdown
+// 	channel := make(chan os.Signal, 1)
+// 	signal.Notify(channel, os.Interrupt, syscall.SIGTERM)
+// 	go func() {
+// 		<-channel
+// 		file.Close()
+// 		app.Shutdown()
+// 	}()
 
-	app.Listen(":3000")
-}
+// 	app.Listen(":3000")
+// }

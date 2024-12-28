@@ -105,8 +105,8 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 	username := (*configurations)["username"].(string)
 	vhost := (*configurations)["vhost"].(string)
 	heartbeatInterval := (*configurations)["heartbeatInterval"].(uint16)
-	b.registerConnection(conn, username, vhost, heartbeatInterval)
 
+	b.registerConnection(conn, username, vhost, heartbeatInterval)
 	go b.sendHeartbeat(conn)
 	log.Println("Handshake successful")
 
@@ -261,6 +261,7 @@ func (b *Broker) sendHeartbeat(conn net.Conn) {
 			b.mu.Lock()
 			if _, ok := b.Connections[conn]; !ok {
 				b.mu.Unlock()
+				log.Println("Connection no longer exists in broker")
 				return
 			}
 			b.mu.Unlock()

@@ -1,13 +1,13 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
+	// "encoding/json"
+	// "fmt"
+	// "net/http"
 
-	"github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/web/models"
-	"github.com/andrelcunha/ottermq/web/utils"
+	// "github.com/andrelcunha/ottermq/pkg/common/communication/api"
+	// "github.com/andrelcunha/ottermq/web/models"
+	// "github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -23,39 +23,40 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings [post]
 func BindQueue(c *fiber.Ctx) error {
-	var request models.BindQueueRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	command := fmt.Sprintf("BIND_QUEUE %s %s %s",
-		request.ExchangeName,
-		request.QueueName,
-		request.RoutingKey)
-	response, err := utils.SendCommand(command)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// var request models.BindQueueRequest
+	// if err := c.BodyParser(&request); err != nil {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
+	// command := fmt.Sprintf("BIND_QUEUE %s %s %s",
+	// 	request.ExchangeName,
+	// 	request.QueueName,
+	// 	request.RoutingKey)
+	// response, err := utils.SendCommand(command)
+	// if err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "failed to parse response",
+	// 	})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"message": commandResponse.Message,
-		})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": commandResponse.Message,
+	// 	})
+	// } else {
+	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 		"message": commandResponse.Message,
+	// 	})
+	// }
+	return nil /// just to make the compiler happy
 }
 
 // ListBindings godoc
@@ -71,37 +72,38 @@ func BindQueue(c *fiber.Ctx) error {
 // @Router /api/bindings/{exchange} [get]
 func ListBindings(c *fiber.Ctx) error {
 
-	exchangeName := c.Params("exchange")
-	if exchangeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Exchange name is required",
-		})
-	}
+	// exchangeName := c.Params("exchange")
+	// if exchangeName == "" {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": "Exchange name is required",
+	// 	})
+	// }
 
-	command := fmt.Sprintf("LIST_BINDINGS %s", exchangeName)
-	response, err := utils.SendCommand(command)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// command := fmt.Sprintf("LIST_BINDINGS %s", exchangeName)
+	// response, err := utils.SendCommand(command)
+	// if err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "failed to parse response",
+	// 	})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"bindings": commandResponse.Data,
-		})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": commandResponse.Message,
+	// 	})
+	// } else {
+	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 		"bindings": commandResponse.Data,
+	// 	})
+	// }
+	return nil // just to make the compiler happy
 }
 
 // DeleteBinding godoc
@@ -116,27 +118,28 @@ func ListBindings(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings [delete]
 func DeleteBinding(c *fiber.Ctx) error {
-	var request models.DeleteBindingRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-	}
-	command := fmt.Sprintf("DELETE_BINDING %s %s %s",
-		request.ExchangeName,
-		request.QueueName,
-		request.RoutingKey)
-	response, err := utils.SendCommand(command)
-	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
+	// var request models.DeleteBindingRequest
+	// if err := c.BodyParser(&request); err != nil {
+	// 	return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	// }
+	// command := fmt.Sprintf("DELETE_BINDING %s %s %s",
+	// 	request.ExchangeName,
+	// 	request.QueueName,
+	// 	request.RoutingKey)
+	// response, err := utils.SendCommand(command)
+	// if err != nil {
+	// 	return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to parse response"})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to parse response"})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": commandResponse.Message})
-	} else {
-		return c.Status(http.StatusOK).JSON(fiber.Map{"message": commandResponse.Message})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": commandResponse.Message})
+	// } else {
+	// 	return c.Status(http.StatusOK).JSON(fiber.Map{"message": commandResponse.Message})
+	// }
+	return nil // just to make the function compile
 }

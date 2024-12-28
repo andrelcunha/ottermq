@@ -215,56 +215,12 @@ func (b *VHost) bindQueue(exchangeName, queueName, routingKey string) error {
 	// if err != nil {
 	// 	log.Printf("Failed to save broker state: %v", err)
 	// }
-
 	return nil
 }
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (b *VHost) bindToDefaultExchange(queueName string) error {
 	return b.bindQueue(default_exchange, queueName, queueName)
-}
-
-func (b *VHost) listExchanges() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	exchangeNames := make([]string, 0, len(b.Exchanges))
-	for name := range b.Exchanges {
-		exchangeNames = append(exchangeNames, name)
-	}
-	return exchangeNames
-}
-
-func (b *VHost) listBindings(exchangeName string) map[string][]string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	exchange, ok := b.Exchanges[exchangeName]
-	if !ok {
-		return nil
-	}
-
-	switch exchange.Typ {
-	case DIRECT:
-		// bindings := make([]string, 0, len(exchange.Bindings))
-		bindings := make(map[string][]string)
-		for routingKey, queues := range exchange.Bindings {
-			var queuesStr []string
-			for _, queue := range queues {
-				queuesStr = append(queuesStr, queue.Name)
-			}
-			bindings[routingKey] = queuesStr
-		}
-		return bindings
-	case FANOUT:
-		// bindings := make([]string, 0, len(exchange.Queues))
-		bindings := make(map[string][]string)
-		var queues []string
-		for queueName := range exchange.Queues {
-			queues = append(queues, queueName)
-		}
-		bindings["fanout"] = queues
-		return bindings
-	}
-	return nil
 }
 
 func (b *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {
@@ -311,59 +267,27 @@ func (b *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {
 	return nil
 }
 
-func (b *VHost) countMessages(queueName string) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+// func (vh *VHost) RegisterSessionAndConsummer(sessionID, consumerID string) string {
+// 	// sessionID := generateSessionID()
+// 	// consumerID := conn.RemoteAddr().String()
 
-	queue, ok := b.Queues[queueName]
-	if !ok {
-		return 0, fmt.Errorf("Queue %s not found", queueName)
-	}
+// 	vh.registerConsumer(consumerID, "default", sessionID)
+// 	log.Println("New connection registered")
+// 	return consumerID
+// }
 
-	// messageCount := len(queue.messages)
-	messageCount := queue.Len()
-	return messageCount, nil
-}
-
-func (b *VHost) deleteExchange(name string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// If the exchange is the default exchange, return an error
-	if name == "default" {
-		return fmt.Errorf("cannot delete default exchange")
-	}
-
-	// Check if the exchange exists
-	_, ok := b.Exchanges[name]
-	if !ok {
-		return fmt.Errorf("exchange %s not found", name)
-	}
-	delete(b.Exchanges, name)
-	// b.saveBrokerState()
-	return nil
-}
-
-func (vh *VHost) RegisterSessionAndConsummer(sessionID, consumerID string) string {
-	// sessionID := generateSessionID()
-	// consumerID := conn.RemoteAddr().String()
-
-	vh.registerConsumer(consumerID, "default", sessionID)
-	log.Println("New connection registered")
-	return consumerID
-}
-
-func (b *VHost) registerConsumer(consumerID, queue, sessionID string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	consumer := &Consumer{
-		ID:        consumerID,
-		Queue:     queue,
-		SessionID: sessionID,
-	}
-	b.Consumers[consumerID] = consumer
-	b.ConsumerSessions[sessionID] = consumerID
-	b.ConsumerUnackMsgs[consumerID] = make(map[string]bool)
-}
+// func (b *VHost) registerConsumer(consumerID, queue, sessionID string) {
+// 	b.mu.Lock()
+// 	defer b.mu.Unlock()
+// 	consumer := &Consumer{
+// 		ID:        consumerID,
+// 		Queue:     queue,
+// 		SessionID: sessionID,
+// 	}
+// 	b.Consumers[consumerID] = consumer
+// 	b.ConsumerSessions[sessionID] = consumerID
+// 	b.ConsumerUnackMsgs[consumerID] = make(map[string]bool)
+// }
 
 func (vh *VHost) getSessionID(conn net.Conn) (string, bool) {
 	vh.mu.Lock()
@@ -374,44 +298,4 @@ func (vh *VHost) getSessionID(conn net.Conn) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func (vh *VHost) CleanupConnection(conn net.Conn) {
-	log.Println("Cleaning vhost connection")
-	vh.mu.Lock()
-
-	vh.mu.Unlock()
-	consumerID, ok := vh.getSessionID(conn)
-	if ok {
-		vh.handleConsumerDisconnection(consumerID)
-	}
-}
-
-func (b *VHost) handleConsumerDisconnection(sessionID string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	consumerID, ok := b.ConsumerSessions[sessionID]
-	if !ok {
-		log.Printf("Session %s not found\n", sessionID)
-		return
-	}
-
-	consumer, ok := b.Consumers[consumerID]
-	if !ok {
-		log.Printf("Consumer %s not found\n", consumerID)
-		return
-	}
-
-	// requeue unacknowledged messages
-	for msgID := range b.ConsumerUnackMsgs[consumerID] {
-		if queue, ok := b.Queues[consumer.Queue]; ok {
-			// queue.messages <- Message{ID: msgID}
-			queue.ReQueue(Message{ID: msgID})
-		}
-	}
-
-	delete(b.ConsumerUnackMsgs, consumerID)
-	delete(b.ConsumerSessions, sessionID)
-	delete(b.Consumers, consumerID)
 }

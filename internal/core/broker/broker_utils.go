@@ -1,7 +1,7 @@
 package broker
 
 import (
-	"github.com/andrelcunha/ottermq/pkg/persistdb"
+	// "github.com/andrelcunha/ottermq/pkg/persistdb"
 	"github.com/google/uuid"
 )
 
@@ -15,15 +15,15 @@ func (b *Broker) Shutdown() {
 	}
 }
 
-func (b *Broker) authenticate(username, password string) bool {
-	err := persistdb.OpenDB()
-	if err != nil {
-		return false
-	}
-	defer persistdb.CloseDB()
-	isAuthenticated, err := persistdb.AuthenticateUser(username, password)
-	if err != nil {
-		return false
-	}
-	return isAuthenticated
-}
+// func (b *Broker) authenticate(username, password string) bool {
+// 	err := persistdb.OpenDB()
+// 	if err != nil {
+// 		return false
+// 	}
+// 	defer persistdb.CloseDB()
+// 	isAuthenticated, err := persistdb.AuthenticateUser(username, password)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	return isAuthenticated
+// }

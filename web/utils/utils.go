@@ -1,55 +1,54 @@
 package utils
 
-import (
-	"bufio"
-	"fmt"
-	"net"
-	"time"
-)
+// import (
+// 	"fmt"
+// 	"net"
+// 	"time"
+// )
 
-var conn net.Conn
-var commandResponse = make(chan string)
+// var conn net.Conn
+// var commandResponse = make(chan string)
 
-func SetConn(c net.Conn) {
-	conn = c
-	go listenForMessages()
-}
+// func SetConn(c net.Conn) {
+// 	conn = c
+// 	go listenForMessages()
+// }
 
-func SendCommand(command string) (string, error) {
+// func SendCommand(command string) (string, error) {
 
-	_, err := conn.Write([]byte(command + "\n"))
-	if err != nil {
-		return "", fmt.Errorf("failed to send command: %v", err)
-	}
+// 	_, err := conn.Write([]byte(command + "\n"))
+// 	if err != nil {
+// 		return "", fmt.Errorf("failed to send command: %v", err)
+// 	}
 
-	response := <-commandResponse
-	return response, nil
-}
+// 	response := <-commandResponse
+// 	return response, nil
+// }
 
-func listenForMessages() {
-	reader := bufio.NewReader(conn)
-	for {
-		message, err := reader.ReadString('\n')
-		if err != nil {
-			return
-		}
+// func listenForMessages() {
+// 	reader := bufio.NewReader(conn)
+// 	for {
+// 		message, err := reader.ReadString('\n')
+// 		if err != nil {
+// 			return
+// 		}
 
-		if message == "HEARTBEAT\n" {
-			continue
-		}
+// 		if message == "HEARTBEAT\n" {
+// 			continue
+// 		}
 
-		commandResponse <- message
-	}
-}
+// 		commandResponse <- message
+// 	}
+// }
 
-func SendHeartbeat(heartbeatInterval time.Duration) {
-	ticker := time.NewTicker(heartbeatInterval)
-	defer ticker.Stop()
+// func SendHeartbeat(heartbeatInterval time.Duration) {
+// 	ticker := time.NewTicker(heartbeatInterval)
+// 	defer ticker.Stop()
 
-	for range ticker.C {
-		_, err := conn.Write([]byte("HEARTBEAT\n"))
-		if err != nil {
-			return
-		}
-	}
-}
+// 	for range ticker.C {
+// 		_, err := conn.Write([]byte("HEARTBEAT\n"))
+// 		if err != nil {
+// 			return
+// 		}
+// 	}
+// }

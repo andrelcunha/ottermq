@@ -29,13 +29,12 @@ func NewClient(config *shared.ClientConfig) *Client {
 	}
 }
 
-func (c *Client) Start() {
-	log.Println("OtterMq is starting...")
-	addr := fmt.Sprintf("%s:%s", c.config.Host, c.config.Port)
+func (c *Client) Dial(host, port string) error {
+	// log.Println("OtterMq is starting...")
+	addr := fmt.Sprintf("%s:%s", host, port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		return
+		return fmt.Errorf("ERROR: %s\n", err.Error())
 	}
 	c.conn = conn
 	defer conn.Close()
@@ -62,7 +61,7 @@ func (c *Client) Start() {
 		"locale":           "en_US",
 	}
 	ClientHandshake(&configurations, conn)
-
+	return nil
 }
 
 // Client sends ProtocolHeader

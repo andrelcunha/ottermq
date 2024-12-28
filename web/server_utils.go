@@ -3,28 +3,33 @@ package web
 import (
 	"fmt"
 	"log"
-	"net"
 	"time"
+
+	"github.com/rabbitmq/amqp091-go"
 )
 
-func getConnection(brokerAddr string) (net.Conn, error) {
-	var conn net.Conn
-	err := error(nil)
+func GetBrokerClient(c *Config) (*amqp091.Connection, error) {
+	username := c.Username
+	password := c.Password
+	host := c.BrokerHost
+	port := c.BrokerPort
+
+	connectionString := fmt.Sprintf("amqp://%s:%s@%s:%s/", username, password, host, port)
+	brokerAddr := fmt.Sprintf("%s:%s", host, port)
 	tries := 1
 	log.Printf("Connecting to %s\n", brokerAddr)
 	for {
 		if tries > 3 {
 			return nil, fmt.Errorf("Broker did not respond after 3 retries")
 		}
-		conn, err = net.Dial("tcp", brokerAddr)
-		if err == nil {
-			log.Println("Connected.")
-			break
+		conn, err := amqp091.Dial(connectionString) //"amqp://guest:guest@localhost:5672/")
+		if err == nil && conn != nil {
+			// log.Println("Connected.")
+			return conn, nil
 		}
 		wait := 3 * tries
 		log.Printf("Broker is not ready. Retrying in %d seconds...\n", wait)
 		time.Sleep(time.Duration(wait) * time.Second)
 		tries++
 	}
-	return conn, nil
 }

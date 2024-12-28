@@ -15,15 +15,16 @@ async function fetchConnections() {
         const fmt_date = formatDate(date)
 
         const row = document.createElement('tr');
-        const fmt_ssl = formatIsSSL(false);
+        const fmt_ssl = formatIsSSL(connInfo.ssl);
         row.onclick = () => selectConnection(connInfo);
         row.innerHTML = `
-            <td>localhost</td>
+            <td>${connInfo.vhost}</td>
             <td><b>${connInfo.name}</b></td>
-            <td>admin</td>
+            <td>${connInfo.user_name}</td>
             <td><span class="small-green-square"> </span> running</td>
             <td class='centered'>${fmt_ssl}</td>
-            <td class='right'>1</td>
+            <td class='right'>${connInfo.protocol}</td>
+            <td class='right'>${connInfo.channels}</td>
             <td class='right'>${heartbeat_in_seconds}s</td>
             <td class='right'><span class='show-time'>${fmt_time}</span></br><span class='show-date'>${fmt_date}</span></td>
         `;

@@ -1,10 +1,11 @@
 package web
 
 import (
-	"net"
 	"os"
 	"time"
 
+	"github.com/andrelcunha/ottermq/internal/core/broker"
+	// "github.com/andrelcunha/ottermq/pkg/connection/client"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
@@ -12,44 +13,54 @@ import (
 
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 type WebServer struct {
-	brokerAddr        string
-	conn              net.Conn
+	brokerAddr string
+	// conn              net.Conn
 	heartbeatInterval time.Duration
 	config            *Config
+	Broker            *broker.Broker
+	// Client            *client.Client
+	Client *amqp091.Connection
 }
 
 type Config struct {
-	BrokerHost        string
-	BrokerPort        string
-	HeartbeatInterval int
-	Username          string
-	Password          string
-	JwtKey            string
+	BrokerHost string
+	BrokerPort string
+	// HeartbeatInterval int
+	Username string
+	Password string
+	JwtKey   string
 }
 
 func (ws *WebServer) Close() {
-	ws.conn.Close()
+	// ws.conn.Close()
 }
 
-func NewWebServer(config *Config) (*WebServer, error) {
-	brokerAddr := config.BrokerHost + ":" + config.BrokerPort
-	conn, err := getConnection(brokerAddr)
-	if err != nil {
-		return nil, err
-	}
+func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connection) (*WebServer, error) {
+	// connectionSting := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.Username, config.Password, config.BrokerHost, config.BrokerPort)
+	// conn, err := getBrokerClient(connectionSting)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	return &WebServer{
-		brokerAddr:        brokerAddr,
-		conn:              conn,
-		heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
-		config:            config,
+		// brokerAddr: brokerAddr,
+		// conn:              conn,
+		// heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
+		config: config,
+		Broker: broker,
+		Client: conn,
 	}, nil
 }
 
 func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
-	ws.configBrokerClient()
+	// connectionSting := fmt.Sprintf("amqp://%s:%s@%s:%s/", ws.config.Username, ws.config.Password, ws.config.BrokerHost, ws.config.BrokerPort)
+	// conn, err := getBrokerClient(connectionSting)
+
+	// ws.Client = conn
 	app := ws.configServer(logFile)
 
 	ws.AddSwagger(app)
@@ -72,7 +83,6 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// API routes
 	apiGrp := app.Group("/api/")
-	apiGrp.Post("/authenticate", api.Authenticate)
 	apiGrp.Get("/queues", api.ListQueues)
 	apiGrp.Post("/queues", api.CreateQueue)
 	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
@@ -86,7 +96,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/bindings/:exchange", api.ListBindings)
 	apiGrp.Post("/bindings", api.BindQueue)
 	apiGrp.Delete("/bindings", api.DeleteBinding)
-	apiGrp.Get("/connections", api.ListConnections)
+	apiGrp.Get("/connections", func(c *fiber.Ctx) error {
+		return api.ListConnections(c, ws.Broker)
+	})
 	apiGrp.Post("/login", api_admin.Login)
 }
 

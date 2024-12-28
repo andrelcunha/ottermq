@@ -28,5 +28,5 @@ func main() {
 		Vhost:    VHOST,
 	}
 	client := client.NewClient(config)
-	client.Start()
+	client.Dial(HOST, PORT)
 }

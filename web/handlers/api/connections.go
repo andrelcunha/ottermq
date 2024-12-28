@@ -1,10 +1,11 @@
 package api
 
 import (
-	"encoding/json"
+	// "encoding/json"
 
-	"github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/web/utils"
+	// "github.com/andrelcunha/ottermq/pkg/common/communication/api"
+	// "github.com/andrelcunha/ottermq/web/utils"
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -17,29 +18,14 @@ import (
 // @Success 200 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/connections [get]
-func ListConnections(c *fiber.Ctx) error {
-	response, err := utils.SendCommand("LIST_CONNECTIONS")
-	if err != nil {
+func ListConnections(c *fiber.Ctx, b *broker.Broker) error {
+	connections := broker.ListConnections(b)
+	if connections == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "failed to list connections",
 		})
 	}
-
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
-
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		// connections := commandResponse.Data.([]common.ConnectionInfo)
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"connections": commandResponse.Data,
-		})
-	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"connections": connections,
+	})
 }

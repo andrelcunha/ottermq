@@ -1,11 +1,10 @@
 package web
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/andrelcunha/ottermq/web/middleware"
-	"github.com/andrelcunha/ottermq/web/utils"
+	// "github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/template/html/v2"
@@ -15,6 +14,7 @@ func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 	engine := html.New("./web/templates", ".html")
 
 	config := fiber.Config{
+
 		Prefork:               false,
 		AppName:               "ottermq-webadmin",
 		Views:                 engine,
@@ -32,15 +32,15 @@ func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
 	return app
 }
 
-func (ws *WebServer) configBrokerClient() {
-	// Pass the connection to the utils package
-	utils.SetConn(ws.conn)
-	auth_command := fmt.Sprintf("AUTH %s %s",
-		ws.config.Username,
-		ws.config.Password,
-	)
-	utils.SendCommand(auth_command)
+// func (ws *WebServer) configBrokerClient() {
+// 	// Pass the connection to the utils package
+// 	utils.SetConn(ws.conn)
+// 	auth_command := fmt.Sprintf("AUTH %s %s",
+// 		ws.config.Username,
+// 		ws.config.Password,
+// 	)
+// 	utils.SendCommand(auth_command)
 
-	// set heartbeat
-	go utils.SendHeartbeat(ws.heartbeatInterval)
-}
+// 	// set heartbeat
+// 	go utils.SendHeartbeat(ws.heartbeatInterval)
+// }

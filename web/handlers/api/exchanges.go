@@ -1,13 +1,7 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
-	"github.com/andrelcunha/ottermq/web/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -21,29 +15,30 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [get]
 func ListExchanges(c *fiber.Ctx) error {
-	response, err := utils.SendCommand("LIST_EXCHANGES")
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// response, err := utils.SendCommand("LIST_EXCHANGES")
+	// if err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "failed to parse response",
+	// 	})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"exchanges": commandResponse.Data,
-		})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": commandResponse.Message,
+	// 	})
+	// } else {
+	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 		"exchanges": commandResponse.Data,
+	// 	})
+	// }
+	return nil // just to make the compiler happy
 }
 
 // CreateExchange godoc
@@ -58,36 +53,37 @@ func ListExchanges(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [post]
 func CreateExchange(c *fiber.Ctx) error {
-	var request models.CreateExchangeRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	command := fmt.Sprintf("CREATE_EXCHANGE %s %s", request.ExchangeName, request.ExchangeType)
-	response, err := utils.SendCommand(command)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// var request models.CreateExchangeRequest
+	// if err := c.BodyParser(&request); err != nil {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
+	// command := fmt.Sprintf("CREATE_EXCHANGE %s %s", request.ExchangeName, request.ExchangeType)
+	// response, err := utils.SendCommand(command)
+	// if err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "failed to parse response",
+	// 	})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"message": commandResponse.Message,
-		})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": commandResponse.Message,
+	// 	})
+	// } else {
+	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 		"message": commandResponse.Message,
+	// 	})
+	// }
+	return nil // just to make the compiler happy
 }
 
 // DeleteExchange godoc
@@ -102,35 +98,36 @@ func CreateExchange(c *fiber.Ctx) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges/{exchange} [delete]
 func DeleteExchange(c *fiber.Ctx) error {
-	exchangeName := c.Params("exchange")
-	if exchangeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "exchange name is required",
-		})
-	}
+	// exchangeName := c.Params("exchange")
+	// if exchangeName == "" {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": "exchange name is required",
+	// 	})
+	// }
 
-	command := fmt.Sprintf("DELETE_EXCHANGE %s", exchangeName)
-	response, err := utils.SendCommand(command)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// command := fmt.Sprintf("DELETE_EXCHANGE %s", exchangeName)
+	// response, err := utils.SendCommand(command)
+	// if err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
 
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
-		})
-	}
+	// var commandResponse api.CommandResponse
+	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "failed to parse response",
+	// 	})
+	// }
 
-	if commandResponse.Status == "ERROR" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": commandResponse.Message,
-		})
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{
-			"message": commandResponse.Message,
-		})
-	}
+	// if commandResponse.Status == "ERROR" {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": commandResponse.Message,
+	// 	})
+	// } else {
+	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 		"message": commandResponse.Message,
+	// 	})
+	// }
+	return nil
 }

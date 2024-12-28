@@ -1,11 +1,7 @@
 package webui
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/web/utils"
+	"github.com/andrelcunha/ottermq/pkg/persistdb"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -20,38 +16,47 @@ func Authenticate(c *fiber.Ctx) error {
 	username := c.FormValue("username")
 	password := c.FormValue("password")
 
-	command := fmt.Sprintf("AUTH %s %s", username, password)
-	response, err := utils.SendCommand(command)
+	err := persistdb.OpenDB()
+	if err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	defer persistdb.CloseDB()
+
+	ok, err := persistdb.AuthenticateUser(username, password)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
-	var commandResponse common.CommandResponse
-	if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid username or password",
+		})
+	}
+	// get user
+	persistedUser, err := persistdb.GetUserByUsername(username)
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to parse response",
+			"error": err.Error(),
 		})
 	}
-
-	if commandResponse.Status == "OK" {
-		c.Cookie(&fiber.Cookie{
-			Name:  "auth_token",
-			Value: "valid_token",
+	userdto, err := persistdb.MaapUserToUserDTO(persistedUser)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
 		})
-		c.Cookie(&fiber.Cookie{
-			Name:  "username",
-			Value: username,
-		})
-		return c.Redirect("/")
-	} else {
-		c.Status(fiber.StatusUnauthorized)
-		return c.Render("login", fiber.Map{
-			"Title":   "Login",
-			"Message": commandResponse.Message,
-		})
-		// return c.Redirect("/login")
 	}
+	token, err := persistdb.GenerateJWTToken(userdto)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	c.Cookie(&fiber.Cookie{
+		Name:  "auth_token",
+		Value: token,
+	})
+	return c.Redirect("/")
 }
 
 func Logout(c *fiber.Ctx) error {
