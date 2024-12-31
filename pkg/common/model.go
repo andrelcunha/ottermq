@@ -15,3 +15,9 @@ type ConnectionInfoDTO struct {
 
 	Done chan struct{} `json:"-"`
 }
+
+type ExchangeDTO struct {
+	Vhost string `json:"vhost"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+}

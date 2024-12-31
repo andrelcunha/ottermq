@@ -33,11 +33,11 @@ async function fetchExchanges() {
         const row = document.createElement('tr');
         row.onclick = () => selectExchange(exchange);
         row.innerHTML = `
-            <td>localhost</td>
-            <td><b>${exchange}<b></td>
-            <td>direct</td>
+            <td>${exchange.vhost}</td>
+            <td><b>${exchange.name}<b></td>
+            <td>${exchange.type}</td>
             <td>
-                <button class='delete-button' onclick="deleteExchange('${exchange}')">Delete</button>
+                <button class='delete-button' onclick="deleteExchange('${exchange.name}')">Delete</button>
             </td>
         `;
         exchangesList.appendChild(row);

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	_ "github.com/andrelcunha/ottermq/web/models"
 	"github.com/gofiber/fiber/v2"
 )
@@ -14,31 +15,16 @@ import (
 // @Success 200 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [get]
-func ListExchanges(c *fiber.Ctx) error {
-	// response, err := utils.SendCommand("LIST_EXCHANGES")
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"exchanges": commandResponse.Data,
-	// 	})
-	// }
-	return nil // just to make the compiler happy
+func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
+	exchanges := broker.ListExchanges(b)
+	if exchanges == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list exchanges",
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"exchanges": exchanges,
+	})
 }
 
 // CreateExchange godoc

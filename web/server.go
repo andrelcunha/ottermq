@@ -87,7 +87,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/queues/:queue/count", api.CountMessages)
 	apiGrp.Post("/messages/:id/ack", api.AckMessage)
 	apiGrp.Post("/messages", api.PublishMessage)
-	apiGrp.Get("/exchanges", api.ListExchanges)
+	apiGrp.Get("/exchanges", func(c *fiber.Ctx) error {
+		return api.ListExchanges(c, ws.Broker)
+	})
 	apiGrp.Post("/exchanges", api.CreateExchange)
 	apiGrp.Delete("/exchanges/:exchange", api.DeleteExchange)
 	apiGrp.Get("/bindings/:exchange", api.ListBindings)

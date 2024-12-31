@@ -37,17 +37,21 @@ func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 	return listConnectonsDTO
 }
 
-// func ListExchanges(b *Broker) []string {
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-// 	vhosts := make([]string, 0, len(b.VHosts))
-
-// 	exchangeNames := make([]string, 0, len(b.Exchanges))
-// 	for name := range b.Exchanges {
-// 		exchangeNames = append(exchangeNames, name)
-// 	}
-// 	return exchangeNames
-// }
+func ListExchanges(b *Broker) []ExchangeDTO {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchanges := make([]ExchangeDTO, 0, len(b.VHosts))
+	for vhost := range b.VHosts {
+		for _, exchange := range b.VHosts[vhost].Exchanges {
+			exchanges = append(exchanges, ExchangeDTO{
+				Vhost: vhost,
+				Name:  exchange.Name,
+				Type:  string(exchange.Typ),
+			})
+		}
+	}
+	return exchanges
+}
 
 // func (b *VHost) listBindings(exchangeName string) map[string][]string {
 // 	b.mu.Lock()
