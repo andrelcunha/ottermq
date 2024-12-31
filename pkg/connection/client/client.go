@@ -3,8 +3,10 @@ package client
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"time"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
@@ -30,7 +32,6 @@ func NewClient(config *shared.ClientConfig) *Client {
 }
 
 func (c *Client) Dial(host, port string) error {
-	// log.Println("OtterMq is starting...")
 	addr := fmt.Sprintf("%s:%s", host, port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -60,8 +61,41 @@ func (c *Client) Dial(host, port string) error {
 		"mechanism":        "PLAIN",
 		"locale":           "en_US",
 	}
-	ClientHandshake(&configurations, conn)
-	return nil
+	if err := ClientHandshake(&configurations, conn); err != nil {
+		return err
+	}
+
+	go c.sendHeartbeats()
+
+	go c.receiveLoop(conn)
+	// return nil
+	select {}
+}
+
+func (c *Client) receiveLoop(conn net.Conn) {
+	fmt.Println("Starting receive loop")
+	for {
+		frame, err := shared.ReadFrame(conn)
+		fmt.Printf("Received frame: %x\n", frame)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				log.Printf("Connection timeout: %v", err)
+			}
+			if err == io.EOF {
+				log.Printf("Connection closed by server: %v", conn.RemoteAddr())
+				return
+			}
+			log.Printf("Error reading frame: %v", err)
+			return
+		}
+		log.Printf("[DEBUG] Received frame: %x", frame)
+
+		_, err = shared.ParseFrame(nil, frame)
+		if err != nil {
+			log.Printf("Error parsing frame: %v", err)
+			// return
+		}
+	}
 }
 
 // Client sends ProtocolHeader
@@ -97,12 +131,19 @@ func ClientHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 		err = fmt.Errorf("Failed to parse connection.start frame: %v", err)
 		return err
 	}
-	startOkResponse, ok := untypedResp.([]byte)
+	startResponse, ok := untypedResp.(*shared.ConnectionStartFrame)
 	if !ok {
 		err = fmt.Errorf("Type assertion failed")
 		return err
 	}
-	if err := shared.SendFrame(conn, startOkResponse); err != nil {
+
+	startOkRequest, err := shared.CreateConnectionStartOkPayload(configurations, startResponse)
+	if err != nil {
+		err = fmt.Errorf("Failed to create connection.start-ok frame: %v", err)
+		return err
+	}
+	startOkFrame := shared.CreateConnectionStartOkFrame(&startOkRequest)
+	if err := shared.SendFrame(conn, startOkFrame); err != nil {
 		err = fmt.Errorf("Failed to send connection.start-ok frame: %v", err)
 		return err
 	}
@@ -147,4 +188,28 @@ func ClientHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 
 func isAMQPVersionResponse(frame []byte) bool {
 	return bytes.Equal(frame[:4], []byte("AMQP"))
+}
+
+func (c *Client) sendHeartbeats() {
+	// heartbeatInterval := 5 // You can set this to the appropriate interval
+	heartbeatInterval := c.config.HeartbeatInterval
+	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			heartbeatFrame := shared.CreateHeartbeatFrame()
+			err := shared.SendFrame(c.conn, heartbeatFrame)
+			if err != nil {
+				log.Printf("Failed to send heartbeat: %v", err)
+				return
+			}
+			log.Println("Heartbeat sent")
+
+			// Add a case for stopping the heartbeat loop if needed
+			// case <-stopHeartbeatChan:
+			//     return
+		}
+	}
 }
