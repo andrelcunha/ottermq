@@ -25,6 +25,7 @@ func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 		channels := len(connection.Channels)
 		listConnectonsDTO[i] = ConnectionInfoDTO{
 			VHost:         connection.VHost,
+			Name:          connection.Name,
 			Username:      connection.User,
 			State:         state,
 			SSL:           false,

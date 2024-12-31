@@ -177,6 +177,7 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 func (b *Broker) registerConnection(conn net.Conn, username, vhost string, heartbeatInterval uint16) {
 	b.mu.Lock()
 	b.Connections[conn] = &ConnectionInfo{
+		Name:              conn.RemoteAddr().String(),
 		User:              username,
 		VHost:             vhost,
 		HeartbeatInterval: heartbeatInterval,

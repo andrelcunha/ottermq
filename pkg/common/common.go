@@ -8,6 +8,7 @@ import (
 type FiberMap map[string]interface{}
 
 type ConnectionInfo struct {
+	Name              string           `json:"name"`
 	User              string           `json:"user"`
 	VHost             string           `json:"vhost"`
 	HeartbeatInterval uint16           `json:"heartbeat_interval"`
