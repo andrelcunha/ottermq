@@ -21,11 +21,12 @@ const (
 
 func main() {
 	config := &shared.ClientConfig{
-		Host:     HOST,
-		Port:     PORT,
-		Username: USERNAME,
-		Password: PASSWORD,
-		Vhost:    VHOST,
+		Host:              HOST,
+		Port:              PORT,
+		Username:          USERNAME,
+		Password:          PASSWORD,
+		Vhost:             VHOST,
+		HeartbeatInterval: HEARTBEAT,
 	}
 	client := client.NewClient(config)
 	client.Dial(HOST, PORT)

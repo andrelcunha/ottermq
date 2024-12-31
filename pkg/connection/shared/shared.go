@@ -14,11 +14,12 @@ import (
 
 // type FieldTable
 type ClientConfig struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
-	Vhost    string
+	Host              string
+	Port              string
+	Username          string
+	Password          string
+	Vhost             string
+	HeartbeatInterval uint16
 }
 
 type AMQP_Key struct {
