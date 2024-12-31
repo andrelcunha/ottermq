@@ -86,7 +86,12 @@ func main() {
 		log.Fatalf("failed to connect to broker: %v", err)
 	}
 	defer webServer.Close()
-	app := webServer.SetupApp(os.Stdout) // Using os.Stdout for logging
+	// open "server.log" for appending
+	logfile, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("failed to open log file: %v", err)
+	}
+	app := webServer.SetupApp(logfile) // Using os.Stdout for logging
 
 	// Start the web admin server in a goroutine
 	go func() {
