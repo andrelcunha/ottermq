@@ -1,8 +1,6 @@
 package broker
 
 import (
-	"fmt"
-
 	. "github.com/andrelcunha/ottermq/pkg/common"
 )
 
@@ -36,7 +34,6 @@ func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 			ConnectedAt:   connection.ConnectedAt,
 		}
 	}
-	fmt.Println("Len of connections: ", len(listConnectonsDTO))
 	return listConnectonsDTO
 }
 

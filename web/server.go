@@ -17,22 +17,19 @@ import (
 )
 
 type WebServer struct {
-	brokerAddr string
-	// conn              net.Conn
+	brokerAddr        string
 	heartbeatInterval time.Duration
 	config            *Config
 	Broker            *broker.Broker
-	// Client            *client.Client
-	Client *amqp091.Connection
+	Client            *amqp091.Connection
 }
 
 type Config struct {
 	BrokerHost string
 	BrokerPort string
-	// HeartbeatInterval int
-	Username string
-	Password string
-	JwtKey   string
+	Username   string
+	Password   string
+	JwtKey     string
 }
 
 func (ws *WebServer) Close() {

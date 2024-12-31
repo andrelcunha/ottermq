@@ -107,7 +107,7 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 	heartbeatInterval := (*configurations)["heartbeatInterval"].(uint16)
 
 	b.registerConnection(conn, username, vhost, heartbeatInterval)
-	go b.sendHeartbeat(conn)
+	go b.sendHeartbeats(conn)
 	log.Println("Handshake successful")
 
 	// keep reading commands in loop
@@ -221,8 +221,11 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 
 	case byte(constants.TYPE_HEARTBEAT):
 		log.Printf("Received HEARTBEAT frame on channel %d\n", channel)
-		err := b.handleHeartbeat(conn, frame)
-		return nil, err
+		err := b.handleHeartbeat(conn)
+		if err != nil {
+			log.Printf("Error handling heartbeat: %v", err)
+		}
+		return nil, nil
 
 	default:
 		fmt.Printf("Received: %x\n", frame)
@@ -230,18 +233,14 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 	}
 }
 
-func (b *Broker) handleHeartbeat(conn net.Conn, frame []byte) error {
-	if err := shared.SendFrame(conn, frame); err != nil {
-		log.Printf("Error sending heartbeat response: %v", err)
-		return err
-	}
+func (b *Broker) handleHeartbeat(conn net.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.Connections[conn].LastHeartbeat = time.Now()
 	return nil
 }
 
-func (b *Broker) sendHeartbeat(conn net.Conn) {
+func (b *Broker) sendHeartbeats(conn net.Conn) {
 	b.mu.Lock()
 	connectionInfo, ok := b.Connections[conn]
 	if !ok {
@@ -266,12 +265,14 @@ func (b *Broker) sendHeartbeat(conn net.Conn) {
 			}
 			b.mu.Unlock()
 
+			// sendHearbeat(conn)
 			heartbeatFrame := shared.CreateHeartbeatFrame()
 			err := shared.SendFrame(conn, heartbeatFrame)
 			if err != nil {
-				log.Println("Fail sending heartbeat: ", err)
+				log.Printf("Failed to send heartbeat: %v", err)
 				return
 			}
+			log.Println("Heartbeat sent")
 
 		case <-done:
 			log.Println("Stopping heartbeat  goroutine for closed connection")
@@ -280,6 +281,19 @@ func (b *Broker) sendHeartbeat(conn net.Conn) {
 
 	}
 }
+
+// func sendHearbeat(conn net.Conn) error {
+// 	heartbeatFrame := shared.CreateHeartbeatFrame()
+// 	if heartbeatFrame == nil {
+// 		return fmt.Errorf("Failed to create heartbeat frame")
+// 	}
+// 	fmt.Printf("Sending heartbeat: %x\n", heartbeatFrame)
+// 	err := shared.SendFrame(conn, heartbeatFrame)
+// 	if err != nil {
+// 		return fmt.Errorf("Fail sending heartbeat: %s\n", err)
+// 	}
+// 	return nil
+// }
 
 func (b *Broker) executeRequest(request *amqp.RequestMethodMessage) (interface{}, error) {
 	switch request.ClassID {

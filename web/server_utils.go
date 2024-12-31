@@ -22,7 +22,7 @@ func GetBrokerClient(c *Config) (*amqp091.Connection, error) {
 		if tries > 3 {
 			return nil, fmt.Errorf("Broker did not respond after 3 retries")
 		}
-		conn, err := amqp091.Dial(connectionString) //"amqp://guest:guest@localhost:5672/")
+		conn, err := amqp091.Dial(connectionString)
 		if err == nil && conn != nil {
 			// log.Println("Connected.")
 			return conn, nil

@@ -43,17 +43,18 @@ func parseConnectionMethod(configurations *map[string]interface{}, methodID uint
 	switch methodID {
 	case uint16(constants.CONNECTION_START):
 		fmt.Printf("Received CONNECTION_START frame \n")
-		startResponse, err := parseConnectionStartFrame(payload)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to parse connection.start frame: %v", err)
-		}
+		return parseConnectionStartFrame(payload)
+		// startResponse, err := parseConnectionStartFrame(payload)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("Failed to parse connection.start frame: %v", err)
+		// }
 
-		startOkRequest, err := createConnectionStartOkPayload(configurations, startResponse)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create connection.start-ok frame: %v", err)
-		}
-		startOkFrame := createConnectionStartOkFrame(&startOkRequest)
-		return startOkFrame, nil
+		// startOkRequest, err := CreateConnectionStartOkPayload(configurations, startResponse)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("Failed to create connection.start-ok frame: %v", err)
+		// }
+		// startOkFrame := CreateConnectionStartOkFrame(&startOkRequest)
+		// return startOkFrame, nil
 
 	case uint16(constants.CONNECTION_START_OK):
 		fmt.Printf("[DEBUG] Received connection.start-ok: %x\n", payload)
@@ -334,25 +335,25 @@ func CreateConnectionStartFrame() []byte {
 	return frame
 }
 
-func createConnectionStartOkPayload(configurations *map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
+func CreateConnectionStartOkPayload(configurations *map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
 
 	clientProperties := (*configurations)["clientProperties"].(map[string]interface{})
 	fmt.Printf("[DEBUG] clientProperties: %+v\n", clientProperties)
 
 	mecanismsStr := startFrameResponse.Mechanisms
-	mechanismsList := strings.Split(mecanismsStr, ",")
+	mechanismsList := strings.Split(mecanismsStr, " ")
 	mechanismsMap := make(map[string]bool)
 	for _, m := range mechanismsList {
 		mechanismsMap[m] = true
 	}
+	fmt.Printf("[DEBUG] Server mechanismsMap: %+v\n", mechanismsMap)
 
 	// find 'PLAIN' in mechanismsList
 	mechanism := (*configurations)["mechanism"].(string)
 	if !mechanismsMap[mechanism] {
-		// mechanism = "PLAIN"
 		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported mechanism: %s", mechanism)
 	}
-	fmt.Printf("mechanism: %s\n", mechanism)
+	fmt.Printf("[DEBUG] mechanism: %s\n", mechanism)
 
 	// fmt.Printf("mechanismsList: %+v\n", mechanismsList)
 	username := (*configurations)["username"].(string)
@@ -380,7 +381,7 @@ func createConnectionStartOkPayload(configurations *map[string]interface{}, star
 	return startOk, nil
 }
 
-func createConnectionStartOkFrame(startOk *ConnectionStartOkFrame) []byte {
+func CreateConnectionStartOkFrame(startOk *ConnectionStartOkFrame) []byte {
 	var payloadBuf bytes.Buffer
 	channelNum := uint16(0)
 	classID := constants.CONNECTION
