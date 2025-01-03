@@ -8,6 +8,7 @@ import (
 	// "github.com/andrelcunha/ottermq/pkg/common/communication/api"
 	// "github.com/andrelcunha/ottermq/web/models"
 	// "github.com/andrelcunha/ottermq/web/utils"
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -70,15 +71,31 @@ func BindQueue(c *fiber.Ctx) error {
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings/{exchange} [get]
-func ListBindings(c *fiber.Ctx) error {
+func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 
-	// exchangeName := c.Params("exchange")
-	// if exchangeName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "Exchange name is required",
-	// 	})
-	// }
+	exchangeName := c.Params("exchange")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Exchange name is required",
+		})
+	}
+	vhostId := c.Params("vhost")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Vhost name is required",
+		})
+	}
 
+	bindings := broker.ListBindings(b, vhostId, exchangeName)
+	if bindings == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list bindings",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"bindings": bindings,
+	})
 	// command := fmt.Sprintf("LIST_BINDINGS %s", exchangeName)
 	// response, err := utils.SendCommand(command)
 	// if err != nil {
@@ -103,7 +120,7 @@ func ListBindings(c *fiber.Ctx) error {
 	// 		"bindings": commandResponse.Data,
 	// 	})
 	// }
-	return nil // just to make the compiler happy
+	// return nil // just to make the compiler happy
 }
 
 // DeleteBinding godoc

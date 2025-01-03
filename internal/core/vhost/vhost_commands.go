@@ -160,11 +160,11 @@ func (b *VHost) listQueues() []string {
 	return queueNames
 }
 
-func (b *VHost) createExchange(name string, typ ExchangeType) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
 	// Check if the exchange already exists
-	if _, ok := b.Exchanges[name]; ok {
+	if _, ok := vh.Exchanges[name]; ok {
 		return fmt.Errorf("exchange %s already exists", name)
 	}
 
@@ -174,7 +174,7 @@ func (b *VHost) createExchange(name string, typ ExchangeType) error {
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
 	}
-	b.Exchanges[name] = exchange
+	vh.Exchanges[name] = exchange
 	return nil
 }
 

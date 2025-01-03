@@ -4,12 +4,14 @@ import (
 	"sync"
 
 	"github.com/andrelcunha/ottermq/pkg/persistdb"
+	"github.com/google/uuid"
 )
 
-const default_exchange = "_OTTERMQ_DEFAULT_EXCHANGE_"
+const default_exchange = "(AMQP default)"
 
 type VHost struct {
 	Name      string                     `json:"name"`
+	Id        string                     `json:"id"`
 	Exchanges map[string]*Exchange       `json:"exchanges"`
 	Queues    map[string]*Queue          `json:"queues"`
 	Users     map[string]*persistdb.User `json:"users"`
@@ -42,8 +44,11 @@ type Consumer struct {
 }
 
 func NewVhost(vhostName string) *VHost {
-	b := &VHost{
+	// generate a random id
+	id := uuid.New().String()
+	vh := &VHost{
 		Name:      vhostName,
+		Id:        id,
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
 		Users:     make(map[string]*persistdb.User),
@@ -53,6 +58,6 @@ func NewVhost(vhostName string) *VHost {
 		ConsumerUnackMsgs: make(map[string]map[string]bool),
 		// config:            config,
 	}
-	b.createExchange(default_exchange, DIRECT)
-	return b
+	vh.CreateExchange(default_exchange, DIRECT)
+	return vh
 }

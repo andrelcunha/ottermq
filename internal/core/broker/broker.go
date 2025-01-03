@@ -15,7 +15,8 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
-	"github.com/andrelcunha/ottermq/pkg/connection/constants/exchange"
+
+	// "github.com/andrelcunha/ottermq/pkg/connection/constants/exchange"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/queue"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/server"
@@ -126,7 +127,7 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 			return
 		}
 
-		fmt.Printf("[DEBUG]received: %x\n", frame)
+		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
 		requestInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
@@ -138,28 +139,22 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 			if !ok {
 				log.Fatalf("Failed to cast request to amqp.Message")
 			}
-			if request.ClassID == uint16(constants.CONNECTION) {
-				switch request.MethodID {
-				case uint16(constants.CONNECTION_CLOSE):
-					b.cleanupConnection(conn)
-					// send close-ok
-					// closeOk := amqp.NewFrame(amqp.MethodMessage{
-					// 	Channel:  0,
-					// 	ClassID:  uint16(constants.CONNECTION),
-					// 	MethodID: uint16(constants.CONNECTION_CLOSE_OK),
-					// 	Content:  nil,
-					// })
-					frame := amqp.ResponseMethodMessage{
-						Channel:  0,
-						ClassID:  uint16(constants.CONNECTION),
-						MethodID: uint16(constants.CONNECTION_CLOSE_OK),
-						Content:  amqp.ContentList{},
-					}.FormatMethodFrame()
-					shared.SendFrame(conn, frame)
-				}
-				continue
-			}
-			b.executeRequest(request)
+			// if request.ClassID == uint16(constants.CONNECTION) {
+			// 	switch request.MethodID {
+			// 	case uint16(constants.CONNECTION_CLOSE):
+			// 		b.cleanupConnection(conn)
+			// 		frame := amqp.ResponseMethodMessage{
+			// 			Channel:  0,
+			// 			ClassID:  uint16(constants.CONNECTION),
+			// 			MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+			// 			Content:  amqp.ContentList{},
+			// 		}.FormatMethodFrame()
+			// 		shared.SendFrame(conn, frame)
+			// 	}
+			// 	continue
+			// }
+			fmt.Printf("[DEBUG] Request: %+v\n", request)
+			b.processRequest(conn, request)
 		}
 	}
 }
@@ -174,12 +169,19 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 // 	return shared.SendFrame(conn, frame)
 // }
 
-func (b *Broker) registerConnection(conn net.Conn, username, vhost string, heartbeatInterval uint16) {
+func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, heartbeatInterval uint16) {
+	vhost := b.GetVHostFromName(vhostName)
+	if vhost == nil {
+		log.Fatalf("VHost not found: %s", vhostName)
+	}
+
 	b.mu.Lock()
+
 	b.Connections[conn] = &ConnectionInfo{
 		Name:              conn.RemoteAddr().String(),
 		User:              username,
-		VHost:             vhost,
+		VHostName:         vhost.Name,
+		VHostId:           vhost.Id,
 		HeartbeatInterval: heartbeatInterval,
 		ConnectedAt:       time.Now(),
 		LastHeartbeat:     time.Now(),
@@ -210,18 +212,22 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 	if len(frame) < int(7+payloadSize) {
 		return nil, fmt.Errorf("frame too short")
 	}
-	if channel != currentChannel {
+	if channel != currentChannel && frameType != byte(constants.TYPE_METHOD) {
 		return nil, fmt.Errorf("unexpected channel: %d", channel)
 	}
 	payload := frame[7:]
 
 	switch frameType {
 	case byte(constants.TYPE_METHOD):
-		fmt.Printf("Received METHOD frame on channel %d\n", channel)
-		return shared.ParseMethodFrame(configurations, channel, payload)
+		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
+		request, err := shared.ParseMethodFrame(configurations, channel, payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse method frame: %v", err)
+		}
+		return request, nil
 
 	case byte(constants.TYPE_HEARTBEAT):
-		log.Printf("Received HEARTBEAT frame on channel %d\n", channel)
+		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
 		err := b.handleHeartbeat(conn)
 		if err != nil {
 			log.Printf("Error handling heartbeat: %v", err)
@@ -283,36 +289,106 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 	}
 }
 
-// func sendHearbeat(conn net.Conn) error {
-// 	heartbeatFrame := shared.CreateHeartbeatFrame()
-// 	if heartbeatFrame == nil {
-// 		return fmt.Errorf("Failed to create heartbeat frame")
-// 	}
-// 	fmt.Printf("Sending heartbeat: %x\n", heartbeatFrame)
-// 	err := shared.SendFrame(conn, heartbeatFrame)
-// 	if err != nil {
-// 		return fmt.Errorf("Fail sending heartbeat: %s\n", err)
-// 	}
-// 	return nil
-// }
-
-func (b *Broker) executeRequest(request *amqp.RequestMethodMessage) (interface{}, error) {
+func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessage) (interface{}, error) {
 	switch request.ClassID {
 
+	case uint16(constants.CONNECTION):
+		switch request.MethodID {
+
+		case uint16(constants.CONNECTION_CLOSE):
+			b.cleanupConnection(conn)
+			frame := amqp.ResponseMethodMessage{
+				Channel:  request.Channel,
+				ClassID:  uint16(constants.CONNECTION),
+				MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+				Content:  amqp.ContentList{},
+			}.FormatMethodFrame()
+			shared.SendFrame(conn, frame)
+			return nil, nil
+		default:
+			log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
+			return nil, fmt.Errorf("Unknown connection method: %d", request.MethodID)
+		}
+
 	case uint16(constants.CHANNEL):
+		switch request.MethodID {
+		case uint16(constants.CHANNEL_OPEN):
+			fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
+			channelId := request.Channel
+			b.mu.Lock()
+			// Check if the channel is already open
+			if b.Connections[conn].Channels[int(channelId)] {
+				fmt.Printf("[DEBUG] Channel %d already open\n", channelId)
+				b.mu.Unlock()
+				return nil, fmt.Errorf("Channel already open")
+			}
+
+			fmt.Printf("[DEBUG] Channel %d swiched to true\n", channelId)
+			if b.Connections[conn].Channels[int(channelId)] {
+				fmt.Printf("[DEBUG] Channel %d opened\n", channelId)
+			} else {
+				fmt.Printf("[DEBUG] Channel %d not opened\n", channelId)
+			}
+			b.mu.Unlock()
+			frame := amqp.ResponseMethodMessage{
+				Channel:  channelId,
+				ClassID:  request.ClassID,
+				MethodID: uint16(constants.CHANNEL_OPEN_OK),
+				Content: amqp.ContentList{
+					KeyValuePairs: []amqp.KeyValue{
+						{
+							Key:   amqp.INT_OCTET,
+							Value: uint8(0),
+						},
+					},
+				},
+			}.FormatMethodFrame()
+			shared.SendFrame(conn, frame)
+			fmt.Printf("[DEBUG] sending frame: %x\n", frame)
+			return nil, nil
+
+		case uint16(constants.CHANNEL_CLOSE):
+			channelId := request.Channel
+			b.mu.Lock()
+			if !b.Connections[conn].Channels[int(channelId)] {
+				b.mu.Unlock()
+				return nil, fmt.Errorf("Channel not open")
+			}
+			b.Connections[conn].Channels[int(channelId)] = false
+			b.mu.Unlock()
+			frame := amqp.ResponseMethodMessage{
+				Channel:  channelId,
+				ClassID:  uint16(constants.CHANNEL),
+				MethodID: uint16(constants.CHANNEL_CLOSE_OK),
+				Content: amqp.ContentList{
+					KeyValuePairs: []amqp.KeyValue{
+						{
+							Key:   amqp.INT_OCTET,
+							Value: uint8(0),
+						},
+					},
+				},
+			}.FormatMethodFrame()
+			shared.SendFrame(conn, frame)
+			return nil, nil
+
+		default:
+			log.Printf("[DEBUG] Unknown channel method: %d", request.MethodID)
+			return nil, fmt.Errorf("Unknown channel method: %d", request.MethodID)
+		}
+
 		// Handle channel-related commands
 	case uint16(constants.EXCHANGE):
 		switch request.MethodID {
-		case uint16(exchange.DECLARE):
-			// // Handle exchange declaration
-			// exchangeName := parts[1]
-			// typ := parts[2]
+		case uint16(constants.EXCHANGE_DECLARE):
+			// content := request.Content.()
+
 			// err := b.createExchange(exchangeName, ExchangeType(typ))
 			// if err != nil {
 			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 			// }
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ)}, nil
-		case uint16(exchange.DELETE):
+		case uint16(constants.EXCHANGE_DELETE):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -327,6 +403,7 @@ func (b *Broker) executeRequest(request *amqp.RequestMethodMessage) (interface{}
 			return nil, fmt.Errorf("unsupported command")
 		}
 		// Handle exchange-related commands
+
 	case uint16(constants.QUEUE):
 		switch request.MethodID {
 		case uint16(queue.DECLARE):

@@ -3,7 +3,8 @@ package common
 import "time"
 
 type ConnectionInfoDTO struct {
-	VHost         string    `json:"vhost"`
+	VHostName     string    `json:"vhost"`
+	VHostId       string    `json:"vhost_id"`
 	Name          string    `json:"name"`
 	Username      string    `json:"user_name"`
 	State         string    `json:"state"`
@@ -17,7 +18,8 @@ type ConnectionInfoDTO struct {
 }
 
 type ExchangeDTO struct {
-	Vhost string `json:"vhost"`
-	Name  string `json:"name"`
-	Type  string `json:"type"`
+	VHostName string `json:"vhost"`
+	VHostId   string `json:"vhost_id"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
 }

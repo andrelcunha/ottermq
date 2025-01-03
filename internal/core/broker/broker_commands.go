@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/vhost"
 	. "github.com/andrelcunha/ottermq/pkg/common"
 )
 
@@ -24,7 +25,8 @@ func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 		}
 		channels := len(connection.Channels)
 		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHost:         connection.VHost,
+			VHostName:     connection.VHostName,
+			VHostId:       connection.VHostId,
 			Name:          connection.Name,
 			Username:      connection.User,
 			State:         state,
@@ -42,60 +44,65 @@ func ListExchanges(b *Broker) []ExchangeDTO {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	exchanges := make([]ExchangeDTO, 0, len(b.VHosts))
-	for vhost := range b.VHosts {
-		for _, exchange := range b.VHosts[vhost].Exchanges {
+	for vhostName := range b.VHosts {
+		vhost := b.VHosts[vhostName]
+		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
 			exchanges = append(exchanges, ExchangeDTO{
-				Vhost: vhost,
-				Name:  exchange.Name,
-				Type:  string(exchange.Typ),
+				VHostName: vhost.Name,
+				VHostId:   vhost.Id,
+				Name:      exchange.Name,
+				Type:      string(exchange.Typ),
 			})
 		}
 	}
 	return exchanges
 }
 
-// func (b *VHost) listBindings(exchangeName string) map[string][]string {
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-// 	exchange, ok := b.Exchanges[exchangeName]
-// 	if !ok {
-// 		return nil
-// 	}
+func ListBindings(b *Broker, vhostId, exchangeName string) map[string][]string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	vh := b.GetVHostFromName(vhostId)
+	// vh := b.VHosts[vhostName]
 
-// 	switch exchange.Typ {
-// 	case DIRECT:
-// 		// bindings := make([]string, 0, len(exchange.Bindings))
-// 		bindings := make(map[string][]string)
-// 		for routingKey, queues := range exchange.Bindings {
-// 			var queuesStr []string
-// 			for _, queue := range queues {
-// 				queuesStr = append(queuesStr, queue.Name)
-// 			}
-// 			bindings[routingKey] = queuesStr
-// 		}
-// 		return bindings
-// 	case FANOUT:
-// 		// bindings := make([]string, 0, len(exchange.Queues))
-// 		bindings := make(map[string][]string)
-// 		var queues []string
-// 		for queueName := range exchange.Queues {
-// 			queues = append(queues, queueName)
-// 		}
-// 		bindings["fanout"] = queues
-// 		return bindings
-// 	}
-// 	return nil
-// }
+	exchange, ok := vh.Exchanges[exchangeName]
+	if !ok {
+		return nil
+	}
+
+	switch exchange.Typ {
+	case vhost.DIRECT:
+		// bindings := make([]string, 0, len(exchange.Bindings))
+		bindings := make(map[string][]string)
+		for routingKey, queues := range exchange.Bindings {
+			var queuesStr []string
+			for _, queue := range queues {
+				queuesStr = append(queuesStr, queue.Name)
+			}
+			bindings[routingKey] = queuesStr
+		}
+		return bindings
+	case vhost.FANOUT:
+		// bindings := make([]string, 0, len(exchange.Queues))
+		bindings := make(map[string][]string)
+		var queues []string
+		for queueName := range exchange.Queues {
+			queues = append(queues, queueName)
+		}
+		bindings["fanout"] = queues
+		return bindings
+	}
+	return nil
+}
 
 // func (b *VHost) countMessages(queueName string) (int, error) {
 // 	b.mu.Lock()
 // 	defer b.mu.Unlock()
-
+//
 // 	queue, ok := b.Queues[queueName]
 // 	if !ok {
 // 		return 0, fmt.Errorf("Queue %s not found", queueName)
 // 	}
-
+//
 // 	// messageCount := len(queue.messages)
 // 	messageCount := queue.Len()
 // 	return messageCount, nil
@@ -108,7 +115,7 @@ func ListExchanges(b *Broker) []ExchangeDTO {
 // 	if name == "default" {
 // 		return fmt.Errorf("cannot delete default exchange")
 // 	}
-
+//
 // 	// Check if the exchange exists
 // 	_, ok := b.Exchanges[name]
 // 	if !ok {

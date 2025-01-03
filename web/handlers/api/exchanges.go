@@ -1,9 +1,13 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 // ListExchanges godoc
@@ -38,38 +42,57 @@ func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [post]
-func CreateExchange(c *fiber.Ctx) error {
-	// var request models.CreateExchangeRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// command := fmt.Sprintf("CREATE_EXCHANGE %s %s", request.ExchangeName, request.ExchangeType)
-	// response, err := utils.SendCommand(command)
+// func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
+func CreateExchange(c *fiber.Ctx, conn *amqp091.Connection) error {
+	var request models.CreateExchangeRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	// exchangeName := request.ExchangeName
+	// exchangeType := request.ExchangeType
+
+	// vh := b.GetVHostFromName("/")
+	// err := vh.CreateExchange(exchangeName, vhost.ExchangeType(exchangeType))
 	// if err != nil {
 	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 	// 		"error": err.Error(),
 	// 	})
 	// }
+	// return c.Status(fiber.StatusOK).JSON(fiber.Map{
+	// 	"message": "Exchange created successfully",
+	// })
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
+	// vhostId := request.VhostId
 
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
-	// 	})
-	// }
-	return nil // just to make the compiler happy
+	ch, err := conn.Channel()
+	if err != nil {
+		fmt.Println("Failed to create channel")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	fmt.Println("Channel created")
+	defer ch.Close()
+
+	err = ch.ExchangeDeclare(
+		request.ExchangeName,
+		request.ExchangeType,
+		true,  // durable
+		false, // auto-deleted
+		false, // internal
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Exchange created successfully",
+	})
 }
 
 // DeleteExchange godoc

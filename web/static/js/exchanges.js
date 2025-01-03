@@ -33,21 +33,23 @@ async function fetchExchanges() {
         const row = document.createElement('tr');
         row.onclick = () => selectExchange(exchange);
         row.innerHTML = `
+            <td style="display:none;">${exchange.vhost_id}</td>
             <td>${exchange.vhost}</td>
             <td><b>${exchange.name}<b></td>
             <td>${exchange.type}</td>
             <td>
-                <button class='delete-button' onclick="deleteExchange('${exchange.name}')">Delete</button>
+                <button class='delete-button' onclick="deleteExchange('${exchange.vhost_id}','${exchange.name}')">Delete</button>
             </td>
         `;
         exchangesList.appendChild(row);
     });
 }
 
-async function addExchange(name) {
+async function addExchange(name, vhost_id) {
     const exchange = {
         exchange_name: name,
-        exchange_type: "direct"
+        exchange_type: "direct",
+        // vhost_id: vhost_id
     }
     const response = await fetch('/api/exchanges', {
         method: 'POST',
@@ -57,13 +59,13 @@ async function addExchange(name) {
     if (response.ok) fetchExchanges();
 }
 
-async function deleteExchange(name) {
-    const response = await fetch(`/api/exchanges/${name}`, { method: 'DELETE' });
+async function deleteExchange(vhost_id, name) {
+    const response = await fetch(`/api/exchanges/${vhost_id}/${name}`, { method: 'DELETE' });
     if (response.ok) fetchExchanges();
 }
 
-async function fetchBindings(exchange) {
-    const response = await fetch(`/api/bindings/${exchange}`);
+async function fetchBindings(vhost_id, exchange) {
+    const response = await fetch(`/api/bindings/${vhost_id}/${exchange}`);
     const data = await response.json();
     const bindingsList = document.getElementById('bindings-list');
     bindingsList.innerHTML = '';
@@ -82,8 +84,9 @@ async function fetchBindings(exchange) {
     });
 }
 
-async function addBinding(exchange, routingKey, queue) {
+async function addBinding(vhost_id, exchange, routingKey, queue) {
     const binding = {
+        vhost_name: vhost,
         exchange_name: exchange,
         routing_key: routingKey,
         queue_name: queue,
@@ -93,10 +96,10 @@ async function addBinding(exchange, routingKey, queue) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(binding)
     });
-    if (response.ok) fetchBindings(exchange);
+    if (response.ok) fetchBindings(vhost_id, exchange);
 }
 
-async function deleteBinding(exchange, routingKey, queue) {
+async function deleteBinding(vhost_id, exchange, routingKey, queue) {
     const binding = {
         exchange_name: exchange,
         routing_key: routingKey,
@@ -107,7 +110,7 @@ async function deleteBinding(exchange, routingKey, queue) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(binding)
     });
-    if (response.ok) fetchBindings(exchange);
+    if (response.ok) fetchBindings(vhost_id, exchange);
 }
 
 async function publishMessage(exchange, routingKey, message) {
@@ -124,5 +127,5 @@ function selectExchange(exchange) {
     document.getElementById('selected-exchange-for-message').value = exchange;
     document.getElementById('bindings-manager').style.display = 'block';
     document.getElementById('publish-message').style.display = 'block';
-    fetchBindings(exchange);
+    fetchBindings(exchange.vhost_id, exchange.name);
 }

@@ -6,8 +6,14 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/queue"
+	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
 
@@ -21,13 +27,22 @@ const (
 )
 
 type Client struct {
-	conn   net.Conn
-	config *shared.ClientConfig
+	conn     net.Conn
+	config   *shared.ClientConfig
+	channels map[uint16]*Channel
+	Mu       sync.Mutex
+	cmdCh    chan []byte
+	respCh   chan interface{}
+	closeCh  chan struct{}
 }
 
 func NewClient(config *shared.ClientConfig) *Client {
 	return &Client{
-		config: config,
+		config:   config,
+		channels: make(map[uint16]*Channel),
+		cmdCh:    make(chan []byte),
+		respCh:   make(chan interface{}),
+		closeCh:  make(chan struct{}),
 	}
 }
 
@@ -61,15 +76,25 @@ func (c *Client) Dial(host, port string) error {
 		"mechanism":        "PLAIN",
 		"locale":           "en_US",
 	}
-	if err := ClientHandshake(&configurations, conn); err != nil {
+	if err := clientHandshake(&configurations, conn); err != nil {
 		return err
 	}
 
 	go c.sendHeartbeats()
-
 	go c.receiveLoop(conn)
-	// return nil
-	select {}
+
+	for {
+		select {
+		case frame := <-c.cmdCh:
+			err := shared.SendFrame(c.conn, frame)
+			if err != nil {
+				fmt.Printf("Failed to open channel: %v", err)
+
+			}
+		case <-c.closeCh:
+			return nil
+		}
+	}
 }
 
 func (c *Client) receiveLoop(conn net.Conn) {
@@ -90,10 +115,14 @@ func (c *Client) receiveLoop(conn net.Conn) {
 		}
 		log.Printf("[DEBUG] Received frame: %x", frame)
 
-		_, err = shared.ParseFrame(nil, frame)
+		response, err := shared.ParseFrame(nil, frame)
 		if err != nil {
 			log.Printf("Error parsing frame: %v", err)
 			// return
+		}
+		if response != nil {
+			// c.respCh <- response
+
 		}
 	}
 }
@@ -105,7 +134,7 @@ func (c *Client) receiveLoop(conn net.Conn) {
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func ClientHandshake(configurations *map[string]interface{}, conn net.Conn) error {
+func clientHandshake(configurations *map[string]interface{}, conn net.Conn) error {
 	log.Printf("Starting connection handshake")
 	// Send Protocol Header
 	if err := shared.SendProtocolHeader(conn); err != nil {
@@ -211,5 +240,322 @@ func (c *Client) sendHeartbeats() {
 			// case <-stopHeartbeatChan:
 			//     return
 		}
+	}
+}
+
+func (c *Client) nextChannelID() uint16 {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	// get the biggest channel ID
+	maxID := uint16(0)
+	for id := range c.channels {
+		if id > maxID {
+			maxID = id
+		}
+	}
+	return maxID + 1
+}
+
+func (c *Client) Channel() (*Channel, error) {
+	channelId := c.nextChannelID()
+	channel := &Channel{
+		Id: channelId,
+		c:  c,
+	}
+	c.Mu.Lock()
+	c.channels[channelId] = channel
+	c.Mu.Unlock()
+
+	frame := amqp.ResponseMethodMessage{
+		Channel:  channelId,
+		ClassID:  uint16(constants.CHANNEL),
+		MethodID: uint16(constants.CHANNEL_OPEN),
+		Content: amqp.ContentList{
+			KeyValuePairs: []amqp.KeyValue{
+				{
+					Key:   amqp.INT_OCTET,
+					Value: uint8(0),
+				},
+			},
+		},
+	}.FormatMethodFrame()
+	c.PostFrame(frame)
+
+	response := <-c.respCh
+	responseFrame, ok := response.(*amqp.RequestMethodMessage)
+	if !ok {
+		return nil, fmt.Errorf("Failed to parse response frame")
+	}
+	if responseFrame.ClassID != uint16(constants.CHANNEL) || responseFrame.MethodID != uint16(constants.CHANNEL_OPEN_OK) {
+		return nil, fmt.Errorf("Failed to open channel")
+	}
+
+	return channel, nil
+}
+
+func (c *Client) Shutdown() {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	for _, channel := range c.channels {
+		channel.Close()
+	}
+
+	//create a connection.close frame
+	frame := amqp.ResponseMethodMessage{
+		Channel:  c.nextChannelID(),
+		ClassID:  uint16(constants.CONNECTION),
+		MethodID: uint16(constants.CONNECTION_CLOSE),
+		Content: amqp.ContentList{
+			KeyValuePairs: []amqp.KeyValue{
+				{
+					Key:   amqp.INT_OCTET,
+					Value: uint8(0),
+				},
+			},
+		},
+	}.FormatMethodFrame()
+	c.PostFrame(frame)
+	response := <-c.respCh
+	responseFrame, ok := response.(*amqp.RequestMethodMessage)
+	if !ok {
+		fmt.Printf("Failed to parse response frame")
+	}
+	if responseFrame.ClassID != uint16(constants.CHANNEL) || responseFrame.MethodID != uint16(constants.CHANNEL_CLOSE_OK) {
+		fmt.Printf("Failed to open channel")
+	}
+
+	// close(c.cmdCh)
+	c.closeCh <- struct{}{}
+	c.conn.Close()
+}
+
+func (c *Client) PostFrame(frame []byte) {
+	c.cmdCh <- frame
+}
+
+func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessage) (interface{}, error) {
+	switch request.ClassID {
+
+	case uint16(constants.CONNECTION):
+		switch request.MethodID {
+
+		case uint16(constants.CONNECTION_CLOSE):
+			c.cleanupConnection()
+			frame := amqp.ResponseMethodMessage{
+				Channel:  request.Channel,
+				ClassID:  uint16(constants.CONNECTION),
+				MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+				Content:  amqp.ContentList{},
+			}.FormatMethodFrame()
+			shared.SendFrame(conn, frame)
+			return nil, nil
+		default:
+			log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
+			return nil, fmt.Errorf("Unknown connection method: %d", request.MethodID)
+		}
+
+	case uint16(constants.CHANNEL):
+		switch request.MethodID {
+		// case uint16(constants.CHANNEL_OPEN_OK):
+		// fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
+		// channelId := request.Channel
+		// c.Mu.Lock()
+		// // Check if the channel is already open
+
+		// c.Mu.Unlock()
+		// frame := amqp.ResponseMethodMessage{
+		// 	Channel:  channelId,
+		// 	ClassID:  request.ClassID,
+		// 	MethodID: uint16(constants.CHANNEL_OPEN_OK),
+		// 	Content: amqp.ContentList{
+		// 		KeyValuePairs: []amqp.KeyValue{
+		// 			{
+		// 				Key:   amqp.INT_OCTET,
+		// 				Value: uint8(0),
+		// 			},
+		// 		},
+		// 	},
+		// }.FormatMethodFrame()
+		// shared.SendFrame(conn, frame)
+		// fmt.Printf("[DEBUG] sending frame: %x\n", frame)
+		// return nil, nil
+
+		case uint16(constants.CHANNEL_CLOSE_OK):
+			channelId := request.Channel
+			c.Mu.Lock()
+			delete(c.channels, channelId)
+			c.Mu.Unlock()
+			return nil, nil
+
+		default:
+			log.Printf("[DEBUG] Unknown channel method: %d", request.MethodID)
+			return nil, fmt.Errorf("Unknown channel method: %d", request.MethodID)
+		}
+
+		// Handle channel-related commands
+	case uint16(constants.EXCHANGE):
+		switch request.MethodID {
+		case uint16(constants.EXCHANGE_DECLARE):
+			// content := request.Content.()
+
+			// err := b.createExchange(exchangeName, ExchangeType(typ))
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s of type %s created", exchangeName, typ)}, nil
+		case uint16(constants.EXCHANGE_DELETE):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// err := b.deleteExchange(exchangeName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Exchange %s deleted", exchangeName)}, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+		// Handle exchange-related commands
+
+	case uint16(constants.QUEUE):
+		switch request.MethodID {
+		case uint16(queue.DECLARE):
+			// Handle queue declaration
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// _, err := b.createQueue(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// // Bind the queue to the default exchange with the same name as the queue
+			// err = b.bindToDefaultExchange(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s created", queueName)}, nil
+		case uint16(queue.BIND):
+			// if len(parts) < 3 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// queueName := parts[2]
+			// routingKey := ""
+			// if len(parts) == 4 {
+			// 	routingKey = parts[3]
+			// }
+			// err := b.bindQueue(exchangeName, queueName, routingKey)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName)}, err
+		case uint16(queue.DELETE):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// err := b.deleteQueue(queueName)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
+
+		case uint16(queue.UNBIND):
+			// if len(parts) != 4 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// queueName := parts[2]
+			// routingKey := parts[3]
+			// b.DeletBinding(exchangeName, queueName, routingKey)
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Binding deleted")}, nil
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	case uint16(constants.BASIC):
+		switch request.MethodID {
+		case uint16(basic.QOS):
+		case uint16(basic.CONSUME):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// queueName := parts[1]
+			// fmt.Println("Consuming from queue:", queueName)
+			// msg := b.consume(queueName, consumerID)
+			// if msg == nil {
+			// 	return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
+			// }
+			// return common.CommandResponse{Status: "OK", Data: msg}, nil
+		case uint16(basic.CANCEL):
+		case uint16(basic.PUBLISH):
+			// if len(parts) < 4 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// exchangeName := parts[1]
+			// routingKey := parts[2]
+			// message := strings.Join(parts[3:], " ")
+			// msgId, err := b.publish(exchangeName, routingKey, message)
+			// if err != nil {
+			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
+			// }
+			// var data struct {
+			// 	MessageID string `json:"message_id"`
+			// }
+			// data.MessageID = msgId
+			// return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
+		case uint16(basic.RETURN):
+		case uint16(basic.DELIVER):
+		case uint16(basic.GET):
+		case uint16(basic.GET_EMPTY):
+			// Handle message retrieval
+		case uint16(basic.ACK):
+			// if len(parts) != 2 {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
+			// }
+			// msgID := parts[1]
+			// // get queue from consumerID
+			// consumer, ok := b.Consumers[consumerID]
+			// if !ok {
+			// 	return common.CommandResponse{Status: "ERROR", Message: "Consumer not found"}, nil
+			// }
+			// queue := consumer.Queue
+			// b.acknowledge(queue, consumerID, msgID)
+			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
+
+		case uint16(basic.REJECT):
+		case uint16(basic.RECOVER_ASYNC):
+		case uint16(basic.RECOVER):
+		case uint16(basic.RECOVER_OK):
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	case uint16(constants.TX):
+		// Handle transaction-related commands
+		switch request.MethodID {
+		case uint16(tx.SELECT):
+			// Handle transaction selection
+		case uint16(tx.COMMIT):
+			// Handle transaction commit
+		case uint16(tx.ROLLBACK):
+			// Handle transaction rollback
+		default:
+			return nil, fmt.Errorf("unsupported command")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
+}
+
+func (c *Client) cleanupConnection() {
+	log.Println("Cleaning connection")
+	c.Mu.Lock()
+	c.conn.Close()
+	c.Mu.Unlock()
+	for _, ch := range c.channels {
+		delete(c.channels, ch.Id)
 	}
 }

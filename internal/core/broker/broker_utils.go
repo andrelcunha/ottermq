@@ -2,11 +2,25 @@ package broker
 
 import (
 	// "github.com/andrelcunha/ottermq/pkg/persistdb"
-	"github.com/google/uuid"
+	"github.com/andrelcunha/ottermq/internal/core/vhost"
 )
 
-func generateSessionID() string {
-	return uuid.New().String()
+// func (b *Broker) GetVHostIdFromName(vhostName string) string {
+// 	b.mu.Lock()
+// 	defer b.mu.Unlock()
+// 	if vhost, ok := b.VHosts[vhostName]; ok {
+// 		return vhost.Id
+// 	}
+// 	return ""
+// }
+
+func (b *Broker) GetVHostFromName(vhostName string) *vhost.VHost {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if vhost, ok := b.VHosts[vhostName]; ok {
+		return vhost
+	}
+	return nil
 }
 
 func (b *Broker) Shutdown() {

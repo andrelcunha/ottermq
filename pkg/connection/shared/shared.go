@@ -363,7 +363,7 @@ func ParseFrame(configurations *map[string]interface{}, frame []byte) (interface
 		return ParseMethodFrame(configurations, channel, payload)
 	case byte(constants.TYPE_HEARTBEAT):
 		err := processHeartbeat(channel)
-		return frame, err
+		return nil, err
 	default:
 		return nil, fmt.Errorf("unknown frame type: %d", frameType)
 	}
@@ -386,27 +386,55 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 
 	switch classID {
 	case uint16(constants.CONNECTION):
-		fmt.Printf("Received CONNECTION frame on channel %d\n", channel)
+		fmt.Printf("[DEBUG] Received CONNECTION frame on channel %d\n", channel)
 		request, err := parseConnectionMethod(configurations, methodID, methodPayload)
 		if err != nil {
 			return nil, err
 		}
 		if request != nil {
-			msg, ok := request.(amqp.RequestMethodMessage)
+			msg, ok := request.(*amqp.RequestMethodMessage)
 			if ok {
 				msg.Channel = channel
 				msg.ClassID = classID
+				msg.MethodID = methodID
 				return msg, nil
 			}
 		}
-
 		return request, nil
+
+	case uint16(constants.CHANNEL):
+		fmt.Printf("[DEBUG] Received CHANNEL frame on channel %d\n", channel)
+		request, err := parseChannelMethod(methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			msg, ok := request.(*amqp.RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				msg.MethodID = methodID
+				return msg, nil
+			}
+		}
+		return request, nil
+
+	case uint16(constants.EXCHANGE):
+		fmt.Printf("[DEBUG] Received EXCHANGE frame on channel %d\n", channel)
+		_, err := parseExchangeMethod(methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
+
 	default:
+		fmt.Printf("[DEBUG] Unknown class ID: %d\n", classID)
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
 }
 
 func SendFrame(conn net.Conn, frame []byte) error {
+	fmt.Printf("[DEBUG] Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
 }

@@ -22,6 +22,7 @@ type WebServer struct {
 	config            *Config
 	Broker            *broker.Broker
 	Client            *amqp091.Connection
+	Channel           *amqp091.Channel
 }
 
 type Config struct {
@@ -42,6 +43,10 @@ func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connectio
 	// if err != nil {
 	// 	return nil, err
 	// }
+	// ch, err := conn.Channel()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &WebServer{
 		// brokerAddr: brokerAddr,
@@ -50,6 +55,7 @@ func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connectio
 		config: config,
 		Broker: broker,
 		Client: conn,
+		// Channel: ch,
 	}, nil
 }
 
@@ -90,9 +96,15 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/exchanges", func(c *fiber.Ctx) error {
 		return api.ListExchanges(c, ws.Broker)
 	})
-	apiGrp.Post("/exchanges", api.CreateExchange)
+	apiGrp.Post("/exchanges", func(c *fiber.Ctx) error {
+		return api.CreateExchange(c, ws.Client)
+		// return api.CreateExchange(c, ws.Broker)
+	})
+
 	apiGrp.Delete("/exchanges/:exchange", api.DeleteExchange)
-	apiGrp.Get("/bindings/:exchange", api.ListBindings)
+	apiGrp.Get("/bindings/:vhost/:exchange", func(c *fiber.Ctx) error {
+		return api.ListBindings(c, ws.Broker)
+	})
 	apiGrp.Post("/bindings", api.BindQueue)
 	apiGrp.Delete("/bindings", api.DeleteBinding)
 	apiGrp.Get("/connections", func(c *fiber.Ctx) error {

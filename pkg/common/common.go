@@ -8,15 +8,16 @@ import (
 type FiberMap map[string]interface{}
 
 type ConnectionInfo struct {
-	Name              string           `json:"name"`
-	User              string           `json:"user"`
-	VHost             string           `json:"vhost"`
-	HeartbeatInterval uint16           `json:"heartbeat_interval"`
-	LastHeartbeat     time.Time        `json:"last_heartbeat"`
-	ConnectedAt       time.Time        `json:"connected_at"`
-	Conn              net.Conn         `json:"-"`
-	Channels          map[int]*Channel `json:"-"`
-	Done              chan struct{}    `json:"-"`
+	Name              string        `json:"name"`
+	User              string        `json:"user"`
+	VHostName         string        `json:"vhost"`
+	VHostId           string        `json:"vhost_id"`
+	HeartbeatInterval uint16        `json:"heartbeat_interval"`
+	LastHeartbeat     time.Time     `json:"last_heartbeat"`
+	ConnectedAt       time.Time     `json:"connected_at"`
+	Conn              net.Conn      `json:"-"`
+	Channels          map[int]bool  `json:"-"`
+	Done              chan struct{} `json:"-"`
 }
 
 type Channel struct {
