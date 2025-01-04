@@ -38,7 +38,7 @@ async function fetchExchanges() {
             <td><b>${exchange.name}<b></td>
             <td>${exchange.type}</td>
             <td>
-                <button class='delete-button' onclick="deleteExchange('${exchange.vhost_id}','${exchange.name}')">Delete</button>
+                <button class='delete-button' onclick="deleteExchange('${exchange.name}')">Delete</button>
             </td>
         `;
         exchangesList.appendChild(row);
@@ -59,8 +59,8 @@ async function addExchange(name, vhost_id) {
     if (response.ok) fetchExchanges();
 }
 
-async function deleteExchange(vhost_id, name) {
-    const response = await fetch(`/api/exchanges/${vhost_id}/${name}`, { method: 'DELETE' });
+async function deleteExchange(name) {
+    const response = await fetch(`/api/exchanges/${name}`, { method: 'DELETE' });
     if (response.ok) fetchExchanges();
 }
 

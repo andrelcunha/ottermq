@@ -41,9 +41,9 @@ func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 }
 
 func ListExchanges(b *Broker) []ExchangeDTO {
+	exchanges := make([]ExchangeDTO, 0, b.GetTotalExchanges())
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	exchanges := make([]ExchangeDTO, 0, len(b.VHosts))
 	for vhostName := range b.VHosts {
 		vhost := b.VHosts[vhostName]
 		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
@@ -56,6 +56,24 @@ func ListExchanges(b *Broker) []ExchangeDTO {
 		}
 	}
 	return exchanges
+}
+
+func ListQueues(b *Broker) []QueueDTO {
+	queues := make([]QueueDTO, 0, b.GetTotalQueues())
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for vhostName := range b.VHosts {
+		vhost := b.VHosts[vhostName]
+		for _, queue := range b.VHosts[vhost.Name].Queues {
+			queues = append(queues, QueueDTO{
+				VHostName: vhost.Name,
+				VHostId:   vhost.Id,
+				Name:      queue.Name,
+				Messages:  queue.Len(),
+			})
+		}
+	}
+	return queues
 }
 
 func ListBindings(b *Broker, vhostId, exchangeName string) map[string][]string {
@@ -106,22 +124,4 @@ func ListBindings(b *Broker, vhostId, exchangeName string) map[string][]string {
 // 	// messageCount := len(queue.messages)
 // 	messageCount := queue.Len()
 // 	return messageCount, nil
-// }
-
-// func (b *VHost) deleteExchange(name string) error {
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-// 	// If the exchange is the default exchange, return an error
-// 	if name == "default" {
-// 		return fmt.Errorf("cannot delete default exchange")
-// 	}
-//
-// 	// Check if the exchange exists
-// 	_, ok := b.Exchanges[name]
-// 	if !ok {
-// 		return fmt.Errorf("exchange %s not found", name)
-// 	}
-// 	delete(b.Exchanges, name)
-// 	// b.saveBrokerState()
-// 	return nil
 // }

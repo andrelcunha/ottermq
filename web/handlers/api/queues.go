@@ -1,7 +1,10 @@
 package api
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
+	"github.com/rabbitmq/amqp091-go"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -15,31 +18,16 @@ import (
 // @Success 200 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues [get]
-func ListQueues(c *fiber.Ctx) error {
-	// response, err := utils.SendCommand("LIST_QUEUES")
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"queues": commandResponse.Data,
-	// 	})
-	// }
-	return nil // just to make it compile
+func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
+	queues := broker.ListQueues(b)
+	if queues == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list exchanges",
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"queues": queues,
+	})
 }
 
 // CreateQueue godoc
@@ -53,18 +41,37 @@ func ListQueues(c *fiber.Ctx) error {
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues [post]
-func CreateQueue(c *fiber.Ctx) error {
-	// var request models.CreateQueueRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// if request.QueueName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "queue name is required",
-	// 	})
-	// }
+func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
+	var request models.CreateQueueRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	if request.QueueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "queue name is required",
+		})
+	}
+
+	_, err := ch.QueueDeclare(
+		request.QueueName,
+		false, // durable
+		false, // delete when unused
+		true,  // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Queue created successfully",
+	})
+
 	// command := fmt.Sprintf("CREATE_QUEUE %s", request.QueueName)
 	// response, err := utils.SendCommand(command)
 	// if err != nil {

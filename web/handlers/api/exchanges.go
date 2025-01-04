@@ -1,8 +1,6 @@
 package api
 
 import (
-	"fmt"
-
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
@@ -43,40 +41,15 @@ func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [post]
 // func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
-func CreateExchange(c *fiber.Ctx, conn *amqp091.Connection) error {
+func CreateExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.CreateExchangeRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
-	// exchangeName := request.ExchangeName
-	// exchangeType := request.ExchangeType
 
-	// vh := b.GetVHostFromName("/")
-	// err := vh.CreateExchange(exchangeName, vhost.ExchangeType(exchangeType))
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 	"message": "Exchange created successfully",
-	// })
-
-	// vhostId := request.VhostId
-
-	ch, err := conn.Channel()
-	if err != nil {
-		fmt.Println("Failed to create channel")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-	fmt.Println("Channel created")
-	defer ch.Close()
-
-	err = ch.ExchangeDeclare(
+	err := ch.ExchangeDeclare(
 		request.ExchangeName,
 		request.ExchangeType,
 		true,  // durable
@@ -106,37 +79,22 @@ func CreateExchange(c *fiber.Ctx, conn *amqp091.Connection) error {
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges/{exchange} [delete]
-func DeleteExchange(c *fiber.Ctx) error {
-	// exchangeName := c.Params("exchange")
-	// if exchangeName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "exchange name is required",
-	// 	})
-	// }
+func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
+	exchangeName := c.Params("exchange")
+	if exchangeName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Exchange name is required",
+		})
+	}
 
-	// command := fmt.Sprintf("DELETE_EXCHANGE %s", exchangeName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
+	err := ch.ExchangeDelete(exchangeName, false, false)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
-	// 	})
-	// }
-	return nil
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Exchange delete successfully",
+	})
 }

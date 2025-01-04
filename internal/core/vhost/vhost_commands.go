@@ -8,14 +8,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func (b *VHost) subscribe(consumerID, queueName string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (vh *VHost) subscribe(consumerID, queueName string) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
 	// Create a new queue if it doesn't exist
-	if _, ok := b.Queues[queueName]; !ok {
-		b.createQueue(queueName)
+	if _, ok := vh.Queues[queueName]; !ok {
+		vh.CreateQueue(queueName)
 	}
-	if consumer, ok := b.Consumers[consumerID]; ok {
+	if consumer, ok := vh.Consumers[consumerID]; ok {
 		consumer.Queue = queueName
 	}
 }
@@ -44,16 +44,16 @@ func (b *VHost) acknowledge(consumerID, msgID string) error {
 	return nil
 }
 
-func (b *VHost) createQueue(name string) (*Queue, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (vh *VHost) CreateQueue(name string) (*Queue, error) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
 	// Check if the queue already exists
-	if _, ok := b.Queues[name]; ok {
+	if _, ok := vh.Queues[name]; ok {
 		return nil, fmt.Errorf("queue %s already exists", name)
 	}
 
 	queue := NewQueue(name)
-	b.Queues[name] = queue
+	vh.Queues[name] = queue
 	// b.saveBrokerState()
 	return queue, nil
 }
@@ -150,16 +150,6 @@ func (b *VHost) deleteQueue(name string) error {
 	return nil
 }
 
-func (b *VHost) listQueues() []string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	queueNames := make([]string, 0, len(b.Queues))
-	for name := range b.Queues {
-		queueNames = append(queueNames, name)
-	}
-	return queueNames
-}
-
 func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -178,21 +168,38 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
 	return nil
 }
 
-func (b *VHost) bindQueue(exchangeName, queueName, routingKey string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+func (vh *VHost) DeleteExchange(name string) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	// If the exchange is the default exchange, return an error
+	if name == "default" {
+		return fmt.Errorf("cannot delete default exchange")
+	}
+
+	// Check if the exchange exists
+	_, ok := vh.Exchanges[name]
+	if !ok {
+		return fmt.Errorf("exchange %s not found", name)
+	}
+	delete(vh.Exchanges, name)
+	return nil
+}
+
+func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
 	if exchangeName == "" {
 		exchangeName = default_exchange
 	}
 
 	// Find the exchange
-	exchange, ok := b.Exchanges[exchangeName]
+	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		return fmt.Errorf("Exchange %s not found", exchangeName)
 	}
 
 	// Find the queue
-	queue, ok := b.Queues[queueName]
+	queue, ok := vh.Queues[queueName]
 	if !ok {
 		return fmt.Errorf("Queue %s not found", queueName)
 	}
@@ -219,8 +226,8 @@ func (b *VHost) bindQueue(exchangeName, queueName, routingKey string) error {
 }
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
-func (b *VHost) bindToDefaultExchange(queueName string) error {
-	return b.bindQueue(default_exchange, queueName, queueName)
+func (vh *VHost) BindToDefaultExchange(queueName string) error {
+	return vh.BindQueue(default_exchange, queueName, queueName)
 }
 
 func (b *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {

@@ -9,14 +9,14 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )
 
-func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
+func parseQueueMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
-	case uint16(constants.EXCHANGE_DECLARE):
-		fmt.Printf("[DEBUG] Received EXCHANGE_DECLARE frame \n")
-		return parseExchangeDeclareFrame(payload)
-	case uint16(constants.EXCHANGE_DELETE):
-		fmt.Printf("[DEBUG] Received EXCHANGE_DELETE frame \n")
-		return parseExchangeDeleteFrame(payload)
+	case uint16(constants.QUEUE_DECLARE):
+		fmt.Printf("[DEBUG] Received QUEUE_DECLARE frame \n")
+		return parseQueueDeclareFrame(payload)
+	case uint16(constants.QUEUE_DELETE):
+		fmt.Printf("[DEBUG] Received QUEUE_DELETE frame \n")
+		return parseQueueDeleteFrame(payload)
 
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
@@ -33,7 +33,7 @@ func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
 // 7: reserved 3
 // 8: no-wait - (bit)
 // 9: arguments - (table)
-func parseExchangeDeclareFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
+func parseQueueDeclareFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -46,22 +46,18 @@ func parseExchangeDeclareFrame(payload []byte) (*amqp.RequestMethodMessage, erro
 	if reserverd1 != 0 {
 		return nil, fmt.Errorf("reserved1 must be 0")
 	}
-	exchangeName, err := DecodeShortStr(buf)
+	queueName, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
-	}
-	exchangeType, err := DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange type: %v", err)
 	}
 	octet, err := buf.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := DecodeExchangeDeclareFlags(octet)
-	autoDelete := flags["autoDelete"]
+	flags := DecodeQueueDeclareFlags(octet)
+	ifUnused := flags["ifUnused"]
 	durable := flags["durable"]
-	internal := flags["internal"]
+	exclusive := flags["exclusive"]
 	noWait := flags["noWait"]
 
 	var arguments map[string]interface{}
@@ -76,19 +72,18 @@ func parseExchangeDeclareFrame(payload []byte) (*amqp.RequestMethodMessage, erro
 			return nil, fmt.Errorf("failed to read arguments: %v", err)
 		}
 	}
-	msg := &message.ExchangeDeclareMessage{
-		ExchangeName: exchangeName,
-		ExchangeType: exchangeType,
-		Durable:      durable,
-		AutoDelete:   autoDelete,
-		Internal:     internal,
-		NoWait:       noWait,
-		Arguments:    arguments,
+	msg := &message.QueueDeclareMessage{
+		QueueName: queueName,
+		Durable:   durable,
+		IfUnused:  ifUnused,
+		Exclusive: exclusive,
+		NoWait:    noWait,
+		Arguments: arguments,
 	}
 	request := &amqp.RequestMethodMessage{
 		Content: msg,
 	}
-	fmt.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
+	fmt.Printf("[DEBUG] Queue fomated: %+v \n", msg)
 	return request, nil
 }
 
@@ -97,11 +92,11 @@ func parseExchangeDeclareFrame(payload []byte) (*amqp.RequestMethodMessage, erro
 // 2: exchange name - length (short)
 // 3: if-unused - (bit)
 // 4: no-wait - (bit)
-func parseExchangeDeleteFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
+func parseQueueDeleteFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("payload too short")
 	}
-	fmt.Printf("[DEBUG] Received EXCHANGE_DELETE frame %x \n", payload)
+	fmt.Printf("[DEBUG] Received QUEUE_DELETE frame %x \n", payload)
 
 	buf := bytes.NewReader(payload)
 	reserverd1, err := DecodeShortInt(buf)
@@ -119,18 +114,18 @@ func parseExchangeDeleteFrame(payload []byte) (*amqp.RequestMethodMessage, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := DecodeExchangeDeclareFlags(octet)
+	flags := DecodeQueueDeclareFlags(octet)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]
 
-	msg := &message.ExchangeDeleteMessage{
-		ExchangeName: exchangeName,
-		IfUnused:     ifUnused,
-		NoWait:       noWait,
+	msg := &message.QueueDeleteMessage{
+		QueueName: exchangeName,
+		IfUnused:  ifUnused,
+		NoWait:    noWait,
 	}
 	request := &amqp.RequestMethodMessage{
 		Content: msg,
 	}
-	fmt.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
+	fmt.Printf("[DEBUG] Queue fomated: %+v \n", msg)
 	return request, nil
 }

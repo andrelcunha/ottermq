@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"encoding/binary"
+	"bytes"
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
@@ -20,7 +20,7 @@ func parseChannelMethod(methodID uint16, payload []byte) (interface{}, error) {
 		return parseChannelOpenOkFrame(payload)
 
 	case uint16(constants.CHANNEL_CLOSE):
-		fmt.Printf("Received CHANNEL_OPEN frame \n")
+		fmt.Printf("Received CHANNEL_CLOSE frame \n")
 		return parseChannelCloseFrame(payload)
 
 	case uint16(constants.CHANNEL_CLOSE_OK):
@@ -55,20 +55,20 @@ func parseChannelOpenOkFrame(payload []byte) (*amqp.RequestMethodMessage, error)
 }
 
 func parseChannelCloseFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
-	if len(payload) < 12 {
+	fmt.Printf("[DEBUG] Received CHANNEL_CLOSE frame: %x \n", payload)
+	if len(payload) < 6 {
 		return nil, fmt.Errorf("frame too short")
 	}
 
-	index := uint16(0)
-	replyCode := binary.BigEndian.Uint16(payload[index : index+2])
-	index += 2
-	replyTextLen := payload[index]
-	index++
-	replyText := string(payload[index : index+uint16(replyTextLen)])
-	index += uint16(replyTextLen)
-	classID := binary.BigEndian.Uint16(payload[index : index+2])
-	index += 2
-	methodID := binary.BigEndian.Uint16(payload[index : index+2])
+	buf := bytes.NewReader(payload)
+	replyCode, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reply code: %v", err)
+	}
+
+	replyText, err := DecodeShortStr(buf)
+	classID, err := DecodeShortInt(buf)
+	methodID, err := DecodeShortInt(buf)
 	msg := &message.ChannelCloseMessage{
 		ReplyCode: replyCode,
 		ReplyText: replyText,
@@ -78,7 +78,6 @@ func parseChannelCloseFrame(payload []byte) (*amqp.RequestMethodMessage, error) 
 	request := &amqp.RequestMethodMessage{
 		Content: msg,
 	}
-	fmt.Printf("[DEBUG] channel close request: %+v\n", request)
 	return request, nil
 }
 

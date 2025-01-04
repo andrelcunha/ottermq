@@ -19,15 +19,14 @@ async function fetchQueues() {
     const data = await response.json();
     const queuesList = document.getElementById('queues-list');
     queuesList.innerHTML = '';
-    for (const queue of data.queues) {
-        const count = await CountMessages(queue)
+    for (const queue of data.queues) {     
         const row = document.createElement('tr');
         row.onclick = () => selectQueue(queue);
         row.innerHTML = `
-            <td>localhost</td>
-            <td><b>${queue}</b></td>
+            <td>${queue.vhost}</td>
+            <td><b>${queue.name}</b></td>
             <td><span class="small-green-square"> </span> running</td>
-            <td>${count}</td>
+            <td>${queue.messages}</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>

@@ -12,7 +12,6 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
-	"github.com/andrelcunha/ottermq/pkg/connection/constants/queue"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
@@ -421,7 +420,7 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 
 	case uint16(constants.QUEUE):
 		switch request.MethodID {
-		case uint16(queue.DECLARE):
+		case uint16(constants.QUEUE_DECLARE):
 			// Handle queue declaration
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
@@ -437,7 +436,7 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 			// }
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s created", queueName)}, nil
-		case uint16(queue.BIND):
+		case uint16(constants.QUEUE_BIND):
 			// if len(parts) < 3 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -452,7 +451,7 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
 			// }
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName)}, err
-		case uint16(queue.DELETE):
+		case uint16(constants.QUEUE_DELETE):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -463,7 +462,7 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// }
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
 
-		case uint16(queue.UNBIND):
+		case uint16(constants.QUEUE_UNBIND):
 			// if len(parts) != 4 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }

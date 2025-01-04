@@ -39,16 +39,11 @@ func main() {
 		}
 	}()
 
-	channel, err := client.Channel()
+	ch, err := client.Channel()
 	if err != nil {
 		log.Fatalf("Failed to open channel: %v", err)
 	}
-	log.Printf("Channel  %d opened successfully\n", channel.Id)
-
-	// if err := channel.Close(); err != nil {
-	// 	log.Fatalf("Failed to close channel: %v", err)
-	// }
-	// log.Printf("Channel %d closed successfully\n", channel.Id)
+	log.Printf("Channel  %d opened successfully\n", ch.Id)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)

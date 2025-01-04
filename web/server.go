@@ -43,19 +43,19 @@ func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connectio
 	// if err != nil {
 	// 	return nil, err
 	// }
-	// ch, err := conn.Channel()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
 
 	return &WebServer{
 		// brokerAddr: brokerAddr,
 		// conn:              conn,
 		// heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
-		config: config,
-		Broker: broker,
-		Client: conn,
-		// Channel: ch,
+		config:  config,
+		Broker:  broker,
+		Client:  conn,
+		Channel: ch,
 	}, nil
 }
 
@@ -86,8 +86,12 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// API routes
 	apiGrp := app.Group("/api/")
-	apiGrp.Get("/queues", api.ListQueues)
-	apiGrp.Post("/queues", api.CreateQueue)
+	apiGrp.Get("/queues", func(c *fiber.Ctx) error {
+		return api.ListQueues(c, ws.Broker)
+	})
+	apiGrp.Post("/queues", func(c *fiber.Ctx) error {
+		return api.CreateQueue(c, ws.Channel)
+	})
 	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
 	apiGrp.Post("/queues/:queue/consume", api.ConsumeMessage)
 	apiGrp.Get("/queues/:queue/count", api.CountMessages)
@@ -97,11 +101,12 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListExchanges(c, ws.Broker)
 	})
 	apiGrp.Post("/exchanges", func(c *fiber.Ctx) error {
-		return api.CreateExchange(c, ws.Client)
-		// return api.CreateExchange(c, ws.Broker)
+		return api.CreateExchange(c, ws.Channel)
 	})
 
-	apiGrp.Delete("/exchanges/:exchange", api.DeleteExchange)
+	apiGrp.Delete("/exchanges/:exchange", func(c *fiber.Ctx) error {
+		return api.DeleteExchange(c, ws.Channel)
+	})
 	apiGrp.Get("/bindings/:vhost/:exchange", func(c *fiber.Ctx) error {
 		return api.ListBindings(c, ws.Broker)
 	})

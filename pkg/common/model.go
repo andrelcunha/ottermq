@@ -23,3 +23,10 @@ type ExchangeDTO struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 }
+
+type QueueDTO struct {
+	VHostName string `json:"vhost"`
+	VHostId   string `json:"vhost_id"`
+	Name      string `json:"name"`
+	Messages  int    `json:"messages"`
+}

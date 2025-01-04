@@ -312,6 +312,50 @@ func DecodeBoolean(buf *bytes.Reader) (bool, error) {
 	return value != 0, nil
 }
 
+func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"passive", "durable", "autoDelete", "internal", "noWait", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
+func DecodeExchangeDeleteFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
+func DecodeQueueDeclareFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"passive", "durable", "ifUnused", "exclusive", "noWait", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
+func DecodeQueueDeleteFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
 func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	var strLen uint32
 	err := binary.Read(buf, binary.BigEndian, &strLen)
@@ -421,11 +465,36 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 
 	case uint16(constants.EXCHANGE):
 		fmt.Printf("[DEBUG] Received EXCHANGE frame on channel %d\n", channel)
-		_, err := parseExchangeMethod(methodID, methodPayload)
+		request, err := parseExchangeMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
 		}
-		return nil, nil
+		if request != nil {
+			msg, ok := request.(*amqp.RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				msg.MethodID = methodID
+				return msg, nil
+			}
+		}
+		return request, nil
+	case uint16(constants.QUEUE):
+		fmt.Printf("[DEBUG] Received QUEUE frame on channel %d\n", channel)
+		request, err := parseQueueMethod(methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			msg, ok := request.(*amqp.RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				msg.MethodID = methodID
+				return msg, nil
+			}
+		}
+		return request, nil
 
 	default:
 		fmt.Printf("[DEBUG] Unknown class ID: %d\n", classID)
