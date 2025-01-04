@@ -110,7 +110,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/bindings/:vhost/:exchange", func(c *fiber.Ctx) error {
 		return api.ListBindings(c, ws.Broker)
 	})
-	apiGrp.Post("/bindings", api.BindQueue)
+	apiGrp.Post("/bindings", func(c *fiber.Ctx) error {
+		return api.BindQueue(c, ws.Channel)
+	})
 	apiGrp.Delete("/bindings", api.DeleteBinding)
 	apiGrp.Get("/connections", func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)

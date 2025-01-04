@@ -356,6 +356,17 @@ func DecodeQueueDeleteFlags(octet byte) map[string]bool {
 	return flags
 }
 
+func DecodeQueueBindFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"noWait", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
 func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	var strLen uint32
 	err := binary.Read(buf, binary.BigEndian, &strLen)

@@ -111,17 +111,3 @@ func ListBindings(b *Broker, vhostId, exchangeName string) map[string][]string {
 	}
 	return nil
 }
-
-// func (b *VHost) countMessages(queueName string) (int, error) {
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-//
-// 	queue, ok := b.Queues[queueName]
-// 	if !ok {
-// 		return 0, fmt.Errorf("Queue %s not found", queueName)
-// 	}
-//
-// 	// messageCount := len(queue.messages)
-// 	messageCount := queue.Len()
-// 	return messageCount, nil
-// }

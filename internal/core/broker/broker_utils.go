@@ -5,15 +5,6 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/vhost"
 )
 
-// func (b *Broker) GetVHostIdFromName(vhostName string) string {
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-// 	if vhost, ok := b.VHosts[vhostName]; ok {
-// 		return vhost.Id
-// 	}
-// 	return ""
-// }
-
 func (b *Broker) GetVHostFromName(vhostName string) *vhost.VHost {
 	b.mu.Lock()
 	defer b.mu.Unlock()

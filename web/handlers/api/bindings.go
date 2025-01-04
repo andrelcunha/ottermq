@@ -9,7 +9,9 @@ import (
 	// "github.com/andrelcunha/ottermq/web/models"
 	// "github.com/andrelcunha/ottermq/web/utils"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
+	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 // BindQueue godoc
@@ -23,41 +25,30 @@ import (
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/bindings [post]
-func BindQueue(c *fiber.Ctx) error {
-	// var request models.BindQueueRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// command := fmt.Sprintf("BIND_QUEUE %s %s %s",
-	// 	request.ExchangeName,
-	// 	request.QueueName,
-	// 	request.RoutingKey)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
+func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
+	var request models.BindQueueRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
+	err := ch.QueueBind(
+		request.QueueName,
+		request.RoutingKey,
+		request.ExchangeName,
+		false, // noWait
+		nil,   // arguments
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Queue bound to exchange",
+	})
 
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
-	// 	})
-	// }
-	return nil /// just to make the compiler happy
 }
 
 // ListBindings godoc

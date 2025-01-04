@@ -17,6 +17,9 @@ func parseQueueMethod(methodID uint16, payload []byte) (interface{}, error) {
 	case uint16(constants.QUEUE_DELETE):
 		fmt.Printf("[DEBUG] Received QUEUE_DELETE frame \n")
 		return parseQueueDeleteFrame(payload)
+	case uint16(constants.QUEUE_BIND):
+		fmt.Printf("[DEBUG] Received QUEUE_BIND frame \n")
+		return parseQueueBindFrame(payload)
 
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
@@ -122,6 +125,59 @@ func parseQueueDeleteFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 		QueueName: exchangeName,
 		IfUnused:  ifUnused,
 		NoWait:    noWait,
+	}
+	request := &amqp.RequestMethodMessage{
+		Content: msg,
+	}
+	fmt.Printf("[DEBUG] Queue fomated: %+v \n", msg)
+	return request, nil
+}
+
+func parseQueueBindFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
+	if len(payload) < 6 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	fmt.Printf("[DEBUG] Received QUEUE_BIND frame %x \n", payload)
+	buf := bytes.NewReader(payload)
+	reserverd1, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	if reserverd1 != 0 {
+		return nil, fmt.Errorf("reserved1 must be 0")
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue name: %v", err)
+	}
+	exchange, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
+	}
+	routingKey, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode routing key: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeQueueBindFlags(octet)
+	noWait := flags["noWait"]
+	arguments := make(map[string]interface{})
+	if buf.Len() > 4 {
+		argumentsStr, err := DecodeLongStr(buf)
+		arguments, err = DecodeTable([]byte(argumentsStr))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read arguments: %v", err)
+		}
+	}
+	msg := &message.QueueBindMessage{
+		Queue:      queue,
+		Exchange:   exchange,
+		RoutingKey: routingKey,
+		NoWait:     noWait,
+		Arguments:  arguments,
 	}
 	request := &amqp.RequestMethodMessage{
 		Content: msg,

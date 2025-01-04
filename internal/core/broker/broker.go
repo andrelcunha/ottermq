@@ -466,20 +466,34 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			return nil, nil
 
 		case uint16(constants.QUEUE_BIND):
-			// if len(parts) < 3 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// exchangeName := parts[1]
-			// queueName := parts[2]
-			// routingKey := ""
-			// if len(parts) == 4 {
-			// 	routingKey = parts[3]
-			// }
-			// err := b.bindQueue(exchangeName, queueName, routingKey)
-			// if err != nil {
-			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
-			// }
-			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s bound to exchange %s", queueName, exchangeName)}, err
+			fmt.Printf("[DEBUG] Received queue bind request: %+v\n", request)
+			channelId := request.Channel
+			content, ok := request.Content.(*message.QueueBindMessage)
+			if !ok {
+				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
+				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
+			}
+			fmt.Printf("[DEBUG] Content: %+v\n", content)
+			vh := b.VHosts["/"]
+			queue := content.Queue
+			exchange := content.Exchange
+			routingKey := content.RoutingKey
+			// noWait := content.NoWait
+
+			err := vh.BindQueue(exchange, queue, routingKey)
+			if err != nil {
+				fmt.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
+				return nil, err
+			}
+			frame := amqp.ResponseMethodMessage{
+				Channel:  channelId,
+				ClassID:  request.ClassID,
+				MethodID: uint16(constants.QUEUE_BIND_OK),
+				Content:  amqp.ContentList{},
+			}.FormatMethodFrame()
+			shared.SendFrame(conn, frame)
+			return nil, nil
+
 		case uint16(constants.QUEUE_DELETE):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil

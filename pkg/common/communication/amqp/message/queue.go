@@ -14,3 +14,11 @@ type QueueDeleteMessage struct {
 	IfUnused  bool
 	NoWait    bool
 }
+
+type QueueBindMessage struct {
+	Queue      string
+	Exchange   string
+	RoutingKey string
+	NoWait     bool
+	Arguments  map[string]interface{}
+}
