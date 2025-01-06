@@ -1,6 +1,8 @@
 package broker
 
 import (
+	"fmt"
+
 	"github.com/andrelcunha/ottermq/internal/core/vhost"
 	. "github.com/andrelcunha/ottermq/pkg/common"
 )
@@ -76,12 +78,14 @@ func ListQueues(b *Broker) []QueueDTO {
 	return queues
 }
 
-func ListBindings(b *Broker, vhostId, exchangeName string) map[string][]string {
+func ListBindings(b *Broker, vhostName, exchangeName string) map[string][]string {
+	vh := b.GetVHostFromName(vhostName)
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	vh := b.GetVHostFromName(vhostId)
-	// vh := b.VHosts[vhostName]
-
+	if vh == nil {
+		return nil
+	}
+	fmt.Printf("exchangeName: %s, Vhost: %s", exchangeName, vh.Name)
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		return nil

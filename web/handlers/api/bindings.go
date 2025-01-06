@@ -70,14 +70,8 @@ func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 			"error": "Exchange name is required",
 		})
 	}
-	vhostId := c.Params("vhost")
-	if exchangeName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Vhost name is required",
-		})
-	}
 
-	bindings := broker.ListBindings(b, vhostId, exchangeName)
+	bindings := broker.ListBindings(b, "/", exchangeName)
 	if bindings == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list bindings",
@@ -87,31 +81,6 @@ func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"bindings": bindings,
 	})
-	// command := fmt.Sprintf("LIST_BINDINGS %s", exchangeName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"bindings": commandResponse.Data,
-	// 	})
-	// }
-	// return nil // just to make the compiler happy
 }
 
 // DeleteBinding godoc
