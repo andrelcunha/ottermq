@@ -31,7 +31,7 @@ async function fetchExchanges() {
     exchangesList.innerHTML = '';
     data.exchanges.forEach(exchange => {
         const row = document.createElement('tr');
-        row.onclick = () => selectExchange(exchange);
+        row.onclick = () => selectExchange(exchange.name);
         row.innerHTML = `
             <td style="display:none;">${exchange.vhost_id}</td>
             <td>${exchange.vhost}</td>
@@ -126,5 +126,5 @@ function selectExchange(exchange) {
     document.getElementById('selected-exchange-for-message').value = exchange;
     document.getElementById('bindings-manager').style.display = 'block';
     document.getElementById('publish-message').style.display = 'block';
-    fetchBindings(exchange.name);
+    fetchBindings(exchange);
 }

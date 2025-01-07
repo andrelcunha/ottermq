@@ -71,32 +71,6 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Queue created successfully",
 	})
-
-	// command := fmt.Sprintf("CREATE_QUEUE %s", request.QueueName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
-	// 	})
-	// }
-	return nil // just to make it compile
 }
 
 // DeleteQueue godoc
@@ -188,43 +162,5 @@ func ConsumeMessage(c *fiber.Ctx) error {
 	// 		"data": commandResponse.Data,
 	// 	})
 	// }
-	return nil // just to make it compile
-}
-
-// CountMessages godoc
-// @Summary Count messages in a queue
-// @Description Count the number of messages in the specified queue
-// @Tags queues
-// @Accept json
-// @Produce json
-// @Param queue path string true "Queue name"
-// @Success 200 {object} fiber.Map
-// @Failure 400 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
-// @Router /api/queues/{queue}/count [get]
-func CountMessages(c *fiber.Ctx) error {
-	// queueName := c.Params("queue")
-	// if queueName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "queue name is required",
-	// 	})
-	// }
-
-	// command := fmt.Sprintf("COUNT_MESSAGES %s", queueName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-	// return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 	"data": commandResponse.Data,
-	// })
 	return nil // just to make it compile
 }

@@ -1,10 +1,6 @@
 package api
 
 import (
-	// "encoding/json"
-
-	// "github.com/andrelcunha/ottermq/pkg/common/communication/api"
-	// "github.com/andrelcunha/ottermq/web/utils"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/gofiber/fiber/v2"
 )

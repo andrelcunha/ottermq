@@ -93,7 +93,6 @@ func ListBindings(b *Broker, vhostName, exchangeName string) map[string][]string
 
 	switch exchange.Typ {
 	case vhost.DIRECT:
-		// bindings := make([]string, 0, len(exchange.Bindings))
 		bindings := make(map[string][]string)
 		for routingKey, queues := range exchange.Bindings {
 			var queuesStr []string
@@ -104,7 +103,6 @@ func ListBindings(b *Broker, vhostName, exchangeName string) map[string][]string
 		}
 		return bindings
 	case vhost.FANOUT:
-		// bindings := make([]string, 0, len(exchange.Queues))
 		bindings := make(map[string][]string)
 		var queues []string
 		for queueName := range exchange.Queues {

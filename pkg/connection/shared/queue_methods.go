@@ -154,6 +154,7 @@ func parseQueueBindFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
+	fmt.Printf("[DEBUG] Exchange name \n", exchange)
 	routingKey, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode routing key: %v", err)
