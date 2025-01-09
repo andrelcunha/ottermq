@@ -7,6 +7,20 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )
 
+type ChannelState struct {
+	MethodFrame *RequestMethodMessage
+	HeaderFrame *HeaderFrame
+	Body        []byte
+	BodySize    uint64
+}
+
+type HeaderFrame struct {
+	Channel    uint16
+	ClassID    uint16
+	BodySize   uint64
+	Properties map[string]interface{}
+}
+
 type RequestMethodMessage struct {
 	Channel  uint16
 	ClassID  uint16

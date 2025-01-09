@@ -39,26 +39,14 @@ type ConnectionOpenFrame struct {
 	VirtualHost string
 }
 
-func parseConnectionMethod(configurations *map[string]interface{}, methodID uint16, payload []byte) (interface{}, error) {
+func parseConnectionMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(constants.CONNECTION_START):
 		fmt.Printf("Received CONNECTION_START frame \n")
 		return parseConnectionStartFrame(payload)
-		// startResponse, err := parseConnectionStartFrame(payload)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("Failed to parse connection.start frame: %v", err)
-		// }
-
-		// startOkRequest, err := CreateConnectionStartOkPayload(configurations, startResponse)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("Failed to create connection.start-ok frame: %v", err)
-		// }
-		// startOkFrame := CreateConnectionStartOkFrame(&startOkRequest)
-		// return startOkFrame, nil
 
 	case uint16(constants.CONNECTION_START_OK):
 		fmt.Printf("[DEBUG] Received connection.start-ok: %x\n", payload)
-
 		return parseConnectionStartOkFrame(payload)
 
 	case uint16(constants.CONNECTION_TUNE):

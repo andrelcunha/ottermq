@@ -8,7 +8,9 @@ import (
 	// "github.com/andrelcunha/ottermq/web/models"
 	// "github.com/andrelcunha/ottermq/web/utils"
 
+	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 // PublishMessage godoc
@@ -22,37 +24,33 @@ import (
 // @Failure 400 {object} models.FiberMap
 // @Failure 500 {object} models.FiberMap
 // @Router /api/messages [post]
-func PublishMessage(c *fiber.Ctx) error {
-	// var request models.PublishMessageRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-	// command := fmt.Sprintf("PUBLISH %s %s %s", request.ExchangeName, request.RoutingKey, request.Message)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
+func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
+	var request models.PublishMessageRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"data": commandResponse.Data,
-	// 	})
-	// }
-	return nil // just to make the compiler happy
+	msg := amqp091.Publishing{
+		ContentType: "text/plain",
+		Body:        []byte(request.Message),
+	}
+	err := ch.Publish(
+		request.ExchangeName,
+		request.RoutingKey,
+		false, // mandatory
+		false, // immediate
+		msg,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Message published",
+	})
 }
 
 // AckMessage godoc

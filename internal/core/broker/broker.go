@@ -15,7 +15,6 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
-	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/server"
@@ -129,18 +128,25 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		requestInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
-		if requestInterface != nil {
-			request, ok := requestInterface.(*amqp.RequestMethodMessage)
+		if newInterface != nil {
+			newState, ok := newInterface.(*amqp.ChannelState)
 			if !ok {
 				log.Fatalf("Failed to cast request to amqp.Message")
 			}
-
-			fmt.Printf("[DEBUG] Request: %+v\n", request)
-			b.processRequest(conn, request)
+			if newState.MethodFrame != nil {
+				request := newState.MethodFrame
+				fmt.Printf("[DEBUG] Request: %+v\n", request)
+				b.processRequest(conn, newState)
+			} else {
+				log.Printf("[DEBUG] it is not a method frame")
+				//get method frame from the current state
+				currentState := b.getCurrentState(conn, channelNum)
+				newState.MethodFrame = currentState.MethodFrame
+			}
 		}
 	}
 }
@@ -188,7 +194,8 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 	if len(frame) < int(7+payloadSize) {
 		return nil, fmt.Errorf("frame too short")
 	}
-	if channel != currentChannel && frameType != byte(constants.TYPE_METHOD) {
+
+	if channel != currentChannel {
 		return nil, fmt.Errorf("unexpected channel: %d", channel)
 	}
 	payload := frame[7:]
@@ -201,6 +208,11 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 			return nil, fmt.Errorf("failed to parse method frame: %v", err)
 		}
 		return request, nil
+
+	case byte(constants.TYPE_HEADER):
+		fmt.Printf("Received HEADER frame on channel %d\n", channel)
+
+		return shared.ParseHeaderFrame(channel, payloadSize, payload)
 
 	case byte(constants.TYPE_HEARTBEAT):
 		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
@@ -265,7 +277,9 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 	}
 }
 
-func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessage) (interface{}, error) {
+// func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessage) (interface{}, error) {
+func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (interface{}, error) {
+	request := newState.MethodFrame
 	switch request.ClassID {
 
 	case uint16(constants.CONNECTION):
@@ -291,21 +305,13 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 		case uint16(constants.CHANNEL_OPEN):
 			fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
 			channelId := request.Channel
-			b.mu.Lock()
 			// Check if the channel is already open
-			if b.Connections[conn].Channels[channelId] {
+			if b.checkChannel(conn, channelId) {
 				fmt.Printf("[DEBUG] Channel %d already open\n", channelId)
-				b.mu.Unlock()
 				return nil, fmt.Errorf("Channel already open")
 			}
+			b.addChannel(conn, request)
 
-			if len(b.Connections[conn].Channels) < 1 {
-				fmt.Printf("[DEBUG] No channels open\n")
-				b.Connections[conn].Channels = make(map[uint16]bool)
-			}
-			b.Connections[conn].Channels[channelId] = true
-
-			b.mu.Unlock()
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
@@ -325,13 +331,12 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 
 		case uint16(constants.CHANNEL_CLOSE):
 			channelId := request.Channel
-			b.mu.Lock()
-			if !b.Connections[conn].Channels[channelId] {
-				b.mu.Unlock()
-				return nil, fmt.Errorf("Channel not open")
+			// check if channel is open
+			if b.checkChannel(conn, channelId) {
+				fmt.Printf("[DEBUG] Channel %d already open\n", channelId)
+				return nil, fmt.Errorf("Channel already open")
 			}
-			b.Connections[conn].Channels[channelId] = false
-			b.mu.Unlock()
+			b.removeChannel(conn, channelId)
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  uint16(constants.CHANNEL),
@@ -519,8 +524,8 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 		}
 	case uint16(constants.BASIC):
 		switch request.MethodID {
-		case uint16(basic.QOS):
-		case uint16(basic.CONSUME):
+		case uint16(constants.BASIC_QOS):
+		case uint16(constants.BASIC_CONSUME):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -531,13 +536,22 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// 	return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
 			// }
 			// return common.CommandResponse{Status: "OK", Data: msg}, nil
-		case uint16(basic.CANCEL):
-		case uint16(basic.PUBLISH):
-			// if len(parts) < 4 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// exchangeName := parts[1]
-			// routingKey := parts[2]
+		case uint16(constants.BASIC_CANCEL):
+		case uint16(constants.BASIC_PUBLISH):
+			channel := request.Channel
+			currentState := b.getCurrentState(conn, channel)
+			// if the class and method are not the same as the current state,
+			// it means that it stated the new publish request
+			if currentState.MethodFrame.ClassID != request.ClassID || currentState.MethodFrame.MethodID != request.MethodID {
+				b.updateCurrentState(conn, channel, newState)
+				return nil, nil
+			}
+			// else it means that the method was alredy received and we are waiting for the header or body
+
+			// publishContent := request.Content.(*message.BasicPublishMessage)
+			// exchange := publishContent.Exchange
+			// routingKey := publishContent.RoutingKey
+
 			// message := strings.Join(parts[3:], " ")
 			// msgId, err := b.publish(exchangeName, routingKey, message)
 			// if err != nil {
@@ -548,12 +562,12 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// }
 			// data.MessageID = msgId
 			// return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
-		case uint16(basic.RETURN):
-		case uint16(basic.DELIVER):
-		case uint16(basic.GET):
-		case uint16(basic.GET_EMPTY):
+		case uint16(constants.BASIC_RETURN):
+		case uint16(constants.BASIC_DELIVER):
+		case uint16(constants.BASIC_GET):
+		case uint16(constants.BASIC_GET_EMPTY):
 			// Handle message retrieval
-		case uint16(basic.ACK):
+		case uint16(constants.BASIC_ACK):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -567,10 +581,10 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// b.acknowledge(queue, consumerID, msgID)
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
-		case uint16(basic.REJECT):
-		case uint16(basic.RECOVER_ASYNC):
-		case uint16(basic.RECOVER):
-		case uint16(basic.RECOVER_OK):
+		case uint16(constants.BASIC_REJECT):
+		case uint16(constants.BASIC_RECOVER_ASYNC):
+		case uint16(constants.BASIC_RECOVER):
+		case uint16(constants.BASIC_RECOVER_OK):
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
@@ -590,4 +604,61 @@ func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 		return nil, fmt.Errorf("unsupported command")
 	}
 	return nil, nil
+}
+
+func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amqp.ChannelState) {
+	currentState := b.getCurrentState(conn, channel)
+	if newState.MethodFrame != nil {
+		currentState.MethodFrame = newState.MethodFrame
+	}
+	if newState.HeaderFrame != nil {
+		currentState.HeaderFrame = newState.HeaderFrame
+	}
+	if newState.Body != nil {
+		currentState.Body = newState.Body
+	}
+	if newState.BodySize != 0 {
+		currentState.BodySize = newState.BodySize
+	}
+}
+
+// processState handles the state transitions of the connection.
+// First of all, it gets the current state of the connection.
+// Then, it checks the
+func (b *Broker) processState(conn net.Conn, channel int, newState amqp.ChannelState) {
+	// get the current state
+
+}
+
+// Add new Channel
+func (b *Broker) addChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// check if channels is already initialized
+	if len(b.Connections[conn].Channels) < 1 {
+		fmt.Printf("[DEBUG] No channels open\n")
+		b.Connections[conn].Channels = map[uint16]*amqp.ChannelState{}
+	}
+	// add new channel to the connectionInfo
+	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
+}
+
+func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	_, ok := b.Connections[conn].Channels[channel]
+	return ok
+}
+
+func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	state, _ := b.Connections[conn].Channels[channel]
+	return state
+}
+
+func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.Connections[conn].Channels, channel)
 }

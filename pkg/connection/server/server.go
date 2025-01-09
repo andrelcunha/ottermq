@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 	"github.com/andrelcunha/ottermq/pkg/persistdb"
@@ -55,11 +56,20 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 	if err != nil {
 		return err
 	}
-	startOkFrame, ok := response.(*shared.ConnectionStartOkFrame)
+	state, ok := response.(*amqp.ChannelState)
 	if !ok {
-		err = fmt.Errorf("Type assertion ConnectionStartOkFrame failed")
+		err = fmt.Errorf("Type assertion ChannelState failed")
 		return err
 	}
+	if state.MethodFrame == nil {
+		err = fmt.Errorf("MethodFrame is empty")
+		return err
+	}
+	startOkFrame := state.MethodFrame.Content.(*shared.ConnectionStartOkFrame)
+	if startOkFrame == nil {
+		err = fmt.Errorf("Type assertion ConnectionStartOkFrame failed")
+	}
+
 	err = processStartOkContent(configurations, startOkFrame)
 	if err != nil {
 		return err
@@ -82,11 +92,25 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 		return err
 	}
 	fmt.Printf("\nreceived: %x\n", frame)
-	tuneOk, err := shared.ParseFrame(configurations, frame)
+	response, err = shared.ParseFrame(configurations, frame)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOk)
+	state, ok = response.(*amqp.ChannelState)
+	if !ok {
+		err = fmt.Errorf("Type assertion ChannelState failed")
+		return err
+	}
+	if state.MethodFrame == nil {
+		err = fmt.Errorf("MethodFrame is empty")
+		return err
+	}
+	tuneOkFrame := state.MethodFrame.Content.(*shared.ConnectionTuneFrame)
+	if tuneOkFrame == nil {
+		err = fmt.Errorf("Type assertion ConnectionTuneOkFrame failed")
+	}
+	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOkFrame)
+	// TODO: save tuneOK data
 
 	// read connection.open frame
 	frame, err = shared.ReadFrame(conn)
@@ -100,9 +124,19 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 	if err != nil {
 		return err
 	}
-	open, ok := response.(*shared.ConnectionOpenFrame)
-	(*configurations)["vhost"] = open.VirtualHost
-	fmt.Printf("Received connection.open: %+v\n", open)
+	state, ok = response.(*amqp.ChannelState)
+	if !ok {
+		err = fmt.Errorf("Type assertion ConnectionOpen failed")
+		return err
+	}
+	if state.MethodFrame == nil {
+		err = fmt.Errorf("MethodFrame is empty")
+		return err
+	}
+
+	openFrame, ok := state.MethodFrame.Content.(*shared.ConnectionOpenFrame)
+	(*configurations)["vhost"] = openFrame.VirtualHost
+	fmt.Printf("Received connection.open: %+v\n", openFrame)
 
 	//send connection.open-ok frame
 	openOkFrame := shared.CreateConnectionOpenOkFrame()

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
@@ -253,6 +254,16 @@ func EncodeSecurityPlain(securityStr string) []byte {
 	return buf.Bytes()
 }
 
+// DecodeTimestamp reads and decodes a 64-bit POSIX timestamp from a bytes.Reader
+func DecodeTimestamp(buf *bytes.Reader) (time.Time, error) {
+	var timestamp int64
+	err := binary.Read(buf, binary.BigEndian, &timestamp)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to decode timestamp: %v", err)
+	}
+	return time.Unix(timestamp, 0), nil
+}
+
 func DecodeLongStr(buf *bytes.Reader) (string, error) {
 	var strLen uint32
 	err := binary.Read(buf, binary.BigEndian, &strLen)
@@ -296,6 +307,15 @@ func DecodeShortInt(buf *bytes.Reader) (uint16, error) {
 
 func DecodeLongInt(buf *bytes.Reader) (uint32, error) {
 	var value uint32
+	err := binary.Read(buf, binary.BigEndian, &value)
+	if err != nil {
+		return 0, err
+	}
+	return value, nil
+}
+
+func DecodeLongLongInt(buf *bytes.Reader) (uint64, error) {
+	var value uint64
 	err := binary.Read(buf, binary.BigEndian, &value)
 	if err != nil {
 		return 0, err
@@ -416,6 +436,11 @@ func ParseFrame(configurations *map[string]interface{}, frame []byte) (interface
 	case byte(constants.TYPE_METHOD):
 		fmt.Printf("Received METHOD frame on channel %d\n", channel)
 		return ParseMethodFrame(configurations, channel, payload)
+
+	case byte(constants.TYPE_HEADER):
+		fmt.Printf("Received HEADER frame on channel %d\n", channel)
+		return ParseHeaderFrame(channel, payloadSize, payload)
+
 	case byte(constants.TYPE_HEARTBEAT):
 		err := processHeartbeat(channel)
 		return nil, err
@@ -430,7 +455,7 @@ func processHeartbeat(channel uint16) error {
 	return nil
 }
 
-func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, payload []byte) (interface{}, error) {
+func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, payload []byte) (*amqp.ChannelState, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -442,20 +467,21 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 	switch classID {
 	case uint16(constants.CONNECTION):
 		fmt.Printf("[DEBUG] Received CONNECTION frame on channel %d\n", channel)
-		request, err := parseConnectionMethod(configurations, methodID, methodPayload)
+		startOkFrame, err := parseConnectionMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
 		}
-		if request != nil {
-			msg, ok := request.(*amqp.RequestMethodMessage)
-			if ok {
-				msg.Channel = channel
-				msg.ClassID = classID
-				msg.MethodID = methodID
-				return msg, nil
-			}
+
+		request := &amqp.RequestMethodMessage{
+			Channel:  channel,
+			ClassID:  classID,
+			MethodID: methodID,
+			Content:  startOkFrame,
 		}
-		return request, nil
+		state := &amqp.ChannelState{
+			MethodFrame: request,
+		}
+		return state, nil
 
 	case uint16(constants.CHANNEL):
 		fmt.Printf("[DEBUG] Received CHANNEL frame on channel %d\n", channel)
@@ -469,10 +495,13 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 				msg.Channel = channel
 				msg.ClassID = classID
 				msg.MethodID = methodID
-				return msg, nil
+				state := &amqp.ChannelState{
+					MethodFrame: msg,
+				}
+				return state, nil
 			}
 		}
-		return request, nil
+		return nil, nil
 
 	case uint16(constants.EXCHANGE):
 		fmt.Printf("[DEBUG] Received EXCHANGE frame on channel %d\n", channel)
@@ -486,10 +515,14 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 				msg.Channel = channel
 				msg.ClassID = classID
 				msg.MethodID = methodID
-				return msg, nil
+				state := &amqp.ChannelState{
+					MethodFrame: msg,
+				}
+				return state, nil
 			}
 		}
-		return request, nil
+		return nil, nil
+
 	case uint16(constants.QUEUE):
 		fmt.Printf("[DEBUG] Received QUEUE frame on channel %d\n", channel)
 		request, err := parseQueueMethod(methodID, methodPayload)
@@ -502,10 +535,33 @@ func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, pa
 				msg.Channel = channel
 				msg.ClassID = classID
 				msg.MethodID = methodID
-				return msg, nil
+				state := &amqp.ChannelState{
+					MethodFrame: msg,
+				}
+				return state, nil
 			}
 		}
-		return request, nil
+		return nil, nil
+
+	case uint16(constants.BASIC):
+		fmt.Printf("[DEBUG] Received BASIC frame on channel %d\n", channel)
+		request, err := parseBasicMethod(methodID, methodPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			msg, ok := request.(*amqp.RequestMethodMessage)
+			if ok {
+				msg.Channel = channel
+				msg.ClassID = classID
+				msg.MethodID = methodID
+				state := &amqp.ChannelState{
+					MethodFrame: msg,
+				}
+				return state, nil
+			}
+		}
+		return nil, nil
 
 	default:
 		fmt.Printf("[DEBUG] Unknown class ID: %d\n", classID)
@@ -526,4 +582,37 @@ func CreateHeartbeatFrame() []byte {
 	binary.BigEndian.PutUint32(frame[3:7], 0)
 	frame[7] = 0xCE
 	return frame
+}
+
+func ParseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*amqp.ChannelState, error) {
+
+	if len(payload) < int(payloadSize) {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	classID := binary.BigEndian.Uint16(payload[0:2])
+
+	headerPayload := payload[4:12]
+
+	switch classID {
+
+	case uint16(constants.BASIC):
+		fmt.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
+		request, err := parseBasicHeader(headerPayload)
+		if err != nil {
+			return nil, err
+		}
+		if request != nil {
+			request.Channel = channel
+			state := &amqp.ChannelState{
+				HeaderFrame: request,
+			}
+			return state, nil
+		}
+		return nil, nil
+
+	default:
+		fmt.Printf("[DEBUG] Unknown class ID: %d\n", classID)
+		return nil, fmt.Errorf("unknown class ID: %d", classID)
+	}
 }

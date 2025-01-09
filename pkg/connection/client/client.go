@@ -11,7 +11,6 @@ import (
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
-	"github.com/andrelcunha/ottermq/pkg/connection/constants/basic"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
 	"github.com/andrelcunha/ottermq/pkg/connection/shared"
 )
@@ -476,8 +475,8 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 		}
 	case uint16(constants.BASIC):
 		switch request.MethodID {
-		case uint16(basic.QOS):
-		case uint16(basic.CONSUME):
+		case uint16(constants.BASIC_QOS):
+		case uint16(constants.BASIC_CONSUME):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -488,8 +487,8 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// 	return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
 			// }
 			// return common.CommandResponse{Status: "OK", Data: msg}, nil
-		case uint16(basic.CANCEL):
-		case uint16(basic.PUBLISH):
+		case uint16(constants.BASIC_CANCEL):
+		case uint16(constants.BASIC_PUBLISH):
 			// if len(parts) < 4 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -505,12 +504,12 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// }
 			// data.MessageID = msgId
 			// return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
-		case uint16(basic.RETURN):
-		case uint16(basic.DELIVER):
-		case uint16(basic.GET):
-		case uint16(basic.GET_EMPTY):
+		case uint16(constants.BASIC_RETURN):
+		case uint16(constants.BASIC_DELIVER):
+		case uint16(constants.BASIC_GET):
+		case uint16(constants.BASIC_GET_EMPTY):
 			// Handle message retrieval
-		case uint16(basic.ACK):
+		case uint16(constants.BASIC_ACK):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -524,10 +523,10 @@ func (c *Client) processRequest(conn net.Conn, request *amqp.RequestMethodMessag
 			// b.acknowledge(queue, consumerID, msgID)
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
-		case uint16(basic.REJECT):
-		case uint16(basic.RECOVER_ASYNC):
-		case uint16(basic.RECOVER):
-		case uint16(basic.RECOVER_OK):
+		case uint16(constants.BASIC_REJECT):
+		case uint16(constants.BASIC_RECOVER_ASYNC):
+		case uint16(constants.BASIC_RECOVER):
+		case uint16(constants.BASIC_RECOVER_OK):
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
