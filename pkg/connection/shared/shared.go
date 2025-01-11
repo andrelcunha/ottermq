@@ -589,16 +589,17 @@ func ParseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*amqp
 	if len(payload) < int(payloadSize) {
 		return nil, fmt.Errorf("payload too short")
 	}
+	fmt.Printf("[DEBUG] payload size: %d\n", payloadSize)
 
 	classID := binary.BigEndian.Uint16(payload[0:2])
 
-	headerPayload := payload[4:12]
+	// headerPayload := payload[2:]
 
 	switch classID {
 
 	case uint16(constants.BASIC):
 		fmt.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
-		request, err := parseBasicHeader(headerPayload)
+		request, err := parseBasicHeader(payload)
 		if err != nil {
 			return nil, err
 		}
@@ -615,4 +616,22 @@ func ParseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*amqp
 		fmt.Printf("[DEBUG] Unknown class ID: %d\n", classID)
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
+}
+
+func ParseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*amqp.ChannelState, error) {
+
+	if len(payload) < int(payloadSize) {
+		return nil, fmt.Errorf("payload too short")
+	}
+	fmt.Printf("[DEBUG] payload size: %d\n", payloadSize)
+
+	// headerPayload := payload[2:]
+
+	fmt.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
+
+	state := &amqp.ChannelState{
+		Body: payload,
+	}
+	return state, nil
+
 }

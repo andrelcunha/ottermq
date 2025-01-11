@@ -20,6 +20,7 @@ func parseBasicHeader(headerPayload []byte) (*amqp.HeaderFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode class ID: %v", err)
 	}
+	fmt.Printf("[DEBUG] Class ID: %d\n", classID)
 
 	weight, err := DecodeShortInt(buf)
 	if err != nil {
@@ -28,11 +29,14 @@ func parseBasicHeader(headerPayload []byte) (*amqp.HeaderFrame, error) {
 	if weight != 0 {
 		return nil, fmt.Errorf("weight must be 0")
 	}
+	fmt.Printf("[DEBUG] Weight: %d\n", weight)
 
 	bodySize, err := DecodeLongLongInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode body size: %v", err)
 	}
+	fmt.Printf("[DEBUG] Body Size: %d\n", bodySize)
+
 	shortFlags, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode flags: %v", err)
@@ -42,6 +46,7 @@ func parseBasicHeader(headerPayload []byte) (*amqp.HeaderFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode properties: %v", err)
 	}
+	fmt.Printf("[DEBUG] properties: %v\n", properties)
 	header := &amqp.HeaderFrame{
 		ClassID:    classID,
 		BodySize:   bodySize,

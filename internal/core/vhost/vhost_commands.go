@@ -58,7 +58,7 @@ func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	return queue, nil
 }
 
-func (b *VHost) publish(exchangeName, routingKey, message string) (string, error) {
+func (b *VHost) Publish(exchangeName, routingKey, message string) (string, error) {
 	b.mu.Lock()
 	exchange, ok := b.Exchanges[exchangeName]
 	b.mu.Unlock()

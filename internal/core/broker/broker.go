@@ -97,6 +97,7 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 		b.cleanupConnection(conn)
 	}()
 	channelNum := uint16(0)
+
 	if err := server.ServerHandshake(configurations, conn); err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
@@ -135,18 +136,32 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 		if newInterface != nil {
 			newState, ok := newInterface.(*amqp.ChannelState)
 			if !ok {
-				log.Fatalf("Failed to cast request to amqp.Message")
+				log.Fatalf("Failed to cast request to amqp.ChannelState")
 			}
+			fmt.Printf("[DEBUG] New State: %+v\n", newState)
+
 			if newState.MethodFrame != nil {
 				request := newState.MethodFrame
-				fmt.Printf("[DEBUG] Request: %+v\n", request)
-				b.processRequest(conn, newState)
+				if channelNum != request.Channel {
+					channelNum = newState.MethodFrame.Channel
+					// b.addChannel(conn, newState.MethodFrame)
+					fmt.Printf("[DEBUG] Newchannel shall be added: %d\n", request.Channel)
+				}
+				//else {
+				// 	fmt.Printf("[DEBUG] Request: %+v\n", request)
+				// 	b.updateCurrentState(conn, channelNum, newState)
+				// }
 			} else {
-				log.Printf("[DEBUG] it is not a method frame")
+				if newState.HeaderFrame != nil {
+					log.Printf("[DEBUG] HeaderFrame: %+v\n", newState.HeaderFrame)
+				} else if newState.Body != nil {
+					log.Printf("[DEBUG] Body: %+v\n", newState.Body)
+				}
 				//get method frame from the current state
-				currentState := b.getCurrentState(conn, channelNum)
-				newState.MethodFrame = currentState.MethodFrame
+				newState.MethodFrame = b.Connections[conn].Channels[channelNum].MethodFrame
+				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
+			b.processRequest(conn, newState)
 		}
 	}
 }
@@ -168,6 +183,7 @@ func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, h
 		ConnectedAt:       time.Now(),
 		LastHeartbeat:     time.Now(),
 		Conn:              conn,
+		Channels:          make(map[uint16]*amqp.ChannelState),
 		Done:              make(chan struct{}),
 	}
 	b.mu.Unlock()
@@ -195,9 +211,9 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 		return nil, fmt.Errorf("frame too short")
 	}
 
-	if channel != currentChannel {
-		return nil, fmt.Errorf("unexpected channel: %d", channel)
-	}
+	// if channel != currentChannel {
+	// 	return nil, fmt.Errorf("unexpected channel: %d", channel)
+	// }
 	payload := frame[7:]
 
 	switch frameType {
@@ -213,6 +229,11 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 		fmt.Printf("Received HEADER frame on channel %d\n", channel)
 
 		return shared.ParseHeaderFrame(channel, payloadSize, payload)
+
+	case byte(constants.TYPE_BODY):
+		fmt.Printf("Received BODY frame on channel %d\n", channel)
+
+		return shared.ParseBodyFrame(channel, payloadSize, payload)
 
 	case byte(constants.TYPE_HEARTBEAT):
 		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
@@ -311,6 +332,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				return nil, fmt.Errorf("Channel already open")
 			}
 			b.addChannel(conn, request)
+			fmt.Printf("[DEBUG] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
 
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
@@ -351,7 +373,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 			return nil, fmt.Errorf("Unknown channel method: %d", request.MethodID)
 		}
 
-		// Handle channel-related commands
 	case uint16(constants.EXCHANGE):
 		switch request.MethodID {
 		case uint16(constants.EXCHANGE_DECLARE):
@@ -416,7 +437,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
-		// Handle exchange-related commands
 
 	case uint16(constants.QUEUE):
 		switch request.MethodID {
@@ -540,28 +560,40 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 		case uint16(constants.BASIC_PUBLISH):
 			channel := request.Channel
 			currentState := b.getCurrentState(conn, channel)
-			// if the class and method are not the same as the current state,
-			// it means that it stated the new publish request
-			if currentState.MethodFrame.ClassID != request.ClassID || currentState.MethodFrame.MethodID != request.MethodID {
-				b.updateCurrentState(conn, channel, newState)
+			if currentState == nil {
+				return nil, fmt.Errorf("Channel not found")
+			}
+			if currentState.MethodFrame != newState.MethodFrame {
+				b.Connections[conn].Channels[channel].MethodFrame = newState.MethodFrame
+				fmt.Printf("[DEBUG] Current state after update method : %+v\n", b.getCurrentState(conn, channel))
 				return nil, nil
 			}
-			// else it means that the method was alredy received and we are waiting for the header or body
+			// if the class and method are not the same as the current state,
+			// it means that it stated the new publish request
+			if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
+				b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
+				b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
+				fmt.Printf("[DEBUG] Current state after update header: %+v\n", b.getCurrentState(conn, channel))
+				return nil, nil
+			}
+			if currentState.Body == nil && newState.Body != nil {
+				b.Connections[conn].Channels[channel].Body = newState.Body
+			}
+			fmt.Printf("[DEBUG] Current state after all: %+v\n", currentState)
+			if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
+				fmt.Printf("[DEBUG] All fields shall be filled -> current state: %+v\n", currentState)
+				if len(currentState.Body) != int(currentState.BodySize) {
+					fmt.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
+					return nil, fmt.Errorf("Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
+				}
+				publishRequest := currentState.MethodFrame.Content.(*message.BasicPublishMessage)
+				exchanege := publishRequest.Exchange
+				routingKey := publishRequest.RoutingKey
+				message := string(currentState.Body)
+				v := b.VHosts["/"]
+				v.Publish(exchanege, routingKey, message)
+			}
 
-			// publishContent := request.Content.(*message.BasicPublishMessage)
-			// exchange := publishContent.Exchange
-			// routingKey := publishContent.RoutingKey
-
-			// message := strings.Join(parts[3:], " ")
-			// msgId, err := b.publish(exchangeName, routingKey, message)
-			// if err != nil {
-			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
-			// }
-			// var data struct {
-			// 	MessageID string `json:"message_id"`
-			// }
-			// data.MessageID = msgId
-			// return common.CommandResponse{Status: "OK", Message: "Message sent", Data: data}, nil
 		case uint16(constants.BASIC_RETURN):
 		case uint16(constants.BASIC_DELIVER):
 		case uint16(constants.BASIC_GET):
@@ -607,7 +639,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 }
 
 func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amqp.ChannelState) {
+	fmt.Println("Updating current state on channel ", channel)
 	currentState := b.getCurrentState(conn, channel)
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if newState.MethodFrame != nil {
 		currentState.MethodFrame = newState.MethodFrame
 	}
@@ -620,27 +655,17 @@ func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amq
 	if newState.BodySize != 0 {
 		currentState.BodySize = newState.BodySize
 	}
-}
-
-// processState handles the state transitions of the connection.
-// First of all, it gets the current state of the connection.
-// Then, it checks the
-func (b *Broker) processState(conn net.Conn, channel int, newState amqp.ChannelState) {
-	// get the current state
-
+	b.Connections[conn].Channels[channel] = currentState
 }
 
 // Add new Channel
 func (b *Broker) addChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// check if channels is already initialized
-	if len(b.Connections[conn].Channels) < 1 {
-		fmt.Printf("[DEBUG] No channels open\n")
-		b.Connections[conn].Channels = map[uint16]*amqp.ChannelState{}
-	}
+
 	// add new channel to the connectionInfo
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
+	fmt.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
 }
 
 func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
@@ -653,7 +678,12 @@ func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	state, _ := b.Connections[conn].Channels[channel]
+	fmt.Printf("[DEBUG] Getting current state for channel %d\n", channel)
+	state, ok := b.Connections[conn].Channels[channel]
+	if !ok {
+		fmt.Printf("[DEBUG] No channel found\n")
+		return nil
+	}
 	return state
 }
 
