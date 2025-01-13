@@ -608,6 +608,23 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				return nil, err
 			}
 
+			if messageCount == 0 {
+				KeyValuePairs := []amqp.KeyValue{
+					{ // reserved-1
+						Key:   amqp.INT_SHORT,
+						Value: uint16(0),
+					},
+				}
+				frame := amqp.ResponseMethodMessage{
+					Channel:  channelId,
+					ClassID:  request.ClassID,
+					MethodID: uint16(constants.BASIC_GET_EMPTY),
+					Content:  amqp.ContentList{KeyValuePairs: KeyValuePairs},
+				}.FormatMethodFrame()
+				shared.SendFrame(conn, frame)
+				return nil, nil
+			}
+
 			KeyValuePairs := []amqp.KeyValue{
 				{ // delivery_tag
 					Key:   amqp.INT_LONG_LONG,
