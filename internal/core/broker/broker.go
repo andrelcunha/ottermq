@@ -589,14 +589,73 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				publishRequest := currentState.MethodFrame.Content.(*message.BasicPublishMessage)
 				exchanege := publishRequest.Exchange
 				routingKey := publishRequest.RoutingKey
-				message := string(currentState.Body)
+				body := currentState.Body
+				props := currentState.HeaderFrame.Properties
 				v := b.VHosts["/"]
-				v.Publish(exchanege, routingKey, message)
+				v.Publish(exchanege, routingKey, body, props)
 			}
 
 		case uint16(constants.BASIC_RETURN):
 		case uint16(constants.BASIC_DELIVER):
 		case uint16(constants.BASIC_GET):
+			vhost := b.VHosts["/"]
+			queue := request.Content.(*message.BasicGetMessage).Queue
+			message := vhost.GetMessage(queue)
+			channelId := request.Channel
+			messageCount, err := vhost.GetMessageCount(queue)
+			if err != nil {
+				fmt.Println("Error getting message count:", err)
+				return nil, err
+			}
+
+			KeyValuePairs := []amqp.KeyValue{
+				{ // delivery_tag
+					Key:   amqp.INT_LONG_LONG,
+					Value: uint64(1),
+				},
+				{ // redelivered
+					Key:   amqp.BIT,
+					Value: false,
+				},
+				{ // exchange
+					Key:   amqp.STRING_SHORT,
+					Value: message.Exchange,
+				},
+				{ // routing_key
+					Key:   amqp.STRING_SHORT,
+					Value: message.RoutingKey,
+				},
+				{ // message_count
+					Key:   amqp.INT_LONG,
+					Value: uint32(messageCount),
+				},
+			}
+
+			frame := amqp.ResponseMethodMessage{
+				Channel:  channelId,
+				ClassID:  request.ClassID,
+				MethodID: uint16(constants.BASIC_GET_OK),
+				Content:  amqp.ContentList{KeyValuePairs: KeyValuePairs},
+			}.FormatMethodFrame()
+
+			err = shared.SendFrame(conn, frame)
+			if err != nil {
+				fmt.Printf("[DEBUG] Error sending frame: %v\n", err)
+				return nil, err
+			}
+
+			responseContent := amqp.ResponseContent{
+				Channel: channelId,
+				ClassID: request.ClassID,
+				Weight:  0,
+				Message: *message,
+			}
+			frame = responseContent.FormatHeaderFrame()
+			shared.SendFrame(conn, frame)
+			frame = responseContent.FormatBodyFrame()
+			shared.SendFrame(conn, frame)
+			return nil, nil
+
 		case uint16(constants.BASIC_GET_EMPTY):
 			// Handle message retrieval
 		case uint16(constants.BASIC_ACK):

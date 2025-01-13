@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/web/models"
 	_ "github.com/andrelcunha/ottermq/web/models"
@@ -119,7 +121,7 @@ func DeleteQueue(c *fiber.Ctx) error {
 	return nil // just to make it compile
 }
 
-// ConsumeMessage godoc
+// GetMessage godoc
 // @Summary Consume a message from a queue
 // @Description Consume a message from the specified queue
 // @Tags queues
@@ -130,37 +132,28 @@ func DeleteQueue(c *fiber.Ctx) error {
 // @Failure 400 {object} fiber.Map
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues/{queue}/consume [post]
-func ConsumeMessage(c *fiber.Ctx) error {
-	// queueName := c.Params("queue")
-	// if queueName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "queue name is required",
-	// 	})
-	// }
-	// command := fmt.Sprintf("CONSUME %s", queueName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
+func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
+	queueName := c.Params("queue")
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "queue name is required",
+		})
+	}
+	fmt.Println("Consuming from queue:", queueName)
+	msg, ok, err := ch.Get(queueName, false)
+	fmt.Println("Message received: ", string(msg.Body))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "no messages available",
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"data": string(msg.Body),
+	})
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
-	// 	})
-	// } else {
-
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"data": commandResponse.Data,
-	// 	})
-	// }
-	return nil // just to make it compile
 }

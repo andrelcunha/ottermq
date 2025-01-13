@@ -1,6 +1,10 @@
 package vhost
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
+)
 
 type Queue struct {
 	Name       string     `json:"name"`
@@ -15,14 +19,9 @@ type Queue struct {
 
 type QueueArgs map[string]interface{}
 
-type Message struct {
-	ID      string `json:"id"`
-	Content string `json:"content"`
-}
-
 type Node struct {
 	next *Node
-	data Message
+	data amqp.Message
 }
 
 func NewQueue(name string) *Queue {
@@ -33,7 +32,7 @@ func NewQueue(name string) *Queue {
 	return queue
 }
 
-func (q *Queue) Push(msg Message) {
+func (q *Queue) Push(msg amqp.Message) {
 	// queue.messages <- msg
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -44,7 +43,7 @@ func (q *Queue) Push(msg Message) {
 
 }
 
-func (q *Queue) Pop() *Message {
+func (q *Queue) Pop() *amqp.Message {
 	// return <-queue.messages
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -56,7 +55,7 @@ func (q *Queue) Pop() *Message {
 	return &head.data
 }
 
-func (q *Queue) ReQueue(msg Message) {
+func (q *Queue) ReQueue(msg amqp.Message) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	node := &Node{data: msg}

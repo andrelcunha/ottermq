@@ -3,6 +3,8 @@ package vhost
 import (
 	"log"
 	"net"
+
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 )
 
 func (vh *VHost) CleanupConnection(conn net.Conn) {
@@ -36,7 +38,7 @@ func (b *VHost) handleConsumerDisconnection(sessionID string) {
 	for msgID := range b.ConsumerUnackMsgs[consumerID] {
 		if queue, ok := b.Queues[consumer.Queue]; ok {
 			// queue.messages <- Message{ID: msgID}
-			queue.ReQueue(Message{ID: msgID})
+			queue.ReQueue(amqp.Message{ID: msgID})
 		}
 	}
 

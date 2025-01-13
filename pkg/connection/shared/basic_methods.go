@@ -31,13 +31,52 @@ func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 	// 	fmt.Printf("[DEBUG] Received BASIC_DELIVER frame \n")
 	// 	return parseBasicDeliverFrame(payload)
 
-	// case uint16(constants.BASIC_GET):
-	// 	fmt.Printf("[DEBUG] Received BASIC_GET frame \n")
-	// 	return parseBasicGetFrame(payload)
+	case uint16(constants.BASIC_GET):
+		fmt.Printf("[DEBUG] Received BASIC_GET frame \n")
+		return parseBasicGetFrame(payload)
 
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseBasicGetFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
+	buf := bytes.NewReader(payload)
+	reserved1, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	if reserved1 != 0 {
+		return nil, fmt.Errorf("reserved1 must be 0")
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeBasicGetFlags(octet)
+	noAck := flags["noAck"]
+	msg := &message.BasicGetMessage{
+		Queue: queue,
+		NoAck: noAck,
+	}
+	return &amqp.RequestMethodMessage{
+		Content: msg,
+	}, nil
+}
+
+func DecodeBasicGetFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"noAck", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
 }
 
 func parseBasicPublishFrame(payload []byte) (*amqp.RequestMethodMessage, error) {

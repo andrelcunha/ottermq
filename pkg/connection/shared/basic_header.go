@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 )
 
 // ClassID: short
@@ -41,7 +42,7 @@ func parseBasicHeader(headerPayload []byte) (*amqp.HeaderFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode flags: %v", err)
 	}
-	flags := DecodeBasicHeaderFlags(shortFlags)
+	flags := decodeBasicHeaderFlags(shortFlags)
 	properties, err := createContentPropertiesTable(flags, buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode properties: %v", err)
@@ -56,7 +57,7 @@ func parseBasicHeader(headerPayload []byte) (*amqp.HeaderFrame, error) {
 
 }
 
-func DecodeBasicHeaderFlags(short uint16) []string {
+func decodeBasicHeaderFlags(short uint16) []string {
 	flagNames := []string{
 		"contentType",
 		"contentEncoding",
@@ -82,8 +83,8 @@ func DecodeBasicHeaderFlags(short uint16) []string {
 	return flags
 }
 
-func createContentPropertiesTable(flags []string, buf *bytes.Reader) (map[string]interface{}, error) {
-	properties := make(map[string]interface{})
+func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*message.BasicProperties, error) {
+	props := &message.BasicProperties{}
 	for _, flag := range flags {
 		switch flag {
 		case "contentType": // shortstr
@@ -91,14 +92,14 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (map[string
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode content type: %v", err)
 			}
-			properties["contentType"] = contentType
+			props.ContentType = contentType
 
 		case "contentEncoding": // shortstr
 			contentEncoding, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode content encoding: %v", err)
 			}
-			properties["contentEncoding"] = contentEncoding
+			props.ContentEncoding = contentEncoding
 
 		case "headers": // longstr (table)
 			headersStr, err := DecodeLongStr(buf)
@@ -109,7 +110,7 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (map[string
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode headers: %v", err)
 			}
-			properties["headers"] = headers
+			props.Headers = headers
 
 		case "deliveryMode": // octet
 			deliveryMode, err := buf.ReadByte()
@@ -119,91 +120,90 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (map[string
 			if deliveryMode != 1 && deliveryMode != 2 {
 				return nil, fmt.Errorf("delivery mode must be 1 or 2")
 			}
-			var deliveryModeStr string // 1: non-persistent, 2: persistent
-			if deliveryMode == 1 {
-				deliveryModeStr = "non-persistent"
-			} else {
-				deliveryModeStr = "persistent"
-			}
-			properties["deliveryMode"] = deliveryModeStr
+			// var deliveryModeStr string // 1: non-persistent, 2: persistent
+			// if deliveryMode == 1 {
+			// 	deliveryModeStr = "non-persistent"
+			// } else {
+			// 	deliveryModeStr = "persistent"
+			// }
+			props.DeliveryMode = deliveryMode
 
 		case "priority": // octet (0-9)
 			priority, err := buf.ReadByte()
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode priority: %v", err)
 			}
-			properties["priority"] = priority
-			if priority < 0 || priority > 9 {
+			if int(priority) < 0 || int(priority) > 9 {
 				return nil, fmt.Errorf("priority must be between 0 and 9")
 			}
-			properties["priority"] = priority
+			props.Priority = priority
 
 		case "correlationID": // shortstr
 			correlationID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode correlation ID: %v", err)
 			}
-			properties["correlationID"] = correlationID
+			props.CorrelationID = correlationID
 
 		case "replyTo": // shortstr
 			replyTo, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode reply to: %v", err)
 			}
-			properties["replyTo"] = replyTo
+			props.ReplyTo = replyTo
 
 		case "expiration": // shortstr
 			expiration, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode expiration: %v", err)
 			}
-			properties["expiration"] = expiration
+			props.Expiration = expiration
 
 		case "messageID": // shortstr
 			messageID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode message ID: %v", err)
 			}
-			properties["messageID"] = messageID
+			props.MessageID = messageID
 
 		case "timestamp": // 64 bit timestamp
 			timestamp, err := DecodeTimestamp(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode timestamp: %v", err)
 			}
-			properties["timestamp"] = timestamp
+			props.Timestamp = timestamp
 
 		case "type": // shortstr
 			type_, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode type: %v", err)
 			}
-			properties["type"] = type_
+			props.Type = type_
 
 		case "userID": // shortstr
 			userID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode user ID: %v", err)
 			}
-			properties["userID"] = userID
+			props.UserID = userID
 
 		case "appID": // shortstr
 			appID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode app ID: %v", err)
 			}
-			properties["appID"] = appID
+			props.AppID = appID
 
 		case "reserved": // shortstr
-			reserved, err := DecodeShortInt(buf)
+			reserved, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode reserved: %v", err)
 			}
-			properties["reserved"] = reserved
+			props.Reserved = reserved
 
 		default:
 			return nil, fmt.Errorf("unknown flag: %s", flag)
 		}
 	}
-	return properties, nil
+	return props, nil
 }

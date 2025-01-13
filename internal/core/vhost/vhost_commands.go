@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/google/uuid"
 )
 
@@ -58,7 +60,18 @@ func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	return queue, nil
 }
 
-func (b *VHost) Publish(exchangeName, routingKey, message string) (string, error) {
+func (vh *VHost) GetMessageCount(name string) (int, error) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	queue, ok := vh.Queues[name]
+	if !ok {
+		return 0, fmt.Errorf("queue %s not found", name)
+	}
+	return queue.Len(), nil
+
+}
+
+func (b *VHost) Publish(exchangeName, routingKey string, body []byte, props *message.BasicProperties) (string, error) {
 	b.mu.Lock()
 	exchange, ok := b.Exchanges[exchangeName]
 	b.mu.Unlock()
@@ -67,9 +80,12 @@ func (b *VHost) Publish(exchangeName, routingKey, message string) (string, error
 		return "", fmt.Errorf("Exchange %s not found", exchangeName)
 	}
 	msgID := uuid.New().String()
-	msg := Message{
-		ID:      msgID,
-		Content: message,
+	msg := amqp.Message{
+		ID:         msgID,
+		Body:       body,
+		Properties: *props,
+		Exchange:   exchangeName,
+		RoutingKey: routingKey,
 	}
 
 	// // Save message to file
@@ -100,8 +116,8 @@ func (b *VHost) Publish(exchangeName, routingKey, message string) (string, error
 	return "", fmt.Errorf("Unknown exchange type")
 }
 
-// func (b *Broker) consume(queueName string) <-chan Message {
-func (b *VHost) consume(queueName, consumerID string) *Message {
+// func (b *Broker) GetMessage(queueName string) <-chan Message {
+func (b *VHost) GetMessage(queueName string) *amqp.Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	queue, ok := b.Queues[queueName]
@@ -131,7 +147,7 @@ func (b *VHost) consume(queueName, consumerID string) *Message {
 	// if b.UnackMsgs[queueName] == nil {
 	// 	b.UnackMsgs[queueName] = make(map[string]bool)
 	// }
-	b.ConsumerUnackMsgs[consumerID][msg.ID] = true
+	// b.ConsumerUnackMsgs[consumerID][msg.ID] = true
 
 	return msg
 }

@@ -31,7 +31,7 @@ async function fetchQueues() {
             <td>0</td>
             <td>0</td>
             <td>
-                <button class='delete-button' onclick="deleteQueue('${queue}')">Delete</button>
+                <button class='delete-button' onclick="deleteQueue('${queue.name}')">Delete</button>
             </td>
         `;
         queuesList.appendChild(row);
@@ -68,7 +68,7 @@ async function getMessage(queue) {
     });
     if (response.ok) {
         const json = await response.json();
-        const message = json.data.content
+        const message = json.data
         const messageContent = document.getElementById('message-content');
         messageContent.style.display = 'block';
         document.getElementById('message').textContent = message;
@@ -79,6 +79,6 @@ async function getMessage(queue) {
 }
 
 function selectQueue(queue) {
-    document.getElementById('selected-queue').value = queue;
+    document.getElementById('selected-queue').value = queue.name;
     document.getElementById('get-message').style.display = 'block';
 }

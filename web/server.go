@@ -93,7 +93,9 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.CreateQueue(c, ws.Channel)
 	})
 	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
-	apiGrp.Post("/queues/:queue/consume", api.ConsumeMessage)
+	apiGrp.Post("/queues/:queue/consume", func(c *fiber.Ctx) error {
+		return api.GetMessage(c, ws.Channel)
+	})
 	apiGrp.Post("/messages/:id/ack", api.AckMessage)
 	apiGrp.Post("/messages", func(c *fiber.Ctx) error {
 		return api.PublishMessage(c, ws.Channel)

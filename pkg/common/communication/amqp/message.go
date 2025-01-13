@@ -3,8 +3,14 @@ package amqp
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
+	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+)
+
+const (
+	FRAME_END = 0xCE
 )
 
 type ChannelState struct {
@@ -18,7 +24,7 @@ type HeaderFrame struct {
 	Channel    uint16
 	ClassID    uint16
 	BodySize   uint64
-	Properties map[string]interface{}
+	Properties *message.BasicProperties
 }
 
 type RequestMethodMessage struct {
@@ -35,6 +41,23 @@ type ResponseMethodMessage struct {
 	Content  ContentList
 }
 
+type ResponseContent struct {
+	Channel uint16
+	ClassID uint16
+	Weight  uint16
+	// Body    []byte
+	// Properties *message.BasicProperties
+	Message Message
+}
+
+type Message struct {
+	ID         string                  `json:"id"`
+	Body       []byte                  `json:"body"`
+	Properties message.BasicProperties `json:"properties"`
+	Exchange   string                  `json:"exchange"`
+	RoutingKey string                  `json:"routing_key"`
+}
+
 type ContentList struct {
 	KeyValuePairs []KeyValue
 }
@@ -42,6 +65,51 @@ type ContentList struct {
 type KeyValue struct {
 	Key   string
 	Value interface{}
+}
+
+func (msg ResponseContent) FormatHeaderFrame() []byte {
+	frameType := uint8(constants.TYPE_HEADER)
+	var payloadBuf bytes.Buffer
+	channel := msg.Channel
+	classID := msg.ClassID
+
+	weight := msg.Weight
+	bodySize := len(msg.Message.Body)
+	flag_list, flags, err := msg.Message.Properties.EncodeBasicProperties()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return nil
+	}
+
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(classID))
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(weight))
+	binary.Write(&payloadBuf, binary.BigEndian, uint64(bodySize))
+	binary.Write(&payloadBuf, binary.BigEndian, uint16(flags))
+	payloadBuf.Write(flag_list)
+
+	// Write the flags and flag_list
+
+	payloadSize := uint32(payloadBuf.Len())
+
+	headerBuf := FormatHeader(frameType, channel, payloadSize)
+
+	frame := append(headerBuf, payloadBuf.Bytes()...)
+	frame = append(frame, FRAME_END)
+	return frame
+}
+
+func (msg ResponseContent) FormatBodyFrame() []byte {
+	frameType := uint8(constants.TYPE_BODY)
+	var payloadBuf bytes.Buffer
+	channel := msg.Channel
+	content := msg.Message.Body
+	payloadBuf.Write(content)
+
+	payloadSize := uint32(payloadBuf.Len())
+	headerBuf := FormatHeader(frameType, channel, payloadSize)
+	frame := append(headerBuf, payloadBuf.Bytes()...)
+	frame = append(frame, FRAME_END)
+	return frame
 }
 
 func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
@@ -65,7 +133,7 @@ func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 
-	frame = append(frame, 0xCE) // frame-end
+	frame = append(frame, FRAME_END) // frame-end
 
 	return frame
 }
