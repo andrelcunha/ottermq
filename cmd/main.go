@@ -59,9 +59,10 @@ func main() {
 
 	// Verify if the database file exists
 	dbPath := filepath.Join(dataDir, "ottermq.db")
+	persistdb.SetDbPath(dbPath)
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		log.Println("Database file not found. Creating a new one...")
-		persistdb.InitDB(dbPath)
+		persistdb.InitDB()
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
 		user := persistdb.UserCreateDTO{Username: config.Username, Password: config.Password, RoleID: 1}

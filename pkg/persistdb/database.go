@@ -12,8 +12,11 @@ var db *sql.DB
 // const dbPath = "./data/ottermq.db"
 var dbPath string
 
-func InitDB(path string) {
+func SetDbPath(path string) {
 	dbPath = path
+}
+
+func InitDB() {
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {

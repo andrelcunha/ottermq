@@ -38,7 +38,6 @@ WORKDIR /app
 
 # Copy the built binaries from the builder stage
 COPY --from=builder /app/bin/ottermq .
-# COPY --from=builder /app/bin/ottermq-webadmin .
 COPY --from=builder /app/web/static ./web/static
 COPY --from=builder /app/web/templates ./web/templates
 
