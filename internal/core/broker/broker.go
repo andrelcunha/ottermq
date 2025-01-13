@@ -279,7 +279,7 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 				log.Printf("Failed to send heartbeat: %v", err)
 				return
 			}
-			log.Println("Heartbeat sent")
+			log.Println("[DEBUG] Heartbeat sent")
 
 		case <-done:
 			log.Println("Stopping heartbeat  goroutine for closed connection")

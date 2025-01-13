@@ -232,11 +232,7 @@ func (c *Client) sendHeartbeats() {
 				log.Printf("Failed to send heartbeat: %v", err)
 				return
 			}
-			log.Println("Heartbeat sent")
-
-			// Add a case for stopping the heartbeat loop if needed
-			// case <-stopHeartbeatChan:
-			//     return
+			log.Println("[DEBUG] Heartbeat sent")
 		}
 	}
 }
@@ -322,7 +318,6 @@ func (c *Client) Shutdown() {
 		fmt.Printf("Failed to open channel")
 	}
 
-	// close(c.cmdCh)
 	c.closeCh <- struct{}{}
 	c.conn.Close()
 }
