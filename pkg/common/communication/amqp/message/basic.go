@@ -14,8 +14,17 @@ type BasicPublishMessage struct {
 }
 
 type BasicGetMessage struct {
-	Queue string
-	NoAck bool
+	Reserved1 uint16
+	Queue     string
+	NoAck     bool
+}
+
+type BasicGetOk struct {
+	DeliveryTag  uint64
+	Redelivered  bool
+	Exchange     string
+	RoutingKey   string
+	MessageCount uint32
 }
 
 type BasicProperties struct {

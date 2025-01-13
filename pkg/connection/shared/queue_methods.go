@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	. "github.com/andrelcunha/ottermq/pkg/connection/utils"
 )
 
 func parseQueueMethod(methodID uint16, payload []byte) (interface{}, error) {
@@ -154,7 +155,7 @@ func parseQueueBindFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
-	fmt.Printf("[DEBUG] Exchange name \n", exchange)
+	fmt.Printf("[DEBUG] Exchange name: %s\n", exchange)
 	routingKey, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode routing key: %v", err)

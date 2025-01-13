@@ -144,20 +144,14 @@ func (b *Broker) handleConnection(configurations *map[string]interface{}, conn n
 				request := newState.MethodFrame
 				if channelNum != request.Channel {
 					channelNum = newState.MethodFrame.Channel
-					// b.addChannel(conn, newState.MethodFrame)
 					fmt.Printf("[DEBUG] Newchannel shall be added: %d\n", request.Channel)
 				}
-				//else {
-				// 	fmt.Printf("[DEBUG] Request: %+v\n", request)
-				// 	b.updateCurrentState(conn, channelNum, newState)
-				// }
 			} else {
 				if newState.HeaderFrame != nil {
 					log.Printf("[DEBUG] HeaderFrame: %+v\n", newState.HeaderFrame)
 				} else if newState.Body != nil {
 					log.Printf("[DEBUG] Body: %+v\n", newState.Body)
 				}
-				//get method frame from the current state
 				newState.MethodFrame = b.Connections[conn].Channels[channelNum].MethodFrame
 				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
@@ -211,9 +205,6 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 		return nil, fmt.Errorf("frame too short")
 	}
 
-	// if channel != currentChannel {
-	// 	return nil, fmt.Errorf("unexpected channel: %d", channel)
-	// }
 	payload := frame[7:]
 
 	switch frameType {
@@ -546,16 +537,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 		switch request.MethodID {
 		case uint16(constants.BASIC_QOS):
 		case uint16(constants.BASIC_CONSUME):
-			// if len(parts) != 2 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// queueName := parts[1]
-			// fmt.Println("Consuming from queue:", queueName)
-			// msg := b.consume(queueName, consumerID)
-			// if msg == nil {
-			// 	return common.CommandResponse{Status: "OK", Message: "No messages available", Data: ""}, nil
-			// }
-			// return common.CommandResponse{Status: "OK", Data: msg}, nil
 		case uint16(constants.BASIC_CANCEL):
 		case uint16(constants.BASIC_PUBLISH):
 			channel := request.Channel
@@ -594,13 +575,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				v := b.VHosts["/"]
 				v.Publish(exchanege, routingKey, body, props)
 			}
-
-		case uint16(constants.BASIC_RETURN):
-		case uint16(constants.BASIC_DELIVER):
 		case uint16(constants.BASIC_GET):
 			vhost := b.VHosts["/"]
 			queue := request.Content.(*message.BasicGetMessage).Queue
-			message := vhost.GetMessage(queue)
 			channelId := request.Channel
 			messageCount, err := vhost.GetMessageCount(queue)
 			if err != nil {
@@ -609,50 +586,33 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 			}
 
 			if messageCount == 0 {
-				KeyValuePairs := []amqp.KeyValue{
-					{ // reserved-1
-						Key:   amqp.INT_SHORT,
-						Value: uint16(0),
-					},
+				reserved1 := amqp.KeyValue{
+					Key:   amqp.INT_LONG,
+					Value: uint32(0),
 				}
 				frame := amqp.ResponseMethodMessage{
 					Channel:  channelId,
 					ClassID:  request.ClassID,
 					MethodID: uint16(constants.BASIC_GET_EMPTY),
-					Content:  amqp.ContentList{KeyValuePairs: KeyValuePairs},
+					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
 				shared.SendFrame(conn, frame)
 				return nil, nil
 			}
 
-			KeyValuePairs := []amqp.KeyValue{
-				{ // delivery_tag
-					Key:   amqp.INT_LONG_LONG,
-					Value: uint64(1),
-				},
-				{ // redelivered
-					Key:   amqp.BIT,
-					Value: false,
-				},
-				{ // exchange
-					Key:   amqp.STRING_SHORT,
-					Value: message.Exchange,
-				},
-				{ // routing_key
-					Key:   amqp.STRING_SHORT,
-					Value: message.RoutingKey,
-				},
-				{ // message_count
-					Key:   amqp.INT_LONG,
-					Value: uint32(messageCount),
-				},
+			msg := vhost.GetMessage(queue)
+			msgGetOk := &message.BasicGetOk{
+				DeliveryTag: 1,
+				Redelivered: false,
+				Exchange:    msg.Exchange,
+				RoutingKey:  msg.RoutingKey,
 			}
 
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
 				MethodID: uint16(constants.BASIC_GET_OK),
-				Content:  amqp.ContentList{KeyValuePairs: KeyValuePairs},
+				Content:  *amqp.EncodeGetOkToContentList(msgGetOk),
 			}.FormatMethodFrame()
 
 			err = shared.SendFrame(conn, frame)
@@ -665,16 +625,13 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				Channel: channelId,
 				ClassID: request.ClassID,
 				Weight:  0,
-				Message: *message,
+				Message: *msg,
 			}
 			frame = responseContent.FormatHeaderFrame()
 			shared.SendFrame(conn, frame)
 			frame = responseContent.FormatBodyFrame()
 			shared.SendFrame(conn, frame)
 			return nil, nil
-
-		case uint16(constants.BASIC_GET_EMPTY):
-			// Handle message retrieval
 		case uint16(constants.BASIC_ACK):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
@@ -692,7 +649,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 		case uint16(constants.BASIC_REJECT):
 		case uint16(constants.BASIC_RECOVER_ASYNC):
 		case uint16(constants.BASIC_RECOVER):
-		case uint16(constants.BASIC_RECOVER_OK):
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
@@ -734,23 +690,6 @@ func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amq
 	b.Connections[conn].Channels[channel] = currentState
 }
 
-// Add new Channel
-func (b *Broker) addChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// add new channel to the connectionInfo
-	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
-	fmt.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
-}
-
-func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	_, ok := b.Connections[conn].Channels[channel]
-	return ok
-}
-
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -761,10 +700,4 @@ func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelSta
 		return nil
 	}
 	return state
-}
-
-func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	delete(b.Connections[conn].Channels, channel)
 }

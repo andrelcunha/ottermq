@@ -49,16 +49,3 @@ func (b *Broker) GetTotalExchanges() int {
 	}
 	return total
 }
-
-// func (b *Broker) authenticate(username, password string) bool {
-// 	err := persistdb.OpenDB()
-// 	if err != nil {
-// 		return false
-// 	}
-// 	defer persistdb.CloseDB()
-// 	isAuthenticated, err := persistdb.AuthenticateUser(username, password)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	return isAuthenticated
-// }

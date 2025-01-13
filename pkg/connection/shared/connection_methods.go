@@ -10,6 +10,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
+	. "github.com/andrelcunha/ottermq/pkg/connection/utils"
 
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
 )

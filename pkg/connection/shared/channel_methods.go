@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	. "github.com/andrelcunha/ottermq/pkg/connection/utils"
 )
 
 func parseChannelMethod(methodID uint16, payload []byte) (interface{}, error) {

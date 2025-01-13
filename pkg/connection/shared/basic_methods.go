@@ -7,6 +7,7 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	. "github.com/andrelcunha/ottermq/pkg/connection/utils"
 )
 
 func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
@@ -60,8 +61,9 @@ func parseBasicGetFrame(payload []byte) (*amqp.RequestMethodMessage, error) {
 	flags := DecodeBasicGetFlags(octet)
 	noAck := flags["noAck"]
 	msg := &message.BasicGetMessage{
-		Queue: queue,
-		NoAck: noAck,
+		Reserved1: reserved1,
+		Queue:     queue,
+		NoAck:     noAck,
 	}
 	return &amqp.RequestMethodMessage{
 		Content: msg,

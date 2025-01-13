@@ -7,6 +7,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
 	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/pkg/connection/utils"
 )
 
 const (
@@ -45,8 +46,6 @@ type ResponseContent struct {
 	Channel uint16
 	ClassID uint16
 	Weight  uint16
-	// Body    []byte
-	// Properties *message.BasicProperties
 	Message Message
 }
 
@@ -86,8 +85,6 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 	binary.Write(&payloadBuf, binary.BigEndian, uint64(bodySize))
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(flags))
 	payloadBuf.Write(flag_list)
-
-	// Write the flags and flag_list
 
 	payloadSize := uint32(payloadBuf.Len())
 
@@ -156,14 +153,14 @@ func formatMethodPayload(content ContentList) []byte {
 				payloadBuf.WriteByte(0)
 			}
 		} else if kv.Key == STRING_SHORT {
-			payloadBuf.Write(EncodeShortStr(kv.Value.(string)))
+			payloadBuf.Write(utils.EncodeShortStr(kv.Value.(string)))
 		} else if kv.Key == STRING_LONG {
-			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
+			payloadBuf.Write(utils.EncodeLongStr(kv.Value.([]byte)))
 		} else if kv.Key == TIMESTAMP {
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64))
 		} else if kv.Key == TABLE {
-			encodedTable := EncodeTable(kv.Value.(map[string]interface{}))
-			payloadBuf.Write(EncodeLongStr(encodedTable))
+			encodedTable := utils.EncodeTable(kv.Value.(map[string]interface{}))
+			payloadBuf.Write(utils.EncodeLongStr(encodedTable))
 		}
 	}
 	return payloadBuf.Bytes()
@@ -177,57 +174,29 @@ func FormatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
 	return header
 }
 
-func EncodeLongStr(data []byte) []byte {
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, uint32(len(data)))
-	buf.Write(data)
-	return buf.Bytes()
-}
-
-func EncodeShortStr(data string) []byte {
-	var buf bytes.Buffer
-	buf.WriteByte(byte(len(data)))
-	buf.WriteString(data)
-	return buf.Bytes()
-}
-
-// encodeTable encodes a proper AMQP field table
-func EncodeTable(table map[string]interface{}) []byte {
-	var buf bytes.Buffer
-
-	for key, value := range table {
-		// Field name
-		buf.Write(EncodeShortStr(key))
-
-		// Field value type and value
-		switch v := value.(type) {
-		case string:
-			buf.WriteByte('S') // Field value type 'S' (string)
-			buf.Write(EncodeLongStr([]byte(v)))
-
-		case int:
-			buf.WriteByte('I') // Field value type 'I' (int)
-			binary.Write(&buf, binary.BigEndian, int32(v))
-			// Add cases for other types as needed
-
-		// In the case map[string]interface:
-		case map[string]interface{}:
-			// Recursively encode the nested map
-			buf.WriteByte('F') // Field value type 'F' (field table)
-			encodedTable := EncodeTable(v)
-			buf.Write(EncodeLongStr(encodedTable))
-
-		case bool:
-			buf.WriteByte('t')
-			if v {
-				buf.WriteByte(1)
-			} else {
-				buf.WriteByte(0)
-			}
-
-		default:
-			buf.WriteByte('U')
-		}
+func EncodeGetOkToContentList(msg *message.BasicGetOk) *ContentList {
+	KeyValuePairs := []KeyValue{
+		{ // delivery_tag
+			Key:   INT_LONG_LONG,
+			Value: msg.DeliveryTag,
+		},
+		{ // redelivered
+			Key:   BIT,
+			Value: msg.Redelivered,
+		},
+		{ // exchange
+			Key:   STRING_SHORT,
+			Value: msg.Exchange,
+		},
+		{ // routing_key
+			Key:   STRING_SHORT,
+			Value: msg.RoutingKey,
+		},
+		{ // message_count
+			Key:   INT_LONG,
+			Value: msg.MessageCount,
+		},
 	}
-	return buf.Bytes()
+	contentList := &ContentList{KeyValuePairs: KeyValuePairs}
+	return contentList
 }

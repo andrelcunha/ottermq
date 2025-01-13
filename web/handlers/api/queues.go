@@ -141,7 +141,6 @@ func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	}
 	fmt.Println("Consuming from queue:", queueName)
 	msg, ok, err := ch.Get(queueName, false)
-	fmt.Println("Message received: ", string(msg.Body))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
@@ -152,6 +151,7 @@ func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 			"error": "no messages available",
 		})
 	}
+	fmt.Println("Message received: ", string(msg.Body))
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"data": string(msg.Body),
 	})
