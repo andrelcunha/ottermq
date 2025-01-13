@@ -9,9 +9,11 @@ import (
 
 var db *sql.DB
 
-const dbPath = "./data/ottermq.db"
+// const dbPath = "./data/ottermq.db"
+var dbPath string
 
-func InitDB() {
+func InitDB(path string) {
+	dbPath = path
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {

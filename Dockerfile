@@ -38,7 +38,7 @@ WORKDIR /app
 
 # Copy the built binaries from the builder stage
 COPY --from=builder /app/bin/ottermq .
-COPY --from=builder /app/bin/ottermq-webadmin .
+# COPY --from=builder /app/bin/ottermq-webadmin .
 COPY --from=builder /app/web/static ./web/static
 COPY --from=builder /app/web/templates ./web/templates
 
@@ -47,5 +47,5 @@ EXPOSE 3000
 EXPOSE 5672
 
 # Command to run both broker and web admin binaries
-CMD ["sh", "-c", "./ottermq & ./ottermq-webadmin"]
+CMD ["sh", "-c", "./ottermq"]
 # CMD ["tail", "-f", "/dev/null"]

@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/andrelcunha/ottermq/config"
@@ -26,6 +27,22 @@ const (
 )
 
 func main() {
+	// Determine the directory of the running binary
+	executablePath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Failed to get executable path: %v", err)
+	}
+	executableDir := filepath.Dir(executablePath)
+	dataDir := filepath.Join(executableDir, "data")
+
+	// Ensure the data directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		log.Println("Data directory not found. Creating a new one...")
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			log.Fatalf("Failed to create data directory: %v", err)
+		}
+	}
+
 	config := &config.Config{
 		Port:                 PORT,
 		Host:                 HOST,
@@ -37,13 +54,14 @@ func main() {
 	}
 
 	b := broker.NewBroker(config)
-
-	log.Println("OtterMq is starting...")
+	log.Println("OtterMQ version ", version)
+	log.Println("Broker is starting...")
 
 	// Verify if the database file exists
-	if _, err := os.Stat("./data/ottermq.db"); os.IsNotExist(err) {
+	dbPath := filepath.Join(dataDir, "ottermq.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		log.Println("Database file not found. Creating a new one...")
-		persistdb.InitDB()
+		persistdb.InitDB(dbPath)
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
 		user := persistdb.UserCreateDTO{Username: config.Username, Password: config.Password, RoleID: 1}
