@@ -1,6 +1,9 @@
-[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml) [![Docker Image CI](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml/badge.svg)](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml)
-
 # OtterMq
+[![Go](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml/badge.svg)](https://github.com/andrelcunha/OtterMq/actions/workflows/go.yml)
+[![Docker Image CI](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml/badge.svg)](https://github.com/andrelcunha/ottermq/actions/workflows/docker-image.yml)
+[![GitHub issues](https://img.shields.io/github/issues/andrelcunha/ottermq.svg)](https://github.com/andrelcunha/ottermq/issues)
+
+
 
 **OtterMq** is a high-performance message broker written in Golang, inspired by RabbitMq. It aims to provide a reliable, scalable, and easy-to-use messaging solution for distributed systems.
 
@@ -30,7 +33,7 @@ ottermq
 ```
 
 ## License
-OtterMq is released under the MIT License. See ￼LICENSE for more information.
+OtterMq is released under the MIT License. See [License](https://github.com/dunstontc/vscode-go-syntax/blob/master/LICENSE) for more information.
 
 ## Contact
 For any questions, suggestions, or issues, please open an issue in the repository.
