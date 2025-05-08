@@ -10,8 +10,8 @@ import (
 func (vh *VHost) CleanupConnection(conn net.Conn) {
 	log.Println("Cleaning vhost connection")
 	vh.mu.Lock()
+	defer vh.mu.Unlock()
 
-	vh.mu.Unlock()
 	consumerID, ok := vh.getSessionID(conn)
 	if ok {
 		vh.handleConsumerDisconnection(consumerID)

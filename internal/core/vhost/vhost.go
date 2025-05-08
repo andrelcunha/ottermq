@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const default_exchange = "(AMQP default)"
+const default_exchange = "AMQP_default"
 
 type VHost struct {
 	Name      string                     `json:"name"`

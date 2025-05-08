@@ -105,7 +105,7 @@ func (b *VHost) Publish(exchangeName, routingKey string, body []byte, props *mes
 			return msgID, nil
 		} else {
 			log.Printf("Routing key %s not found for exchange %s", routingKey, exchangeName)
-			return "", fmt.Errorf("Routing key %s not found for exchange %s", routingKey, exchangeName)
+			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
 	case FANOUT:
 		for _, queue := range exchange.Queues {
@@ -113,7 +113,7 @@ func (b *VHost) Publish(exchangeName, routingKey string, body []byte, props *mes
 		}
 		return msgID, nil
 	}
-	return "", fmt.Errorf("Unknown exchange type")
+	return "", fmt.Errorf("unknown exchange type")
 }
 
 // func (b *Broker) GetMessage(queueName string) <-chan Message {
@@ -258,7 +258,7 @@ func (b *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {
 
 	queues, ok := exchange.Bindings[routingKey]
 	if !ok {
-		return fmt.Errorf("Binding with routing key %s not found", routingKey)
+		return fmt.Errorf("binding with routing key %s not found", routingKey)
 	}
 
 	// Find the queue
