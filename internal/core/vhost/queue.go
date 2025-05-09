@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
@@ -24,6 +25,46 @@ type Node struct {
 	data amqp.Message
 }
 
+func (vh *VHost) subscribe(consumerID, queueName string) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	// Create a new queue if it doesn't exist
+	if _, ok := vh.Queues[queueName]; !ok {
+		vh.CreateQueue(queueName)
+	}
+	if consumer, ok := vh.Consumers[consumerID]; ok {
+		consumer.Queue = queueName
+	}
+}
+
+func (vh *VHost) CreateQueue(name string) (*Queue, error) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	// Check if the queue already exists
+	if _, ok := vh.Queues[name]; ok {
+		return nil, fmt.Errorf("queue %s already exists", name)
+	}
+
+	queue := NewQueue(name)
+	vh.Queues[name] = queue
+	// vh.saveBrokerState()
+	return queue, nil
+}
+
+func (vh *VHost) deleteQueue(name string) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	// Check if the queue exists
+	_, ok := vh.Queues[name]
+	if !ok {
+		return fmt.Errorf("queue %s not found", name)
+	}
+
+	delete(vh.Queues, name)
+	// vh.saveBrokerState()
+	return nil
+}
+
 func NewQueue(name string) *Queue {
 	queue := &Queue{
 		Name: name,
@@ -40,7 +81,6 @@ func (q *Queue) Push(msg amqp.Message) {
 		q.head = &Node{data: msg}
 		return
 	}
-
 }
 
 func (q *Queue) Pop() *amqp.Message {
