@@ -71,5 +71,4 @@ func TestFormatHeader(t *testing.T) {
 			}
 		})
 	}
-	return
 }

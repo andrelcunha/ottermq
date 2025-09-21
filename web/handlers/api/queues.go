@@ -147,8 +147,8 @@ func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 		})
 	}
 	if !ok {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "no messages available",
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"data": "",
 		})
 	}
 	fmt.Println("Message received: ", string(msg.Body))
