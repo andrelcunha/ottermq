@@ -14,22 +14,16 @@ func (vh *VHost) acknowledge(consumerID, msgID string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	// if vh.UnackMsgs[queueName] == nil {
-	// 	return fmt.Errorf("no unack messages for queue %s", queueName)
-	// }
-	// if _, ok := vh.UnackMsgs[queueName][msgID]; !ok {
-	// 	return fmt.Errorf("Message ID %s not found in unack messages", msgID)
-	// }
-	// delete(vh.UnackMsgs[queueName], msgID)
+	if vh.ConsumerUnackMsgs[consumerID] == nil {
+		return fmt.Errorf("no unack messages for consumer %s", consumerID)
+	}
+	if _, ok := vh.ConsumerUnackMsgs[consumerID][msgID]; !ok {
+		return fmt.Errorf("message ID %s not found in unack messages for consumer %s", msgID, consumerID)
+	}
 	delete(vh.ConsumerUnackMsgs[consumerID], msgID)
-	// vh.saveBrokerState()
-	// if vh.UnackMsgs[queueName] == nil {
-	// 	return fmt.Errorf("no unack messages for queue %s", queueName)
-	// }
-	// if _, ok := vh.UnackMsgs[queueName][msgID]; !ok {
-	// 	return fmt.Errorf("Message ID %s not found in unack messages", msgID)
-	// }
-	// delete(vh.UnackMsgs[queueName], msgID)
+	log.Printf("[DEBUG] Acknoledged messege %s for consumer %s", msgID, consumerID)
+
+	// vh.saveBrokerState() // TODO: Persist
 	return nil
 }
 
@@ -41,7 +35,6 @@ func (vh *VHost) GetMessageCount(name string) (int, error) {
 		return 0, fmt.Errorf("queue %s not found", name)
 	}
 	return queue.Len(), nil
-
 }
 
 func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *message.BasicProperties) (string, error) {
@@ -60,8 +53,10 @@ func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *me
 		Exchange:   exchangeName,
 		RoutingKey: routingKey,
 	}
+	log.Printf("[DEBUG] Publishing message: ID=%s, Exchange=%s, RoutingKey=%s, Body=%s, Properties=%+v",
+		msgID, msg.Exchange, msg.RoutingKey, string(msg.Body), msg.Properties)
 
-	// // Save message to file
+	// // Save message to file TODO: Persist
 	// err := vh.saveMessage(routingKey, msg)
 	// if err != nil {
 	// 	log.Printf("Failed to save message to file: %v", err)
@@ -76,10 +71,10 @@ func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *me
 				queue.Push(msg)
 			}
 			return msgID, nil
-		} else {
-			log.Printf("Routing key %s not found for exchange %s", routingKey, exchangeName)
-			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
+		log.Printf("[ERROR] Routing key %s not found for exchange %s", routingKey, exchangeName)
+		return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
+
 	case FANOUT:
 		for _, queue := range exchange.Queues {
 			queue.Push(msg)
@@ -95,33 +90,14 @@ func (vh *VHost) GetMessage(queueName string) *amqp.Message {
 	defer vh.mu.Unlock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		log.Printf("Queue %s not found", queueName)
+		log.Printf("[ERROR] Queue %s not found", queueName)
 		return nil
 	}
-	// select {
-	// case msg := <-queue.messages:
-	// 	if vh.UnackMsgs[queueName] == nil {
-	// 		vh.UnackMsgs[queueName] = make(map[string]bool)
-	// 	}
-	// 	vh.UnackMsgs[queueName][msg.ID] = true
-	// 	vh.ConsumerUnackMsgs[consumerID][msg.ID] = true
-	// 	return &msg
-	// default:
-	// 	log.Printf("No messages in queue %s", queueName)
-	// 	return nil
-	// }
-
 	msg := queue.Pop()
 	if msg == nil {
-		log.Printf("No messages in queue %s", queueName)
+		log.Printf("[DEBUG] No messages in queue %s", queueName)
 		return nil
 	}
-
-	// if vh.UnackMsgs[queueName] == nil {
-	// 	vh.UnackMsgs[queueName] = make(map[string]bool)
-	// }
-	// vh.ConsumerUnackMsgs[consumerID][msg.ID] = true
-
 	return msg
 }
 

@@ -28,20 +28,20 @@ type BasicGetOk struct {
 }
 
 type BasicProperties struct {
-	ContentType     string                 // shortstr
-	ContentEncoding string                 // shortstr
-	Headers         map[string]interface{} // table
-	DeliveryMode    uint8                  // octet
-	Priority        uint8                  // octet
-	CorrelationID   string                 // shortstr
-	ReplyTo         string                 // shortstr
-	Expiration      string                 // shortstr
-	MessageID       string                 // shortstr
-	Timestamp       time.Time              // timestamp (64 bits)
-	Type            string                 // shortsrt
-	UserID          string                 // shortstr
-	AppID           string                 // shortstr
-	Reserved        string                 // shortstr
+	ContentType     string         // shortstr
+	ContentEncoding string         // shortstr
+	Headers         map[string]any // table
+	DeliveryMode    uint8          // octet
+	Priority        uint8          // octet
+	CorrelationID   string         // shortstr
+	ReplyTo         string         // shortstr
+	Expiration      string         // shortstr
+	MessageID       string         // shortstr
+	Timestamp       time.Time      // timestamp (64 bits)
+	Type            string         // shortsrt
+	UserID          string         // shortstr
+	AppID           string         // shortstr
+	Reserved        string         // shortstr
 }
 
 func (props *BasicProperties) EncodeBasicProperties() ([]byte, uint16, error) {

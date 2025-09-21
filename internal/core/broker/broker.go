@@ -47,7 +47,7 @@ func NewBroker(config *config.Config) *Broker {
 }
 
 func (b *Broker) Start() {
-	capabilities := map[string]interface{}{
+	capabilities := map[string]any{
 		"basic.nack":             true,
 		"connection.blocked":     true,
 		"consumer_cancel_notify": true,
@@ -186,8 +186,7 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 	}
 }
 
-// func (b *Broker) processRequest(conn net.Conn, request *amqp.RequestMethodMessage) (interface{}, error) {
-func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (interface{}, error) {
+func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
 	switch request.ClassID {
 
