@@ -83,6 +83,9 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 			table[string(fieldName)] = value
 
 		// Add cases for other types as needed
+		case 'V': // Void (null)
+			// No payload, just store nil or skip
+			table[string(fieldName)] = nil
 
 		default:
 			return nil, fmt.Errorf("unknown field type: %c", fieldType)

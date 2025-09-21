@@ -77,10 +77,16 @@ func (q *Queue) Push(msg amqp.Message) {
 	// queue.messages <- msg
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	newNode := &Node{data: msg}
 	if q.head == nil {
-		q.head = &Node{data: msg}
+		q.head = newNode
 		return
 	}
+	current := q.head
+	for current.next != nil {
+		current = current.next
+	}
+	current.next = newNode
 }
 
 func (q *Queue) Pop() *amqp.Message {

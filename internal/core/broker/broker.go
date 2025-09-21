@@ -462,7 +462,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				fmt.Printf("[DEBUG] All fields shall be filled -> current state: %+v\n", currentState)
 				if len(currentState.Body) != int(currentState.BodySize) {
 					fmt.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
-					return nil, fmt.Errorf("Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
+					return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
 				}
 				publishRequest := currentState.MethodFrame.Content.(*message.BasicPublishMessage)
 				exchanege := publishRequest.Exchange
@@ -470,22 +470,32 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				body := currentState.Body
 				props := currentState.HeaderFrame.Properties
 				v := b.VHosts["/"]
-				v.Publish(exchanege, routingKey, body, props)
+				// v.Publish(exchanege, routingKey, body, props)
+				_, err := v.Publish(exchanege, routingKey, body, props)
+				if err == nil {
+					log.Printf("[DEBUG] Published message to exchange=%s, routingKey=%s, body=%s", exchanege, routingKey, string(body))
+					b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+				}
+				return nil, err
+
 			}
 		case uint16(constants.BASIC_GET):
-			vhost := b.VHosts["/"]
-			queue := request.Content.(*message.BasicGetMessage).Queue
+			vhost := b.VHosts["/"] // TODO: set the selected vhost
+			getMsg := request.Content.(*message.BasicGetMessage)
+			queue := getMsg.Queue
 			channelId := request.Channel
 			messageCount, err := vhost.GetMessageCount(queue)
 			if err != nil {
 				fmt.Println("Error getting message count:", err)
 				return nil, err
 			}
-
-			if messageCount == 0 {
+			msg := vhost.GetMessage(queue)
+			if msg == nil {
+				// Send Basic.GetEmpty
+				// I figure out that expects an octet here
 				reserved1 := amqp.KeyValue{
-					Key:   amqp.INT_LONG,
-					Value: uint32(0),
+					Key:   amqp.INT_OCTET,
+					Value: getMsg.Reserved1,
 				}
 				frame := amqp.ResponseMethodMessage{
 					Channel:  channelId,
@@ -493,16 +503,18 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 					MethodID: uint16(constants.BASIC_GET_EMPTY),
 					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
+				fmt.Printf("[DEBUG] Sending get-enpty frame: %x\n", frame)
 				shared.SendFrame(conn, frame)
 				return nil, nil
 			}
 
-			msg := vhost.GetMessage(queue)
+			// Send Basic.GetOk + header + body
 			msgGetOk := &message.BasicGetOk{
-				DeliveryTag: 1,
-				Redelivered: false,
-				Exchange:    msg.Exchange,
-				RoutingKey:  msg.RoutingKey,
+				DeliveryTag:  1,
+				Redelivered:  false,
+				Exchange:     msg.Exchange,
+				RoutingKey:   msg.RoutingKey,
+				MessageCount: uint32(messageCount),
 			}
 
 			frame := amqp.ResponseMethodMessage{
@@ -513,6 +525,8 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 			}.FormatMethodFrame()
 
 			err = shared.SendFrame(conn, frame)
+			log.Printf("[DEBUG] Sent message from queue %s: ID=%s", queue, msg.ID)
+
 			if err != nil {
 				fmt.Printf("[DEBUG] Error sending frame: %v\n", err)
 				return nil, err
@@ -524,11 +538,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (int
 				Weight:  0,
 				Message: *msg,
 			}
+			// Header
 			frame = responseContent.FormatHeaderFrame()
 			shared.SendFrame(conn, frame)
+			// Body
 			frame = responseContent.FormatBodyFrame()
 			shared.SendFrame(conn, frame)
 			return nil, nil
+
 		case uint16(constants.BASIC_ACK):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
@@ -579,7 +596,7 @@ func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amq
 		currentState.HeaderFrame = newState.HeaderFrame
 	}
 	if newState.Body != nil {
-		currentState.Body = newState.Body
+		currentState.Body = append(currentState.Body, newState.Body...)
 	}
 	if newState.BodySize != 0 {
 		currentState.BodySize = newState.BodySize
