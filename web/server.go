@@ -85,7 +85,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// API routes
-	apiGrp := app.Group("/api/")
+	apiGrp := app.Group("/api")
 	apiGrp.Get("/queues", func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})

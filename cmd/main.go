@@ -19,7 +19,7 @@ var (
 
 const (
 	PORT      = "5672"
-	HOST      = "localhost"
+	HOST      = "0.0.0.0"
 	HEARTBEAT = 10
 	USERNAME  = "guest"
 	PASSWORD  = "guest"
@@ -124,6 +124,6 @@ func main() {
 	<-stop
 	log.Println("Shutting down OtterMq...")
 	b.Shutdown()
-	app.Shutdown()
+	// app.Shutdown()
 	log.Println("Server gracefully stopped.")
 }

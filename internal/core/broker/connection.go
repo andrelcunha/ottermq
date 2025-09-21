@@ -14,7 +14,7 @@ import (
 	_ "github.com/andrelcunha/ottermq/pkg/persistdb"
 )
 
-func (b *Broker) handleConnection(configurations *map[string]interface{}, conn net.Conn) {
+func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
 		conn.Close()
 		b.cleanupConnection(conn)
