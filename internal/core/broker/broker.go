@@ -9,15 +9,11 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/config"
-	"github.com/andrelcunha/ottermq/internal/core/vhost"
-	. "github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
-	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp/message"
-	"github.com/andrelcunha/ottermq/pkg/connection/constants"
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 
-	"github.com/andrelcunha/ottermq/pkg/connection/constants/tx"
-	"github.com/andrelcunha/ottermq/pkg/connection/shared"
-	_ "github.com/andrelcunha/ottermq/pkg/persistdb"
+	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
 var (
@@ -105,7 +101,7 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 	payload := frame[7:]
 
 	switch frameType {
-	case byte(constants.TYPE_METHOD):
+	case byte(amqp.TYPE_METHOD):
 		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
 		request, err := shared.ParseMethodFrame(configurations, channel, payload)
 		if err != nil {
@@ -113,17 +109,17 @@ func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Con
 		}
 		return request, nil
 
-	case byte(constants.TYPE_HEADER):
+	case byte(amqp.TYPE_HEADER):
 		fmt.Printf("Received HEADER frame on channel %d\n", channel)
 
 		return shared.ParseHeaderFrame(channel, payloadSize, payload)
 
-	case byte(constants.TYPE_BODY):
+	case byte(amqp.TYPE_BODY):
 		fmt.Printf("Received BODY frame on channel %d\n", channel)
 
 		return shared.ParseBodyFrame(channel, payloadSize, payload)
 
-	case byte(constants.TYPE_HEARTBEAT):
+	case byte(amqp.TYPE_HEARTBEAT):
 		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
 		err := b.handleHeartbeat(conn)
 		if err != nil {
@@ -190,15 +186,15 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	request := newState.MethodFrame
 	switch request.ClassID {
 
-	case uint16(constants.CONNECTION):
+	case uint16(amqp.CONNECTION):
 		switch request.MethodID {
 
-		case uint16(constants.CONNECTION_CLOSE):
+		case uint16(amqp.CONNECTION_CLOSE):
 			b.cleanupConnection(conn)
 			frame := amqp.ResponseMethodMessage{
 				Channel:  request.Channel,
-				ClassID:  uint16(constants.CONNECTION),
-				MethodID: uint16(constants.CONNECTION_CLOSE_OK),
+				ClassID:  uint16(amqp.CONNECTION),
+				MethodID: uint16(amqp.CONNECTION_CLOSE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 			shared.SendFrame(conn, frame)
@@ -208,9 +204,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, fmt.Errorf("Unknown connection method: %d", request.MethodID)
 		}
 
-	case uint16(constants.CHANNEL):
+	case uint16(amqp.CHANNEL):
 		switch request.MethodID {
-		case uint16(constants.CHANNEL_OPEN):
+		case uint16(amqp.CHANNEL_OPEN):
 			fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
 			channelId := request.Channel
 			// Check if the channel is already open
@@ -224,7 +220,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.CHANNEL_OPEN_OK),
+				MethodID: uint16(amqp.CHANNEL_OPEN_OK),
 				Content: amqp.ContentList{
 					KeyValuePairs: []amqp.KeyValue{
 						{
@@ -238,7 +234,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			shared.SendFrame(conn, frame)
 			return nil, nil
 
-		case uint16(constants.CHANNEL_CLOSE):
+		case uint16(amqp.CHANNEL_CLOSE):
 			channelId := request.Channel
 			// check if channel is open
 			if b.checkChannel(conn, channelId) {
@@ -248,8 +244,8 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			b.removeChannel(conn, channelId)
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
-				ClassID:  uint16(constants.CHANNEL),
-				MethodID: uint16(constants.CHANNEL_CLOSE_OK),
+				ClassID:  uint16(amqp.CHANNEL),
+				MethodID: uint16(amqp.CHANNEL_CLOSE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 			shared.SendFrame(conn, frame)
@@ -260,13 +256,13 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, fmt.Errorf("Unknown channel method: %d", request.MethodID)
 		}
 
-	case uint16(constants.EXCHANGE):
+	case uint16(amqp.EXCHANGE):
 		switch request.MethodID {
-		case uint16(constants.EXCHANGE_DECLARE):
+		case uint16(amqp.EXCHANGE_DECLARE):
 			fmt.Printf("[DEBUG] Received exchange declare request: %+v\n", request)
 			channelId := request.Channel
 			fmt.Printf("[DEBUG] Channel: %d\n", channelId)
-			content, ok := request.Content.(*message.ExchangeDeclareMessage)
+			content, ok := request.Content.(*amqp.ExchangeDeclareMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
@@ -284,18 +280,18 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.EXCHANGE_DECLARE_OK),
+				MethodID: uint16(amqp.EXCHANGE_DECLARE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 
 			shared.SendFrame(conn, frame)
 			return nil, nil
 
-		case uint16(constants.EXCHANGE_DELETE):
+		case uint16(amqp.EXCHANGE_DELETE):
 			fmt.Printf("[DEBUG] Received exchange.delete request: %+v\n", request)
 			channelId := request.Channel
 			fmt.Printf("[DEBUG] Channel: %d\n", channelId)
-			content, ok := request.Content.(*message.ExchangeDeleteMessage)
+			content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
@@ -314,7 +310,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.EXCHANGE_DELETE_OK),
+				MethodID: uint16(amqp.EXCHANGE_DELETE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 
@@ -325,12 +321,12 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, fmt.Errorf("unsupported command")
 		}
 
-	case uint16(constants.QUEUE):
+	case uint16(amqp.QUEUE):
 		switch request.MethodID {
-		case uint16(constants.QUEUE_DECLARE):
+		case uint16(amqp.QUEUE_DECLARE):
 			fmt.Printf("[DEBUG] Received queue declare request: %+v\n", request)
 			channelId := request.Channel
-			content, ok := request.Content.(*message.QueueDeclareMessage)
+			content, ok := request.Content.(*amqp.QueueDeclareMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
@@ -356,7 +352,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.QUEUE_DECLARE_OK),
+				MethodID: uint16(amqp.QUEUE_DECLARE_OK),
 				Content: amqp.ContentList{
 					KeyValuePairs: []amqp.KeyValue{
 						{
@@ -377,10 +373,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			shared.SendFrame(conn, frame)
 			return nil, nil
 
-		case uint16(constants.QUEUE_BIND):
+		case uint16(amqp.QUEUE_BIND):
 			fmt.Printf("[DEBUG] Received queue bind request: %+v\n", request)
 			channelId := request.Channel
-			content, ok := request.Content.(*message.QueueBindMessage)
+			content, ok := request.Content.(*amqp.QueueBindMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
@@ -400,13 +396,13 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.QUEUE_BIND_OK),
+				MethodID: uint16(amqp.QUEUE_BIND_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 			shared.SendFrame(conn, frame)
 			return nil, nil
 
-		case uint16(constants.QUEUE_DELETE):
+		case uint16(amqp.QUEUE_DELETE):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -417,7 +413,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			// }
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
 
-		case uint16(constants.QUEUE_UNBIND):
+		case uint16(amqp.QUEUE_UNBIND):
 			// if len(parts) != 4 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -429,12 +425,12 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
-	case uint16(constants.BASIC):
+	case uint16(amqp.BASIC):
 		switch request.MethodID {
-		case uint16(constants.BASIC_QOS):
-		case uint16(constants.BASIC_CONSUME):
-		case uint16(constants.BASIC_CANCEL):
-		case uint16(constants.BASIC_PUBLISH):
+		case uint16(amqp.BASIC_QOS):
+		case uint16(amqp.BASIC_CONSUME):
+		case uint16(amqp.BASIC_CANCEL):
+		case uint16(amqp.BASIC_PUBLISH):
 			channel := request.Channel
 			currentState := b.getCurrentState(conn, channel)
 			if currentState == nil {
@@ -463,7 +459,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 					fmt.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
 					return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
 				}
-				publishRequest := currentState.MethodFrame.Content.(*message.BasicPublishMessage)
+				publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishMessage)
 				exchanege := publishRequest.Exchange
 				routingKey := publishRequest.RoutingKey
 				body := currentState.Body
@@ -478,9 +474,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				return nil, err
 
 			}
-		case uint16(constants.BASIC_GET):
+		case uint16(amqp.BASIC_GET):
 			vhost := b.VHosts["/"] // TODO: set the selected vhost
-			getMsg := request.Content.(*message.BasicGetMessage)
+			getMsg := request.Content.(*amqp.BasicGetMessage)
 			queue := getMsg.Queue
 			channelId := request.Channel
 			messageCount, err := vhost.GetMessageCount(queue)
@@ -499,7 +495,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				frame := amqp.ResponseMethodMessage{
 					Channel:  channelId,
 					ClassID:  request.ClassID,
-					MethodID: uint16(constants.BASIC_GET_EMPTY),
+					MethodID: uint16(amqp.BASIC_GET_EMPTY),
 					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
 				fmt.Printf("[DEBUG] Sending get-enpty frame: %x\n", frame)
@@ -508,7 +504,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 
 			// Send Basic.GetOk + header + body
-			msgGetOk := &message.BasicGetOk{
+			msgGetOk := &amqp.BasicGetOk{
 				DeliveryTag:  1,
 				Redelivered:  false,
 				Exchange:     msg.Exchange,
@@ -519,7 +515,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			frame := amqp.ResponseMethodMessage{
 				Channel:  channelId,
 				ClassID:  request.ClassID,
-				MethodID: uint16(constants.BASIC_GET_OK),
+				MethodID: uint16(amqp.BASIC_GET_OK),
 				Content:  *amqp.EncodeGetOkToContentList(msgGetOk),
 			}.FormatMethodFrame()
 
@@ -545,7 +541,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			shared.SendFrame(conn, frame)
 			return nil, nil
 
-		case uint16(constants.BASIC_ACK):
+		case uint16(amqp.BASIC_ACK):
 			// if len(parts) != 2 {
 			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
 			// }
@@ -559,20 +555,20 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			// b.acknowledge(queue, consumerID, msgID)
 			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
 
-		case uint16(constants.BASIC_REJECT):
-		case uint16(constants.BASIC_RECOVER_ASYNC):
-		case uint16(constants.BASIC_RECOVER):
+		case uint16(amqp.BASIC_REJECT):
+		case uint16(amqp.BASIC_RECOVER_ASYNC):
+		case uint16(amqp.BASIC_RECOVER):
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
-	case uint16(constants.TX):
+	case uint16(amqp.TX):
 		// Handle transaction-related commands
 		switch request.MethodID {
-		case uint16(tx.SELECT):
+		case uint16(amqp.SELECT):
 			// Handle transaction selection
-		case uint16(tx.COMMIT):
+		case uint16(amqp.COMMIT):
 			// Handle transaction commit
-		case uint16(tx.ROLLBACK):
+		case uint16(amqp.ROLLBACK):
 			// Handle transaction rollback
 		default:
 			return nil, fmt.Errorf("unsupported command")

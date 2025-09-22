@@ -9,7 +9,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/pkg/persistdb"
+	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 	"github.com/andrelcunha/ottermq/web"
 )
 
