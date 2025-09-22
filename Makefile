@@ -8,7 +8,7 @@ build:
 
 
 docs:
-	@$(shell go env GOPATH)/bin/swag init --parseInternal  -g ../../../main.go --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/static/docs -ot json
+	@$(shell go env GOPATH)/bin/swag init --parseInternal  -g ../../../cmd/ottermq/main.go --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/static/docs -ot json
 
 install:
 	@mkdir -p $(shell go env GOPATH)/bin
