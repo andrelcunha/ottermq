@@ -10,7 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.24
-	github.com/spf13/cobra v1.8.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	golang.org/x/crypto v0.31.0
 )
 
@@ -31,7 +31,6 @@ require (
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -40,9 +39,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.58.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
