@@ -7,12 +7,23 @@ import (
 	"net"
 	"time"
 
-	. "github.com/andrelcunha/ottermq/pkg/common"
-	"github.com/andrelcunha/ottermq/pkg/common/communication/amqp"
-	"github.com/andrelcunha/ottermq/pkg/connection/server"
-	"github.com/andrelcunha/ottermq/pkg/connection/shared"
-	_ "github.com/andrelcunha/ottermq/pkg/persistdb"
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
+	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
+
+type ConnectionInfo struct {
+	Name              string                        `json:"name"`
+	User              string                        `json:"user"`
+	VHostName         string                        `json:"vhost"`
+	VHostId           string                        `json:"vhost_id"`
+	HeartbeatInterval uint16                        `json:"heartbeat_interval"`
+	LastHeartbeat     time.Time                     `json:"last_heartbeat"`
+	ConnectedAt       time.Time                     `json:"connected_at"`
+	Conn              net.Conn                      `json:"-"`
+	Channels          map[uint16]*amqp.ChannelState `json:"-"`
+	Done              chan struct{}                 `json:"-"`
+}
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
@@ -21,7 +32,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}()
 	channelNum := uint16(0)
 
-	if err := server.ServerHandshake(configurations, conn); err != nil {
+	if err := shared.ServerHandshake(configurations, conn); err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
@@ -81,17 +92,6 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			b.processRequest(conn, newState)
 		}
 	}
-}
-
-func ListConnections(b *Broker) []ConnectionInfoDTO {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	connections := make([]ConnectionInfo, 0, len(b.Connections))
-	for _, c := range b.Connections {
-		connections = append(connections, *c)
-	}
-	connectionsDTO := mapListConnectionsDTO(connections)
-	return connectionsDTO
 }
 
 func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, heartbeatInterval uint16) {

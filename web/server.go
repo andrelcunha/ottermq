@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	// "github.com/andrelcunha/ottermq/pkg/connection/client"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
