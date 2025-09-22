@@ -124,6 +124,6 @@ func main() {
 	<-stop
 	log.Println("Shutting down OtterMq...")
 	b.Shutdown()
-	// app.Shutdown()
+	app.Shutdown()
 	log.Println("Server gracefully stopped.")
 }
