@@ -12,6 +12,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
@@ -27,15 +28,15 @@ const (
 
 type Broker struct {
 	VHosts      map[string]*vhost.VHost
-	config      *config.Config               `json:"-"`
-	Connections map[net.Conn]*ConnectionInfo `json:"-"`
-	mu          sync.Mutex                   `json:"-"`
+	config      *config.Config                      `json:"-"`
+	Connections map[net.Conn]*models.ConnectionInfo `json:"-"`
+	mu          sync.Mutex                          `json:"-"`
 }
 
 func NewBroker(config *config.Config) *Broker {
 	b := &Broker{
 		VHosts:      make(map[string]*vhost.VHost),
-		Connections: make(map[net.Conn]*ConnectionInfo),
+		Connections: make(map[net.Conn]*models.ConnectionInfo),
 		config:      config,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")

@@ -4,7 +4,7 @@ import "fmt"
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
-	return vh.BindQueue(default_exchange, queueName, queueName)
+	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName)
 }
 
 func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {

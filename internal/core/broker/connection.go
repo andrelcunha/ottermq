@@ -9,21 +9,9 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
-
-type ConnectionInfo struct {
-	Name              string                        `json:"name"`
-	User              string                        `json:"user"`
-	VHostName         string                        `json:"vhost"`
-	VHostId           string                        `json:"vhost_id"`
-	HeartbeatInterval uint16                        `json:"heartbeat_interval"`
-	LastHeartbeat     time.Time                     `json:"last_heartbeat"`
-	ConnectedAt       time.Time                     `json:"connected_at"`
-	Conn              net.Conn                      `json:"-"`
-	Channels          map[uint16]*amqp.ChannelState `json:"-"`
-	Done              chan struct{}                 `json:"-"`
-}
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
@@ -102,7 +90,7 @@ func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, h
 
 	b.mu.Lock()
 
-	b.Connections[conn] = &ConnectionInfo{
+	b.Connections[conn] = &models.ConnectionInfo{
 		Name:              conn.RemoteAddr().String(),
 		User:              username,
 		VHostName:         vhost.Name,
@@ -125,30 +113,6 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	for _, vhost := range b.VHosts {
 		vhost.CleanupConnection(conn)
 	}
-}
-
-func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
-	listConnectonsDTO := make([]ConnectionInfoDTO, len(connections))
-	for i, connection := range connections {
-		state := "disconnected"
-		if connection.Done == nil {
-			state = "running"
-		}
-		channels := len(connection.Channels)
-		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHostName:     connection.VHostName,
-			VHostId:       connection.VHostId,
-			Name:          connection.Name,
-			Username:      connection.User,
-			State:         state,
-			SSL:           false,
-			Protocol:      "AMQP 0-9-1",
-			Channels:      channels,
-			LastHeartbeat: connection.LastHeartbeat,
-			ConnectedAt:   connection.ConnectedAt,
-		}
-	}
-	return listConnectonsDTO
 }
 
 func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
