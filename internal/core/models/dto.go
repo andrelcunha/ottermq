@@ -23,21 +23,23 @@ func MapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 	listConnectonsDTO := make([]ConnectionInfoDTO, len(connections))
 	for i, connection := range connections {
 		state := "disconnected"
-		if connection.Done == nil {
+		if connection.Client.Done == nil {
 			state = "running"
 		}
 		channels := len(connection.Channels)
 		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHostName:     connection.VHostName,
-			VHostId:       connection.VHostId,
-			Name:          connection.Name,
-			Username:      connection.User,
-			State:         state,
-			SSL:           false,
-			Protocol:      "AMQP 0-9-1",
+			VHostName: connection.Client.VHostName,
+			VHostId:   connection.Client.VHostId,
+			Name:      connection.Client.Name,
+			Username:  connection.Client.User,
+			State:     state,
+			// SSL:           false,
+			// Protocol:      "AMQP 0-9-1",
+			SSL:           connection.Client.SSL,
+			Protocol:      connection.Client.Protocol,
 			Channels:      channels,
-			LastHeartbeat: connection.LastHeartbeat,
-			ConnectedAt:   connection.ConnectedAt,
+			LastHeartbeat: connection.Client.LastHeartbeat,
+			ConnectedAt:   connection.Client.ConnectedAt,
 		}
 	}
 	return listConnectonsDTO

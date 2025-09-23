@@ -64,6 +64,8 @@ func (b *Broker) Start() {
 		"heartbeatInterval": b.config.HeartbeatIntervalMax,
 		"frameMax":          b.config.FrameMax,
 		"channelMax":        b.config.ChannelMax,
+		"ssl":               true,
+		"protocol":          "AMQP 0-9-1",
 	}
 
 	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
@@ -89,51 +91,53 @@ func (b *Broker) Start() {
 func (b *Broker) handleHeartbeat(conn net.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.Connections[conn].LastHeartbeat = time.Now()
+	// b.Connections[conn].LastHeartbeat = time.Now()
+	b.Connections[conn].Client.LastHeartbeat = time.Now()
+
 	return nil
 }
 
-func (b *Broker) sendHeartbeats(conn net.Conn) {
-	b.mu.Lock()
-	connectionInfo, ok := b.Connections[conn]
-	if !ok {
-		b.mu.Unlock()
-		return
-	}
-	heartbeatInterval := connectionInfo.HeartbeatInterval
-	done := connectionInfo.Done
-	b.mu.Unlock()
-
-	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			b.mu.Lock()
-			if _, ok := b.Connections[conn]; !ok {
-				b.mu.Unlock()
-				log.Println("[DEBUG] Connection no longer exists in broker")
-				return
-			}
-			b.mu.Unlock()
-
-			// sendHearbeat(conn)
-			heartbeatFrame := shared.CreateHeartbeatFrame()
-			err := shared.SendFrame(conn, heartbeatFrame)
-			if err != nil {
-				log.Printf("[ERROR] Failed to send heartbeat: %v", err)
-				return
-			}
-			log.Println("[DEBUG] Heartbeat sent")
-
-		case <-done:
-			log.Println("Stopping heartbeat goroutine for closed connection")
-			return
-		}
-
-	}
-}
+// func (b *Broker) sendHeartbeats(conn net.Conn) {
+// 	b.mu.Lock()
+// 	connectionInfo, ok := b.Connections[conn]
+// 	if !ok {
+// 		b.mu.Unlock()
+// 		return
+// 	}
+// 	heartbeatInterval := connectionInfo.HeartbeatInterval
+// 	done := connectionInfo.Done
+// 	b.mu.Unlock()
+//
+// 	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
+// 	defer ticker.Stop()
+//
+// 	for {
+// 		select {
+// 		case <-ticker.C:
+// 			b.mu.Lock()
+// 			if _, ok := b.Connections[conn]; !ok {
+// 				b.mu.Unlock()
+// 				log.Println("[DEBUG] Connection no longer exists in broker")
+// 				return
+// 			}
+// 			b.mu.Unlock()
+//
+// 			// sendHearbeat(conn)
+// 			heartbeatFrame := shared.CreateHeartbeatFrame()
+// 			err := shared.SendFrame(conn, heartbeatFrame)
+// 			if err != nil {
+// 				log.Printf("[ERROR] Failed to send heartbeat: %v", err)
+// 				return
+// 			}
+// 			log.Println("[DEBUG] Heartbeat sent")
+//
+// 		case <-done:
+// 			log.Println("Stopping heartbeat goroutine for closed connection")
+// 			return
+// 		}
+//
+// 	}
+// }
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame

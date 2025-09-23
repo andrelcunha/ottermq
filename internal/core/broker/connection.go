@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
@@ -19,17 +18,13 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		b.cleanupConnection(conn)
 	}()
 	channelNum := uint16(0)
-
-	if err := shared.ServerHandshake(configurations, conn); err != nil {
+	client, err := shared.Handshake(configurations, conn)
+	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
-	username := (*configurations)["username"].(string)
-	vhost := (*configurations)["vhost"].(string)
-	heartbeatInterval := (*configurations)["heartbeatInterval"].(uint16)
 
-	b.registerConnection(conn, username, vhost, heartbeatInterval)
-	go b.sendHeartbeats(conn)
+	b.registerConnection(conn, client)
 	log.Println("Handshake successful")
 
 	// keep reading commands in loop
@@ -86,25 +81,17 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, heartbeatInterval uint16) {
-	vhost := b.GetVHostFromName(vhostName)
+func (b *Broker) registerConnection(conn net.Conn, client *shared.AmqpClient) {
+	vhost := b.GetVHostFromName(client.VHostName)
 	if vhost == nil {
-		log.Fatalf("VHost not found: %s", vhostName)
+		log.Fatalf("VHost not found: %s", client.VHostName)
 	}
-
+	client.VHostId = vhost.Id
 	b.mu.Lock()
 
 	b.Connections[conn] = &models.ConnectionInfo{
-		Name:              conn.RemoteAddr().String(),
-		User:              username,
-		VHostName:         vhost.Name,
-		VHostId:           vhost.Id,
-		HeartbeatInterval: heartbeatInterval,
-		ConnectedAt:       time.Now(),
-		LastHeartbeat:     time.Now(),
-		Conn:              conn,
-		Channels:          make(map[uint16]*amqp.ChannelState),
-		Done:              make(chan struct{}),
+		Client:   client,
+		Channels: make(map[uint16]*amqp.ChannelState),
 	}
 	b.mu.Unlock()
 }

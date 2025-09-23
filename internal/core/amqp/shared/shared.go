@@ -21,8 +21,8 @@ type AMQP_Key struct {
 type AMQP_Type struct {
 }
 
-func SendProtocolHeader(conn net.Conn) error {
-	header := []byte(amqp.AMQP_PROTOCOL_HEADER)
+func SendProtocolHeader(conn net.Conn, header []byte) error {
+	// header := []byte(amqp.AMQP_PROTOCOL_HEADER)
 	_, err := conn.Write(header)
 	return err
 }
