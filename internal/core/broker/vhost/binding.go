@@ -1,6 +1,8 @@
 package vhost
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
@@ -17,13 +19,11 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("Exchange %s not found", exchangeName)
+		return fmt.Errorf("exchange %s not found", exchangeName)
 	}
-
-	// Find the queue
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		return fmt.Errorf("Queue %s not found", queueName)
+		return fmt.Errorf("queue %s not found", queueName)
 	}
 
 	switch exchange.Typ {
@@ -44,6 +44,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	// if err != nil {
 	// 	log.Printf("Failed to save broker state: %v", err)
 	// }
+	// vh.publishBindingUpdate(exchangeName)
 	return nil
 }
 

@@ -18,7 +18,7 @@ import (
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) error {
+func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	// read the protocol header from the client
 	clientHeader, err := ReadProtocolHeader(conn)
 	if err != nil {
@@ -32,7 +32,7 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("bad protocol: %x (%s -> %s)\n", clientHeader, conn.RemoteAddr().String(), conn.LocalAddr().String())
+		return fmt.Errorf("bad protocol: %x (%s -> %s)", clientHeader, conn.RemoteAddr().String(), conn.LocalAddr().String())
 	}
 	log.Printf("accepting AMQP connection (%s -> %s)\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
@@ -56,16 +56,14 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 	}
 	state, ok := response.(*amqp.ChannelState)
 	if !ok {
-		err = fmt.Errorf("Type assertion ChannelState failed")
-		return err
+		return fmt.Errorf("type assertion ChannelState failed")
 	}
 	if state.MethodFrame == nil {
-		err = fmt.Errorf("MethodFrame is empty")
-		return err
+		return fmt.Errorf("methodFrame is empty")
 	}
 	startOkFrame := state.MethodFrame.Content.(*ConnectionStartOkFrame)
 	if startOkFrame == nil {
-		err = fmt.Errorf("Type assertion ConnectionStartOkFrame failed")
+		return fmt.Errorf("type assertion ConnectionStartOkFrame failed")
 	}
 
 	err = processStartOkContent(configurations, startOkFrame)
@@ -73,10 +71,14 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 		return err
 	}
 
+	heartbeat, _ := (*configurations)["heartbeatInterval"].(uint16)
+	frameMax, _ := (*configurations)["frameMax"].(uint32)
+	channelMax, _ := (*configurations)["channelMax"].(uint16)
+
 	tune := &ConnectionTuneFrame{
-		ChannelMax: 2047,
-		FrameMax:   131072,
-		Heartbeat:  10,
+		ChannelMax: uint16(channelMax), //2047,
+		FrameMax:   uint32(frameMax),   //131072,
+		Heartbeat:  uint16(heartbeat),  //10
 	}
 	// create tune frame
 	tuneFrame := CreateConnectionTuneFrame(tune)
@@ -96,19 +98,19 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 	}
 	state, ok = response.(*amqp.ChannelState)
 	if !ok {
-		err = fmt.Errorf("Type assertion ChannelState failed")
-		return err
+		return fmt.Errorf("type assertion ChannelState failed")
 	}
 	if state.MethodFrame == nil {
-		err = fmt.Errorf("MethodFrame is empty")
-		return err
+		return fmt.Errorf("MethodFrame is empty")
 	}
 	tuneOkFrame := state.MethodFrame.Content.(*ConnectionTuneFrame)
 	if tuneOkFrame == nil {
-		err = fmt.Errorf("Type assertion ConnectionTuneOkFrame failed")
+		return fmt.Errorf("type assertion ConnectionTuneOkFrame failed")
 	}
 	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOkFrame)
-	// TODO: save tuneOK data
+	(*configurations)["heartbeatInterval"] = tuneOkFrame.Heartbeat
+	(*configurations)["frameMax"] = tuneOkFrame.FrameMax
+	(*configurations)["channelMax"] = tuneOkFrame.ChannelMax
 
 	// read connection.open frame
 	frame, err = ReadFrame(conn)
@@ -124,15 +126,13 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 	}
 	state, ok = response.(*amqp.ChannelState)
 	if !ok {
-		err = fmt.Errorf("Type assertion ConnectionOpen failed")
-		return err
+		return fmt.Errorf("type assertion ConnectionOpen failed")
 	}
 	if state.MethodFrame == nil {
-		err = fmt.Errorf("MethodFrame is empty")
-		return err
+		return fmt.Errorf("methodFrame is empty")
 	}
 
-	openFrame, ok := state.MethodFrame.Content.(*ConnectionOpenFrame)
+	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpenFrame)
 	(*configurations)["vhost"] = openFrame.VirtualHost
 	fmt.Printf("Received connection.open: %+v\n", openFrame)
 
@@ -148,14 +148,14 @@ func ServerHandshake(configurations *map[string]interface{}, conn net.Conn) erro
 func processStartOkContent(configurations *map[string]interface{}, startOkFrame *ConnectionStartOkFrame) error {
 	mechanism := startOkFrame.Mechanism
 	if mechanism != "PLAIN" {
-		return fmt.Errorf("Mechanism invalid or %s not suported", mechanism)
+		return fmt.Errorf("mechanism invalid or %s not suported", mechanism)
 	}
 	// parse username and password from startOkFrame.Response
 	fmt.Printf("Response: '%s'\n", startOkFrame.Response)
 	credentials := strings.Split(strings.Trim(startOkFrame.Response, " "), " ")
 	fmt.Printf("Credentials: username: '%s' password: '%s'\n", credentials[0], credentials[1])
 	if len(credentials) != 2 {
-		return fmt.Errorf("Failed to parse credentials: invalid format")
+		return fmt.Errorf("failed to parse credentials: invalid format")
 	}
 	username := credentials[0]
 	password := credentials[1]
@@ -165,7 +165,7 @@ func processStartOkContent(configurations *map[string]interface{}, startOkFrame 
 		return err
 	}
 	if !authOk {
-		return fmt.Errorf("Authentication failed")
+		return fmt.Errorf("authentication failed")
 	}
 	// set username to configurations
 	(*configurations)["username"] = username

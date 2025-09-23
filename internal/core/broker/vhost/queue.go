@@ -37,14 +37,23 @@ func NewQueue(name string) *Queue {
 
 func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	vh.mu.Lock()
-	defer vh.mu.Unlock()
 	if _, ok := vh.Queues[name]; ok {
 		return nil, fmt.Errorf("queue %s already exists", name)
 	}
 	queue := NewQueue(name)
 	vh.Queues[name] = queue
+	vh.mu.Unlock()
 	log.Printf("[DEBUG] Created queue %s", name)
 	// vh.saveBrokerState() // TODO: persist state
+	// adminQueues := make(map[string]bool)
+	// queues := []string{ADMIN_QUEUES, ADMIN_EXCHANGES, ADMIN_BINDINGS, ADMIN_CONNECTIONS}
+	// for _, queueName := range queues {
+	// 	adminQueues[queueName] = true
+	// }
+
+	// if _, ok := adminQueues[name]; !ok {
+	// 	vh.publishQueueUpdate()
+	// }
 	return queue, nil
 }
 
@@ -105,6 +114,7 @@ func (vh *VHost) deleteQueue(name string) error {
 	}
 	delete(vh.Queues, name)
 	log.Printf("[DEBUG] Deleted queue %s", name)
+	vh.publishQueueUpdate()
 	return nil
 }
 

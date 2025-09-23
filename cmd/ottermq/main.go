@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	version = "0.6.0-alpha"
+	version = "0.6.1"
 )
 
 const (
 	PORT      = "5672"
 	HOST      = "0.0.0.0"
-	HEARTBEAT = 10
+	HEARTBEAT = 60
 	USERNAME  = "guest"
 	PASSWORD  = "guest"
 	VHOST     = "/"

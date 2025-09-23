@@ -116,7 +116,10 @@ func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
 
-	methodPayload := formatMethodPayload(msg.Content)
+	var methodPayload []byte
+	if len(msg.Content.KeyValuePairs) > 0 {
+		methodPayload = formatMethodPayload(msg.Content)
+	}
 	payloadBuf.Write(methodPayload)
 
 	// Calculate the size of the payload
@@ -136,28 +139,29 @@ func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
 func formatMethodPayload(content ContentList) []byte {
 	var payloadBuf bytes.Buffer
 	for _, kv := range content.KeyValuePairs {
-		if kv.Key == INT_OCTET {
+		switch kv.Key {
+		case INT_OCTET:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint8))
-		} else if kv.Key == INT_SHORT {
+		case INT_SHORT:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint16))
-		} else if kv.Key == INT_LONG {
+		case INT_LONG:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint32))
-		} else if kv.Key == INT_LONG_LONG {
+		case INT_LONG_LONG:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint64))
-		} else if kv.Key == BIT {
+		case BIT:
 			if kv.Value.(bool) {
 				payloadBuf.WriteByte(1)
 			} else {
 				payloadBuf.WriteByte(0)
 			}
-		} else if kv.Key == STRING_SHORT {
+		case STRING_SHORT:
 			payloadBuf.Write(utils.EncodeShortStr(kv.Value.(string)))
-		} else if kv.Key == STRING_LONG {
+		case STRING_LONG:
 			payloadBuf.Write(utils.EncodeLongStr(kv.Value.([]byte)))
-		} else if kv.Key == TIMESTAMP {
+		case TIMESTAMP:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64))
-		} else if kv.Key == TABLE {
-			encodedTable := utils.EncodeTable(kv.Value.(map[string]interface{}))
+		case TABLE:
+			encodedTable := utils.EncodeTable(kv.Value.(map[string]any))
 			payloadBuf.Write(utils.EncodeLongStr(encodedTable))
 		}
 	}

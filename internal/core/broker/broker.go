@@ -51,14 +51,14 @@ func (b *Broker) Start() {
 		"publisher_confirms":     true,
 	}
 
-	serverProperties := map[string]interface{}{
+	serverProperties := map[string]any{
 		"capabilities": capabilities,
 		"product":      product,
 		"version":      version,
 		"platform":     platform,
 	}
 
-	configurations := map[string]interface{}{
+	configurations := map[string]any{
 		"mechanisms":        []string{"PLAIN"},
 		"locales":           []string{"en_US"},
 		"serverProperties":  serverProperties,
@@ -185,6 +185,7 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
+	channel := request.Channel
 	switch request.ClassID {
 
 	case uint16(amqp.CONNECTION):
@@ -193,7 +194,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		case uint16(amqp.CONNECTION_CLOSE):
 			b.cleanupConnection(conn)
 			frame := amqp.ResponseMethodMessage{
-				Channel:  request.Channel,
+				Channel:  channel,
 				ClassID:  uint16(amqp.CONNECTION),
 				MethodID: uint16(amqp.CONNECTION_CLOSE_OK),
 				Content:  amqp.ContentList{},
@@ -202,24 +203,24 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 		default:
 			log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
-			return nil, fmt.Errorf("Unknown connection method: %d", request.MethodID)
+			return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
 		}
 
 	case uint16(amqp.CHANNEL):
 		switch request.MethodID {
 		case uint16(amqp.CHANNEL_OPEN):
 			fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
-			channelId := request.Channel
+
 			// Check if the channel is already open
-			if b.checkChannel(conn, channelId) {
-				fmt.Printf("[DEBUG] Channel %d already open\n", channelId)
-				return nil, fmt.Errorf("Channel already open")
+			if b.checkChannel(conn, channel) {
+				fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+				return nil, fmt.Errorf("channel already open")
 			}
 			b.addChannel(conn, request)
 			fmt.Printf("[DEBUG] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
 
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.CHANNEL_OPEN_OK),
 				Content: amqp.ContentList{
@@ -236,15 +237,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 
 		case uint16(amqp.CHANNEL_CLOSE):
-			channelId := request.Channel
 			// check if channel is open
-			if b.checkChannel(conn, channelId) {
-				fmt.Printf("[DEBUG] Channel %d already open\n", channelId)
-				return nil, fmt.Errorf("Channel already open")
+			if b.checkChannel(conn, channel) {
+				fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+				return nil, fmt.Errorf("channel already open")
 			}
-			b.removeChannel(conn, channelId)
+			b.removeChannel(conn, channel)
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  uint16(amqp.CHANNEL),
 				MethodID: uint16(amqp.CHANNEL_CLOSE_OK),
 				Content:  amqp.ContentList{},
@@ -254,19 +254,18 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 		default:
 			log.Printf("[DEBUG] Unknown channel method: %d", request.MethodID)
-			return nil, fmt.Errorf("Unknown channel method: %d", request.MethodID)
+			return nil, fmt.Errorf("unknown channel method: %d", request.MethodID)
 		}
 
 	case uint16(amqp.EXCHANGE):
 		switch request.MethodID {
 		case uint16(amqp.EXCHANGE_DECLARE):
 			fmt.Printf("[DEBUG] Received exchange declare request: %+v\n", request)
-			channelId := request.Channel
-			fmt.Printf("[DEBUG] Channel: %d\n", channelId)
+			fmt.Printf("[DEBUG] Channel: %d\n", channel)
 			content, ok := request.Content.(*amqp.ExchangeDeclareMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
-				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
+				return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 			}
 			fmt.Printf("[DEBUG] Content: %+v\n", content)
 			typ := content.ExchangeType
@@ -279,7 +278,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				return nil, err
 			}
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.EXCHANGE_DECLARE_OK),
 				Content:  amqp.ContentList{},
@@ -290,12 +289,11 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 		case uint16(amqp.EXCHANGE_DELETE):
 			fmt.Printf("[DEBUG] Received exchange.delete request: %+v\n", request)
-			channelId := request.Channel
-			fmt.Printf("[DEBUG] Channel: %d\n", channelId)
+			fmt.Printf("[DEBUG] Channel: %d\n", channel)
 			content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
-				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
+				fmt.Printf("Invalid content type for ExchangeDeleteMessage")
+				return nil, fmt.Errorf("invalid content type for ExchangeDeleteMessage")
 			}
 			fmt.Printf("[DEBUG] Content: %+v\n", content)
 			exchangeName := content.ExchangeName
@@ -309,7 +307,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.EXCHANGE_DELETE_OK),
 				Content:  amqp.ContentList{},
@@ -326,11 +324,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		switch request.MethodID {
 		case uint16(amqp.QUEUE_DECLARE):
 			fmt.Printf("[DEBUG] Received queue declare request: %+v\n", request)
-			channelId := request.Channel
 			content, ok := request.Content.(*amqp.QueueDeclareMessage)
 			if !ok {
 				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
-				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
+				return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 			}
 			fmt.Printf("[DEBUG] Content: %+v\n", content)
 			queueName := content.QueueName
@@ -351,7 +348,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			counsumerCount := uint32(0)
 
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.QUEUE_DECLARE_OK),
 				Content: amqp.ContentList{
@@ -376,11 +373,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 		case uint16(amqp.QUEUE_BIND):
 			fmt.Printf("[DEBUG] Received queue bind request: %+v\n", request)
-			channelId := request.Channel
 			content, ok := request.Content.(*amqp.QueueBindMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
-				return nil, fmt.Errorf("Invalid content type for ExchangeDeclareMessage")
+				fmt.Printf("Invalid content type for QueueBindMessage")
+				return nil, fmt.Errorf("invalid content type for QueueBindMessage")
 			}
 			fmt.Printf("[DEBUG] Content: %+v\n", content)
 			vh := b.VHosts["/"]
@@ -395,7 +391,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				return nil, err
 			}
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.QUEUE_BIND_OK),
 				Content:  amqp.ContentList{},
@@ -479,42 +475,41 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			vhost := b.VHosts["/"] // TODO: set the selected vhost
 			getMsg := request.Content.(*amqp.BasicGetMessage)
 			queue := getMsg.Queue
-			channelId := request.Channel
-			messageCount, err := vhost.GetMessageCount(queue)
+			msgCount, err := vhost.GetMessageCount(queue)
 			if err != nil {
-				fmt.Println("Error getting message count:", err)
+				fmt.Printf("[ERROR] Error getting message count: %v", err)
 				return nil, err
 			}
-			msg := vhost.GetMessage(queue)
-			if msg == nil {
+			if msgCount == 0 {
 				// Send Basic.GetEmpty
 				// I figure out that expects an octet here
-				reserved1 := amqp.KeyValue{
-					Key:   amqp.INT_OCTET,
-					Value: getMsg.Reserved1,
-				}
+				// reserved1 := amqp.KeyValue{
+				// 	Key:   amqp.INT_SHORT,
+				// 	Value: getMsg.Reserved1,
+				// }
 				frame := amqp.ResponseMethodMessage{
-					Channel:  channelId,
+					Channel:  channel,
 					ClassID:  request.ClassID,
 					MethodID: uint16(amqp.BASIC_GET_EMPTY),
-					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
+					// Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
-				fmt.Printf("[DEBUG] Sending get-enpty frame: %x\n", frame)
+				fmt.Printf("[DEBUG] Sending get-empty frame: %x\n", frame)
 				shared.SendFrame(conn, frame)
 				return nil, nil
 			}
 
 			// Send Basic.GetOk + header + body
+			msg := vhost.GetMessage(queue)
 			msgGetOk := &amqp.BasicGetOk{
 				DeliveryTag:  1,
 				Redelivered:  false,
 				Exchange:     msg.Exchange,
 				RoutingKey:   msg.RoutingKey,
-				MessageCount: uint32(messageCount),
+				MessageCount: uint32(msgCount),
 			}
 
 			frame := amqp.ResponseMethodMessage{
-				Channel:  channelId,
+				Channel:  channel,
 				ClassID:  request.ClassID,
 				MethodID: uint16(amqp.BASIC_GET_OK),
 				Content:  *amqp.EncodeGetOkToContentList(msgGetOk),
@@ -529,7 +524,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 
 			responseContent := amqp.ResponseContent{
-				Channel: channelId,
+				Channel: channel,
 				ClassID: request.ClassID,
 				Weight:  0,
 				Message: *msg,
