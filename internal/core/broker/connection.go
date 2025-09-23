@@ -51,7 +51,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		newInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := shared.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
@@ -78,6 +78,10 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
 			b.processRequest(conn, newState)
+		} else {
+			if _, ok := newInterface.(shared.Heartbeat); ok {
+				b.handleHeartbeat(conn)
+			}
 		}
 	}
 }

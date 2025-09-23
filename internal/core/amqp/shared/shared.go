@@ -4,20 +4,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 )
 
-// type FieldTable
-// type ClientConfig struct {
-// 	Host              string
-// 	Port              string
-// 	Username          string
-// 	Password          string
-// 	Vhost             string
-// 	HeartbeatInterval uint16
-// }
+type Heartbeat struct {
+}
 
 type AMQP_Key struct {
 	Key  string
@@ -99,7 +93,7 @@ func FormatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
 	return header
 }
 
-func ParseFrame(configurations *map[string]interface{}, frame []byte) (interface{}, error) {
+func ParseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
@@ -114,25 +108,29 @@ func ParseFrame(configurations *map[string]interface{}, frame []byte) (interface
 
 	switch frameType {
 	case byte(amqp.TYPE_METHOD):
-		fmt.Printf("Received METHOD frame on channel %d\n", channel)
-		return ParseMethodFrame(configurations, channel, payload)
+		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
+		request, err := ParseMethodFrame(configurations, channel, payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse method frame: %v", err)
+		}
+		return request, nil
 
 	case byte(amqp.TYPE_HEADER):
 		fmt.Printf("Received HEADER frame on channel %d\n", channel)
 		return ParseHeaderFrame(channel, payloadSize, payload)
 
+	case byte(amqp.TYPE_BODY):
+		log.Printf("[DEBUG] Received BODY frame on channel %d\n", channel)
+		return ParseBodyFrame(channel, payloadSize, payload)
+
 	case byte(amqp.TYPE_HEARTBEAT):
-		err := processHeartbeat(channel)
-		return nil, err
+		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
+		return nil, nil
+
 	default:
+		log.Printf("[DEBUG] Received: %x\n", frame)
 		return nil, fmt.Errorf("unknown frame type: %d", frameType)
 	}
-}
-
-func processHeartbeat(channel uint16) error {
-	// TODO: Implement heartbeat processing
-	fmt.Printf("Received HEARTBEAT frame on channel %d\n", channel)
-	return nil
 }
 
 func ParseMethodFrame(configurations *map[string]interface{}, channel uint16, payload []byte) (*amqp.ChannelState, error) {

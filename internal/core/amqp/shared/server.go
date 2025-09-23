@@ -24,7 +24,7 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n[DEBUG] received: %x\n", clientHeader)
+	log.Printf("[DEBUG] - Handshake - Received: %x", clientHeader)
 
 	expectedHeader := []byte(amqp.AMQP_PROTOCOL_HEADER)
 	if !bytes.Equal(clientHeader, expectedHeader) {
@@ -34,7 +34,7 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 		}
 		return fmt.Errorf("bad protocol: %x (%s -> %s)", clientHeader, conn.RemoteAddr().String(), conn.LocalAddr().String())
 	}
-	log.Printf("accepting AMQP connection (%s -> %s)\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	log.Printf("[DEBUG] - Handshake - Accepting AMQP connection (%s -> %s)\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 	/** connection.start **/
 	// send connection.start frame
@@ -49,8 +49,8 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n[DEBUG] received: %x\n", frame)
-	response, err := ParseFrame(configurations, frame)
+	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
+	response, err := ParseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return err
 	}
@@ -91,8 +91,8 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\nreceived: %x\n", frame)
-	response, err = ParseFrame(configurations, frame)
+	log.Printf("[DEBUG] - Handshake - Received: %x", frame)
+	response, err = ParseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	if tuneOkFrame == nil {
 		return fmt.Errorf("type assertion ConnectionTuneOkFrame failed")
 	}
-	fmt.Printf("Received connection.tune-ok: %+v\n", tuneOkFrame)
+	log.Printf("[DEBUG] - Handshake - Received connection.tune-ok: %+v", tuneOkFrame)
 	(*configurations)["heartbeatInterval"] = tuneOkFrame.Heartbeat
 	(*configurations)["frameMax"] = tuneOkFrame.FrameMax
 	(*configurations)["channelMax"] = tuneOkFrame.ChannelMax
@@ -117,10 +117,10 @@ func ServerHandshake(configurations *map[string]any, conn net.Conn) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\nreceived: %x\n", frame)
+	log.Printf("[DEBUG] - Handshake - Received: %x\n", frame)
 	// set vhost on configurations
 
-	response, err = ParseFrame(configurations, frame)
+	response, err = ParseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return err
 	}
