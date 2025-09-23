@@ -4,16 +4,17 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-func ListExchanges(b *Broker) []ExchangeDTO {
-	exchanges := make([]ExchangeDTO, 0, b.GetTotalExchanges())
+func ListExchanges(b *Broker) []models.ExchangeDTO {
+	exchanges := make([]models.ExchangeDTO, 0, b.GetTotalExchanges())
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for vhostName := range b.VHosts {
 		vhost := b.VHosts[vhostName]
 		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
-			exchanges = append(exchanges, ExchangeDTO{
+			exchanges = append(exchanges, models.ExchangeDTO{
 				VHostName: vhost.Name,
 				VHostId:   vhost.Id,
 				Name:      exchange.Name,
@@ -39,14 +40,14 @@ func (b *Broker) GetTotalExchanges() int {
 	return total
 }
 
-func ListQueues(b *Broker) []QueueDTO {
-	queues := make([]QueueDTO, 0, b.GetTotalQueues())
+func ListQueues(b *Broker) []models.QueueDTO {
+	queues := make([]models.QueueDTO, 0, b.GetTotalQueues())
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for vhostName := range b.VHosts {
 		vhost := b.VHosts[vhostName]
 		for _, queue := range b.VHosts[vhost.Name].Queues {
-			queues = append(queues, QueueDTO{
+			queues = append(queues, models.QueueDTO{
 				VHostName: vhost.Name,
 				VHostId:   vhost.Id,
 				Name:      queue.Name,
@@ -72,14 +73,14 @@ func (b *Broker) GetTotalQueues() int {
 	return total
 }
 
-func ListConnections(b *Broker) []ConnectionInfoDTO {
+func ListConnections(b *Broker) []models.ConnectionInfoDTO {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	connections := make([]ConnectionInfo, 0, len(b.Connections))
+	connections := make([]models.ConnectionInfo, 0, len(b.Connections))
 	for _, c := range b.Connections {
 		connections = append(connections, *c)
 	}
-	connectionsDTO := mapListConnectionsDTO(connections)
+	connectionsDTO := models.MapListConnectionsDTO(connections)
 	return connectionsDTO
 }
 

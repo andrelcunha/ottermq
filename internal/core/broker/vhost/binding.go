@@ -1,10 +1,13 @@
 package vhost
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
 func (vh *VHost) BindToDefaultExchange(queueName string) error {
-	return vh.BindQueue(default_exchange, queueName, queueName)
+	return vh.BindQueue(DEFAULT_EXCHANGE, queueName, queueName)
 }
 
 func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
@@ -17,23 +20,21 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
-		return fmt.Errorf("Exchange %s not found", exchangeName)
+		return fmt.Errorf("exchange %s not found", exchangeName)
 	}
-
-	// Find the queue
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		return fmt.Errorf("Queue %s not found", queueName)
+		return fmt.Errorf("queue %s not found", queueName)
 	}
 
 	switch exchange.Typ {
 	case DIRECT:
 		for _, q := range exchange.Bindings[routingKey] {
 			if q.Name == queueName {
-				return fmt.Errorf("Queue %s already binded to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+				log.Printf("[DEBUG] Queue %s already boud to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+				return nil
 			}
 		}
-
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
 	case FANOUT:
 		exchange.Queues[queueName] = queue
@@ -44,6 +45,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	// if err != nil {
 	// 	log.Printf("Failed to save broker state: %v", err)
 	// }
+	// vh.publishBindingUpdate(exchangeName)
 	return nil
 }
 

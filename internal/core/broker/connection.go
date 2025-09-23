@@ -5,25 +5,12 @@ import (
 	"io"
 	"log"
 	"net"
-	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
-
-type ConnectionInfo struct {
-	Name              string                        `json:"name"`
-	User              string                        `json:"user"`
-	VHostName         string                        `json:"vhost"`
-	VHostId           string                        `json:"vhost_id"`
-	HeartbeatInterval uint16                        `json:"heartbeat_interval"`
-	LastHeartbeat     time.Time                     `json:"last_heartbeat"`
-	ConnectedAt       time.Time                     `json:"connected_at"`
-	Conn              net.Conn                      `json:"-"`
-	Channels          map[uint16]*amqp.ChannelState `json:"-"`
-	Done              chan struct{}                 `json:"-"`
-}
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
@@ -31,17 +18,13 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		b.cleanupConnection(conn)
 	}()
 	channelNum := uint16(0)
-
-	if err := shared.ServerHandshake(configurations, conn); err != nil {
+	client, err := shared.Handshake(configurations, conn)
+	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
-	username := (*configurations)["username"].(string)
-	vhost := (*configurations)["vhost"].(string)
-	heartbeatInterval := (*configurations)["heartbeatInterval"].(uint16)
 
-	b.registerConnection(conn, username, vhost, heartbeatInterval)
-	go b.sendHeartbeats(conn)
+	b.registerConnection(conn, client)
 	log.Println("Handshake successful")
 
 	// keep reading commands in loop
@@ -49,11 +32,11 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		frame, err := shared.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Printf("Connection timeout: %v", err)
+				log.Printf("[DEBUG] Connection timeout: %v", err)
 			}
 			if err == io.EOF {
 				b.cleanupConnection(conn)
-				log.Printf("Connection closed by client: %v", conn.RemoteAddr())
+				log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
 				return
 			}
 			log.Printf("Error reading frame: %v", err)
@@ -63,7 +46,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		newInterface, err := b.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := shared.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
@@ -90,29 +73,25 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
 			b.processRequest(conn, newState)
+		} else {
+			if _, ok := newInterface.(shared.Heartbeat); ok {
+				b.handleHeartbeat(conn)
+			}
 		}
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, username, vhostName string, heartbeatInterval uint16) {
-	vhost := b.GetVHostFromName(vhostName)
+func (b *Broker) registerConnection(conn net.Conn, client *shared.AmqpClient) {
+	vhost := b.GetVHostFromName(client.VHostName)
 	if vhost == nil {
-		log.Fatalf("VHost not found: %s", vhostName)
+		log.Fatalf("VHost not found: %s", client.VHostName)
 	}
-
+	client.VHostId = vhost.Id
 	b.mu.Lock()
 
-	b.Connections[conn] = &ConnectionInfo{
-		Name:              conn.RemoteAddr().String(),
-		User:              username,
-		VHostName:         vhost.Name,
-		VHostId:           vhost.Id,
-		HeartbeatInterval: heartbeatInterval,
-		ConnectedAt:       time.Now(),
-		LastHeartbeat:     time.Now(),
-		Conn:              conn,
-		Channels:          make(map[uint16]*amqp.ChannelState),
-		Done:              make(chan struct{}),
+	b.Connections[conn] = &models.ConnectionInfo{
+		Client:   client,
+		Channels: make(map[uint16]*amqp.ChannelState),
 	}
 	b.mu.Unlock()
 }
@@ -125,30 +104,6 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	for _, vhost := range b.VHosts {
 		vhost.CleanupConnection(conn)
 	}
-}
-
-func mapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
-	listConnectonsDTO := make([]ConnectionInfoDTO, len(connections))
-	for i, connection := range connections {
-		state := "disconnected"
-		if connection.Done == nil {
-			state = "running"
-		}
-		channels := len(connection.Channels)
-		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHostName:     connection.VHostName,
-			VHostId:       connection.VHostId,
-			Name:          connection.Name,
-			Username:      connection.User,
-			State:         state,
-			SSL:           false,
-			Protocol:      "AMQP 0-9-1",
-			Channels:      channels,
-			LastHeartbeat: connection.LastHeartbeat,
-			ConnectedAt:   connection.ConnectedAt,
-		}
-	}
-	return listConnectonsDTO
 }
 
 func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {

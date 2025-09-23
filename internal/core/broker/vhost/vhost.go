@@ -22,6 +22,13 @@ type VHost struct {
 	mu                sync.Mutex                         `json:"-"`
 }
 
+const (
+	ADMIN_QUEUES      = "ottermq.admin.queues"
+	ADMIN_EXCHANGES   = "ottermq.admin.exchanges"
+	ADMIN_BINDINGS    = "ottermq.admin.bindings"
+	ADMIN_CONNECTIONS = "ottermq.admin.connections"
+)
+
 type Consumer struct {
 	ID        string `json:"id"`
 	Queue     string `json:"queue"`
@@ -40,12 +47,18 @@ func NewVhost(vhostName string) *VHost {
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]amqp.Message),
 	}
-	vh.CreateExchange(default_exchange, DIRECT)
+	vh.CreateExchange(DEFAULT_EXCHANGE, DIRECT)
+	// Admin expecific
+	// vh.CreateQueue(ADMIN_QUEUES)
+	// vh.CreateQueue(ADMIN_EXCHANGES)
+	// vh.CreateQueue(ADMIN_BINDINGS)
+	// vh.CreateQueue(ADMIN_CONNECTIONS)
+	// vh.bindAdminQueues()
 	return vh
 }
 
 func (vh *VHost) CleanupConnection(conn net.Conn) {
-	log.Println(" [DEBUG] Cleaning vhost connection")
+	log.Println("[DEBUG] Cleaning vhost connection")
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -53,6 +66,7 @@ func (vh *VHost) CleanupConnection(conn net.Conn) {
 	if ok {
 		vh.handleConsumerDisconnection(sessionId)
 	}
+	// publishConnectionUpdate(nil) // Trigger update afte cleanup
 }
 
 func (vh *VHost) handleConsumerDisconnection(sessionID string) {
@@ -71,7 +85,6 @@ func (vh *VHost) handleConsumerDisconnection(sessionID string) {
 		return
 	}
 
-	// requeue unacknowledged messages
 	for _, msg := range vh.ConsumerUnackMsgs[consumerID] {
 		if queue, ok := vh.Queues[consumer.Queue]; ok {
 			queue.ReQueue(msg)

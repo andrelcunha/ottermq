@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-const default_exchange = "AMQP_default"
+const DEFAULT_EXCHANGE = "AMQP_default"
 
 type Exchange struct {
 	Name     string              `json:"name"`
