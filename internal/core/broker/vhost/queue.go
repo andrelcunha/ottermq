@@ -37,12 +37,13 @@ func NewQueue(name string) *Queue {
 
 func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	vh.mu.Lock()
-	if _, ok := vh.Queues[name]; ok {
-		return nil, fmt.Errorf("queue %s already exists", name)
+	defer vh.mu.Unlock()
+	if queue, ok := vh.Queues[name]; ok {
+		log.Printf("[DEBUG] Queue %s already exists", name)
+		return queue, nil
 	}
 	queue := NewQueue(name)
 	vh.Queues[name] = queue
-	vh.mu.Unlock()
 	log.Printf("[DEBUG] Created queue %s", name)
 	// vh.saveBrokerState() // TODO: persist state
 	// adminQueues := make(map[string]bool)

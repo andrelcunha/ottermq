@@ -113,7 +113,7 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 			b.mu.Lock()
 			if _, ok := b.Connections[conn]; !ok {
 				b.mu.Unlock()
-				log.Println("Connection no longer exists in broker")
+				log.Println("[DEBUG] Connection no longer exists in broker")
 				return
 			}
 			b.mu.Unlock()
@@ -122,13 +122,13 @@ func (b *Broker) sendHeartbeats(conn net.Conn) {
 			heartbeatFrame := shared.CreateHeartbeatFrame()
 			err := shared.SendFrame(conn, heartbeatFrame)
 			if err != nil {
-				log.Printf("Failed to send heartbeat: %v", err)
+				log.Printf("[ERROR] Failed to send heartbeat: %v", err)
 				return
 			}
 			log.Println("[DEBUG] Heartbeat sent")
 
 		case <-done:
-			log.Println("Stopping heartbeat  goroutine for closed connection")
+			log.Println("Stopping heartbeat goroutine for closed connection")
 			return
 		}
 

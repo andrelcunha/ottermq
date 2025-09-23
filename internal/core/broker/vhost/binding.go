@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+	"log"
 )
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
@@ -30,10 +31,10 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	case DIRECT:
 		for _, q := range exchange.Bindings[routingKey] {
 			if q.Name == queueName {
-				return fmt.Errorf("Queue %s already binded to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+				log.Printf("[DEBUG] Queue %s already boud to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+				return nil
 			}
 		}
-
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
 	case FANOUT:
 		exchange.Queues[queueName] = queue

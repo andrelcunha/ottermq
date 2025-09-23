@@ -37,11 +37,11 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		frame, err := shared.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Printf("Connection timeout: %v", err)
+				log.Printf("[DEBUG] Connection timeout: %v", err)
 			}
 			if err == io.EOF {
 				b.cleanupConnection(conn)
-				log.Printf("Connection closed by client: %v", conn.RemoteAddr())
+				log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
 				return
 			}
 			log.Printf("Error reading frame: %v", err)
