@@ -1,7 +1,6 @@
 package broker
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -84,53 +83,6 @@ func (b *Broker) Start() {
 		}
 		log.Println("New client waiting for connection: ", conn.RemoteAddr())
 		go b.handleConnection((&configurations), conn)
-	}
-}
-
-func (b *Broker) ParseFrame(configurations *map[string]interface{}, conn net.Conn, currentChannel uint16, frame []byte) (interface{}, error) {
-	if len(frame) < 7 {
-		return nil, fmt.Errorf("frame too short")
-	}
-
-	frameType := frame[0]
-	channel := binary.BigEndian.Uint16(frame[1:3])
-	payloadSize := binary.BigEndian.Uint32(frame[3:7])
-	if len(frame) < int(7+payloadSize) {
-		return nil, fmt.Errorf("frame too short")
-	}
-
-	payload := frame[7:]
-
-	switch frameType {
-	case byte(amqp.TYPE_METHOD):
-		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
-		request, err := shared.ParseMethodFrame(configurations, channel, payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse method frame: %v", err)
-		}
-		return request, nil
-
-	case byte(amqp.TYPE_HEADER):
-		fmt.Printf("Received HEADER frame on channel %d\n", channel)
-
-		return shared.ParseHeaderFrame(channel, payloadSize, payload)
-
-	case byte(amqp.TYPE_BODY):
-		fmt.Printf("Received BODY frame on channel %d\n", channel)
-
-		return shared.ParseBodyFrame(channel, payloadSize, payload)
-
-	case byte(amqp.TYPE_HEARTBEAT):
-		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
-		err := b.handleHeartbeat(conn)
-		if err != nil {
-			log.Printf("Error handling heartbeat: %v", err)
-		}
-		return nil, nil
-
-	default:
-		fmt.Printf("Received: %x\n", frame)
-		return nil, fmt.Errorf("unknown frame type: %d", frameType)
 	}
 }
 
@@ -431,7 +383,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			channel := request.Channel
 			currentState := b.getCurrentState(conn, channel)
 			if currentState == nil {
-				return nil, fmt.Errorf("Channel not found")
+				return nil, fmt.Errorf("channel not found")
 			}
 			if currentState.MethodFrame != newState.MethodFrame {
 				b.Connections[conn].Channels[channel].MethodFrame = newState.MethodFrame
@@ -482,16 +434,15 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			if msgCount == 0 {
 				// Send Basic.GetEmpty
-				// I figure out that expects an octet here
-				// reserved1 := amqp.KeyValue{
-				// 	Key:   amqp.INT_SHORT,
-				// 	Value: getMsg.Reserved1,
-				// }
+				reserved1 := amqp.KeyValue{
+					Key:   amqp.STRING_SHORT,
+					Value: "",
+				}
 				frame := amqp.ResponseMethodMessage{
 					Channel:  channel,
 					ClassID:  request.ClassID,
 					MethodID: uint16(amqp.BASIC_GET_EMPTY),
-					// Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
+					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
 				fmt.Printf("[DEBUG] Sending get-empty frame: %x\n", frame)
 				shared.SendFrame(conn, frame)
