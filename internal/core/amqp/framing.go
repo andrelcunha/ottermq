@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"strings"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
@@ -233,72 +232,6 @@ func createConnectionStartFrame() []byte {
 	return frame
 }
 
-func createConnectionStartOkPayload(configurations *map[string]interface{}, startFrameResponse *ConnectionStartFrame) (ConnectionStartOkFrame, error) {
-
-	clientProperties := (*configurations)["clientProperties"].(map[string]interface{})
-	fmt.Printf("[DEBUG] clientProperties: %+v\n", clientProperties)
-
-	mecanismsStr := startFrameResponse.Mechanisms
-	mechanismsList := strings.Split(mecanismsStr, " ")
-	mechanismsMap := make(map[string]bool)
-	for _, m := range mechanismsList {
-		mechanismsMap[m] = true
-	}
-	fmt.Printf("[DEBUG] Server mechanismsMap: %+v\n", mechanismsMap)
-
-	// find 'PLAIN' in mechanismsList
-	mechanism := (*configurations)["mechanism"].(string)
-	if !mechanismsMap[mechanism] {
-		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported mechanism: %s", mechanism)
-	}
-	fmt.Printf("[DEBUG] mechanism: %s\n", mechanism)
-
-	// fmt.Printf("mechanismsList: %+v\n", mechanismsList)
-	username := (*configurations)["username"].(string)
-	password := (*configurations)["password"].(string)
-
-	securityStr := fmt.Sprintf(" %s %s", username, password)
-	// find 'en_US' in localesList
-	localesStr := startFrameResponse.Locales
-	localesList := strings.Split(localesStr, ",")
-	localesMap := make(map[string]bool)
-	for _, l := range localesList {
-		localesMap[l] = true
-	}
-	locale := (*configurations)["locale"].(string)
-	if !localesMap[locale] {
-		// locale = "en_US"
-		return ConnectionStartOkFrame{}, fmt.Errorf("unsupported locale: %s", locale)
-	}
-	startOk := ConnectionStartOkFrame{
-		ClientProperties: clientProperties,
-		Mechanism:        mechanism,
-		Response:         securityStr,
-		Locale:           locale,
-	}
-	return startOk, nil
-}
-
-func createConnectionStartOkFrame(startOk *ConnectionStartOkFrame) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_START_OK
-
-	clientProperties := startOk.ClientProperties
-	encodedProperties := utils.EncodeTable(clientProperties)
-	payloadBuf.Write(utils.EncodeLongStr(encodedProperties))
-
-	payloadBuf.Write(utils.EncodeShortStr(startOk.Mechanism))
-	payloadBuf.Write(utils.EncodeSecurityPlain(startOk.Response))
-
-	payloadBuf.Write(utils.EncodeShortStr(startOk.Locale))
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-
-	return frame
-}
-
 func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, methodPayload []byte) []byte {
 	var payloadBuf bytes.Buffer
 
@@ -346,25 +279,6 @@ func createConnectionTuneOkFrame(tune *ConnectionTuneFrame) []byte {
 	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
 	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
 	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionOpenFrame(vhost string) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_OPEN
-
-	// Vhost - short string
-	payloadBuf.Write(utils.EncodeShortStr(vhost))
-
-	// Reserved-1 (bit) - set to 0
-	payloadBuf.WriteByte(0)
-
-	// Reserved-2 (shortstr) - typically empty
-	payloadBuf.Write(utils.EncodeShortStr(""))
 
 	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
 	return frame

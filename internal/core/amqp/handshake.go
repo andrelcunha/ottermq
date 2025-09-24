@@ -16,7 +16,6 @@ import (
 // REGION Share
 // Probably should be called Handshake or something
 
-
 // handshake
 // Client sends ProtocolHeader
 // Server responds with connection.start
@@ -37,7 +36,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if err != nil {
 		msg := "error parsing protocol"
 		log.Printf("[ERROR] %s", msg)
-		return nil, fmt.Errorf(msg)
+		return nil, fmt.Errorf("%s", msg)
 	}
 	if !bytes.Equal(clientHeader, protocolHeader) {
 		err := sendProtocolHeader(conn, protocolHeader)
@@ -232,15 +231,6 @@ func sendProtocolHeader(conn net.Conn, header []byte) error {
 
 func readProtocolHeader(conn net.Conn) ([]byte, error) {
 	header := make([]byte, 8)
-	_, err := io.ReadFull(conn, header)
-	if err != nil {
-		return nil, err
-	}
-	return header, nil
-}
-
-func readHeader(conn net.Conn) ([]byte, error) {
-	header := make([]byte, 7)
 	_, err := io.ReadFull(conn, header)
 	if err != nil {
 		return nil, err
