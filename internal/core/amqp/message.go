@@ -86,7 +86,7 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 
 	payloadSize := uint32(payloadBuf.Len())
 
-	headerBuf := FormatHeader(frameType, channel, payloadSize)
+	headerBuf := formatHeader(frameType, channel, payloadSize)
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 	frame = append(frame, FRAME_END)
@@ -101,7 +101,7 @@ func (msg ResponseContent) FormatBodyFrame() []byte {
 	payloadBuf.Write(content)
 
 	payloadSize := uint32(payloadBuf.Len())
-	headerBuf := FormatHeader(frameType, channel, payloadSize)
+	headerBuf := formatHeader(frameType, channel, payloadSize)
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 	frame = append(frame, FRAME_END)
 	return frame
@@ -127,7 +127,7 @@ func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
 
 	// Buffer for the frame header
 	frameType := uint8(TYPE_METHOD) // METHOD frame type
-	headerBuf := FormatHeader(frameType, channelNum, payloadSize)
+	headerBuf := formatHeader(frameType, channelNum, payloadSize)
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 
@@ -168,7 +168,7 @@ func formatMethodPayload(content ContentList) []byte {
 	return payloadBuf.Bytes()
 }
 
-func FormatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
+func formatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
 	header := make([]byte, 7)
 	header[0] = frameType
 	binary.BigEndian.PutUint16(header[1:3], channel)

@@ -71,7 +71,7 @@ func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 
-	bindings := broker.ListBindings(b, "/", exchangeName)
+	bindings := b.AdminApi.ListBindings("/", exchangeName)
 	if bindings == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list bindings",

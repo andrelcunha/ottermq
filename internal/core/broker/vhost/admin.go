@@ -48,7 +48,7 @@ func (vh *VHost) publishQueueUpdate() {
 		log.Printf("[ERROR] Failed to marshal queue update: %v", err)
 	}
 	props := &amqp.BasicProperties{ContentType: "application/json"}
-	_, err = vh.Publish(DEFAULT_EXCHANGE, ADMIN_QUEUES, body, props)
+	_, err = vh.publish(DEFAULT_EXCHANGE, ADMIN_QUEUES, body, props)
 	if err != nil {
 		log.Printf("[ERROR] Failed to publish queue update: %v", err)
 	}
@@ -71,7 +71,7 @@ func (vh *VHost) publishExchangeUpdate() {
 		return
 	}
 	props := &amqp.BasicProperties{ContentType: "application/json"}
-	_, err = vh.Publish(DEFAULT_EXCHANGE, ADMIN_EXCHANGES, body, props)
+	_, err = vh.publish(DEFAULT_EXCHANGE, ADMIN_EXCHANGES, body, props)
 	if err != nil {
 		log.Printf("[ERROR] Failed to publish exchage update: %v", err)
 	}
@@ -111,7 +111,7 @@ func (vh *VHost) publishBindingUpdate(exchangeName string) {
 		return
 	}
 	props := &amqp.BasicProperties{ContentType: "application/json"}
-	_, err = vh.Publish(DEFAULT_EXCHANGE, ADMIN_BINDINGS, body, props)
+	_, err = vh.publish(DEFAULT_EXCHANGE, ADMIN_BINDINGS, body, props)
 	if err != nil {
 		log.Printf("[ERROR] Failed to publish binding update: %v", err)
 	}

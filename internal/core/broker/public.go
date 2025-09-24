@@ -7,8 +7,26 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-func ListExchanges(b *Broker) []models.ExchangeDTO {
-	exchanges := make([]models.ExchangeDTO, 0, b.GetTotalExchanges())
+type AdminApi interface {
+	ListExchanges() []models.ExchangeDTO
+	GetTotalExchanges() int
+	ListQueues() []models.QueueDTO
+	GetTotalQueues() int
+	ListConnections() []models.ConnectionInfoDTO
+	ListBindings(vhostName, exchangeName string) map[string][]string
+}
+
+func NewDefaultAdminApi(broker *Broker) *DefaultAdminApi {
+	return &DefaultAdminApi{broker: broker}
+}
+
+type DefaultAdminApi struct {
+	broker *Broker
+}
+
+func (a DefaultAdminApi) ListExchanges() []models.ExchangeDTO {
+	b := a.broker
+	exchanges := make([]models.ExchangeDTO, 0, a.GetTotalExchanges())
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for vhostName := range b.VHosts {
@@ -25,7 +43,8 @@ func ListExchanges(b *Broker) []models.ExchangeDTO {
 	return exchanges
 }
 
-func (b *Broker) GetTotalExchanges() int {
+func (a DefaultAdminApi) GetTotalExchanges() int {
+	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	total := 0
@@ -40,8 +59,9 @@ func (b *Broker) GetTotalExchanges() int {
 	return total
 }
 
-func ListQueues(b *Broker) []models.QueueDTO {
-	queues := make([]models.QueueDTO, 0, b.GetTotalQueues())
+func (a DefaultAdminApi) ListQueues() []models.QueueDTO {
+	b := a.broker
+	queues := make([]models.QueueDTO, 0, a.GetTotalQueues())
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for vhostName := range b.VHosts {
@@ -58,7 +78,8 @@ func ListQueues(b *Broker) []models.QueueDTO {
 	return queues
 }
 
-func (b *Broker) GetTotalQueues() int {
+func (a DefaultAdminApi) GetTotalQueues() int {
+	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	total := 0
@@ -73,7 +94,8 @@ func (b *Broker) GetTotalQueues() int {
 	return total
 }
 
-func ListConnections(b *Broker) []models.ConnectionInfoDTO {
+func (a DefaultAdminApi) ListConnections() []models.ConnectionInfoDTO {
+	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	connections := make([]models.ConnectionInfo, 0, len(b.Connections))
@@ -84,7 +106,8 @@ func ListConnections(b *Broker) []models.ConnectionInfoDTO {
 	return connectionsDTO
 }
 
-func ListBindings(b *Broker, vhostName, exchangeName string) map[string][]string {
+func (a DefaultAdminApi) ListBindings(vhostName, exchangeName string) map[string][]string {
+	b := a.broker
 	vh := b.GetVHostFromName(vhostName)
 	b.mu.Lock()
 	defer b.mu.Unlock()

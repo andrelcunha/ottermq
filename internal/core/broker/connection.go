@@ -5,31 +5,56 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
+
+type ConnManager interface {
+	HandleConnection(configurations *map[string]any, conn net.Conn) error
+	ProcessRequest(conn net.Conn, newState *amqp.ChannelState) (any, error)
+	GetChannelState(conn net.Conn, channel uint16) *amqp.ChannelState
+	UpdateChannelState(conn net.Conn, channel uint16, newState *amqp.ChannelState)
+	HandleHeartbeat(conn net.Conn) error
+	GetVHostFromName(vhostName string) *vhost.VHost
+}
+
+// DefaultConnManager implements ConnManager
+type DefaultConnManager struct {
+	broker *Broker
+	framer amqp.Framer
+	mu     sync.Mutex
+}
+
+// NewDefaultConnManager creates a new connection manager
+func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManager {
+	return &DefaultConnManager{
+		broker: broker,
+		framer: framer,
+	}
+}
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
 		conn.Close()
 		b.cleanupConnection(conn)
 	}()
-	channelNum := uint16(0)
-	client, err := shared.Handshake(configurations, conn)
+	channelNum := uint16(0) //initial
+	client, err := b.framer.Handshake(configurations, conn)
 	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
 
 	b.registerConnection(conn, client)
-	log.Println("Handshake successful")
-
+	go b.sendHeartbeats(conn, client)
 	// keep reading commands in loop
 	for {
-		frame, err := shared.ReadFrame(conn)
+		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("[DEBUG] Connection timeout: %v", err)
@@ -42,13 +67,19 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			log.Printf("Error reading frame: %v", err)
 			return
 		}
+		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
+			b.handleHeartbeat(conn)
+		}
 
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		newInterface, err := shared.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := b.framer.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
+		}
+		if _, ok := newInterface.(*amqp.Heartbeat); ok {
+			continue
 		}
 		if newInterface != nil {
 			newState, ok := newInterface.(*amqp.ChannelState)
@@ -73,15 +104,11 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
 			b.processRequest(conn, newState)
-		} else {
-			if _, ok := newInterface.(shared.Heartbeat); ok {
-				b.handleHeartbeat(conn)
-			}
 		}
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, client *shared.AmqpClient) {
+func (b *Broker) registerConnection(conn net.Conn, client *amqp.AmqpClient) {
 	vhost := b.GetVHostFromName(client.VHostName)
 	if vhost == nil {
 		log.Fatalf("VHost not found: %s", client.VHostName)
@@ -127,4 +154,55 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.Connections[conn].Channels, channel)
+}
+
+func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
+	b.mu.Lock()
+	// connectionInfo, ok := b.Connections[conn]
+	// if !ok {
+	// 	b.mu.Unlock()
+	// 	return
+	// }
+	heartbeatInterval := int(client.HeartbeatInterval >> 1)
+	done := client.Done
+	b.mu.Unlock()
+
+	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			b.mu.Lock()
+			if _, ok := b.Connections[conn]; !ok {
+				b.mu.Unlock()
+				log.Println("Connection no longer exists in broker")
+				return
+			}
+			b.mu.Unlock()
+
+			// sendHearbeat(conn)
+			// heartbeatFrame := amqp.CreateHeartbeatFrame()
+			// err := shared.SendFrame(conn, heartbeatFrame)
+			err := b.framer.SendHearbeat(conn)
+			if err != nil {
+				log.Printf("Failed to send heartbeat: %v", err)
+				return
+			}
+			log.Println("[DEBUG] Heartbeat sent")
+
+		case <-done:
+			log.Println("Stopping heartbeat  goroutine for closed connection")
+			return
+		}
+	}
+}
+
+func (b *Broker) handleHeartbeat(conn net.Conn) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// b.Connections[conn].LastHeartbeat = time.Now()
+	b.Connections[conn].Client.LastHeartbeat = time.Now()
+
+	return nil
 }
