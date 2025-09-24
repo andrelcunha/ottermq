@@ -42,7 +42,7 @@ func parseFrame(configurations *map[string]any, conn net.Conn, currentChannel ui
 
 	case byte(TYPE_HEARTBEAT):
 		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
-		return nil, nil
+		return &Heartbeat{}, nil
 
 	default:
 		log.Printf("[DEBUG] Received: %x\n", frame)

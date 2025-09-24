@@ -41,7 +41,7 @@ func NewBroker(config *config.Config) *Broker {
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")
 	b.framer = &amqp.DefaultFramer{}
-	b.AdminApi = &DefaultAdminApi{}
+	b.AdminApi = &DefaultAdminApi{b}
 	return b
 }
 
@@ -422,7 +422,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				props := currentState.HeaderFrame.Properties
 				v := b.VHosts["/"]
 				// v.Publish(exchanege, routingKey, body, props)
-				_, err := v.Publish(exchanege, routingKey, body, props)
+				_, err := v.MsgCtrlr.Publish(exchanege, routingKey, body, props)
 				if err == nil {
 					log.Printf("[DEBUG] Published message to exchange=%s, routingKey=%s, body=%s", exchanege, routingKey, string(body))
 					b.Connections[conn].Channels[channel] = &amqp.ChannelState{}

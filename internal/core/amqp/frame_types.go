@@ -1,7 +1,6 @@
 package amqp
 
-type Heartbeat struct {
-}
+type Heartbeat struct{}
 
 type AMQP_Key struct {
 	Key  string

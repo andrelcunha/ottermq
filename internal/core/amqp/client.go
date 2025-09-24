@@ -20,6 +20,9 @@ type AmqpClient struct {
 	Protocol          string
 	SSL               bool
 	Done              chan struct{}
+	interlaval        time.Duration
+	maxDelay          time.Duration
+	heartbeatChan     chan struct{}
 }
 
 type AmqpClientConfig struct {
@@ -41,14 +44,18 @@ func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
 		Protocol:          config.Protocol,
 		SSL:               config.SSL,
 		ConnectedAt:       time.Now(),
-		LastHeartbeat:     time.Now(),
 		HeartbeatInterval: config.HeartbeatInterval,
+		LastHeartbeat:     time.Now(),
 		FrameMax:          config.FrameMax,
 		ChannelMax:        config.ChannelMax,
 		Conn:              conn,
 		Done:              make(chan struct{}),
+		interlaval:        time.Duration(config.HeartbeatInterval>>1) * time.Second,
+		maxDelay:          time.Duration(config.HeartbeatInterval<<1) * time.Second,
+		heartbeatChan:     make(chan struct{}, 1),
 	}
-	client.StartHeartbeat()
+	client.startHeartbeat()
+	client.startHeartbeatMonitor()
 	return client
 }
 
@@ -70,8 +77,8 @@ func NewAmqpClientConfig(configurations *map[string]any) *AmqpClientConfig {
 	}
 }
 
-func (c *AmqpClient) StartHeartbeat() {
-	ticker := time.NewTicker(time.Duration(c.HeartbeatInterval) * time.Second)
+func (c *AmqpClient) startHeartbeat() {
+	ticker := time.NewTicker(c.interlaval)
 	go func() {
 		defer ticker.Stop()
 		for {
@@ -90,6 +97,50 @@ func (c *AmqpClient) StartHeartbeat() {
 			}
 		}
 	}()
+}
+
+func (c *AmqpClient) startHeartbeatMonitor() {
+	timer := time.NewTimer(c.maxDelay)
+
+	go func() {
+		for {
+			select {
+			case <-timer.C:
+				log.Printf("[DEBUG] Heartbeat overdue for %s", c.Name)
+				c.Stop()
+				return
+
+			case <-c.heartbeatChan:
+				c.LastHeartbeat = time.Now()
+				if !timer.Stop() {
+					<-timer.C // drain if needed
+				}
+				timer.Reset(c.maxDelay)
+
+			case <-c.Done:
+				log.Printf("[DEBUG] Heartbeat monitor stopped for %s", c.Name)
+				timer.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (c *AmqpClient) ReceiveHeartbeat() {
+	select {
+	case c.heartbeatChan <- struct{}{}:
+	default: // avoid blocking if no one is listening
+	}
+}
+
+func (c *AmqpClient) IsAlive() bool {
+	select {
+	case <-c.Done:
+		return false
+	default:
+		return time.Since(c.LastHeartbeat) <= c.maxDelay
+
+	}
 }
 
 func (c *AmqpClient) Stop() {

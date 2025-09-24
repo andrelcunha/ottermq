@@ -8,6 +8,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type MessageController interface {
+	Publish(exchange, routingKey string, body []byte, props *amqp.BasicProperties) (string, error)
+}
+
+type DefaultMessageController struct {
+	vhost *VHost
+}
+
+func (m *DefaultMessageController) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+	return m.vhost.publish(exchangeName, routingKey, body, props)
+}
+
 // acknowledge removes the message with the given ID frrom the unackedMessages map.
 func (vh *VHost) acknowledge(consumerID, msgID string) error {
 	vh.mu.Lock()
@@ -36,7 +48,8 @@ func (vh *VHost) GetMessageCount(name string) (int, error) {
 	return queue.Len(), nil
 }
 
-func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+	// vh := m.vhost
 	vh.mu.Lock()
 	exchange, ok := vh.Exchanges[exchangeName]
 	vh.mu.Unlock()

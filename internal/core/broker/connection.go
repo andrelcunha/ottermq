@@ -5,11 +5,37 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
+
+type ConnManager interface {
+	HandleConnection(configurations *map[string]any, conn net.Conn) error
+	ProcessRequest(conn net.Conn, newState *amqp.ChannelState) (any, error)
+	GetChannelState(conn net.Conn, channel uint16) *amqp.ChannelState
+	UpdateChannelState(conn net.Conn, channel uint16, newState *amqp.ChannelState)
+	HandleHeartbeat(conn net.Conn) error
+	GetVHostFromName(vhostName string) *vhost.VHost
+}
+
+// DefaultConnManager implements ConnManager
+type DefaultConnManager struct {
+	broker *Broker
+	framer amqp.Framer
+	mu     sync.Mutex
+}
+
+// NewDefaultConnManager creates a new connection manager
+func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManager {
+	return &DefaultConnManager{
+		broker: broker,
+		framer: framer,
+	}
+}
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
@@ -24,10 +50,15 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}
 
 	b.registerConnection(conn, client)
-	log.Println("Handshake successful")
 
 	// keep reading commands in loop
 	for {
+		// verify if client is alive
+		if !client.IsAlive() {
+			log.Printf("[DEBUG] Connection terminated due heartbeat timeout")
+			// client.Done <- struct{}{}
+			// return
+		}
 		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -52,6 +83,11 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		if newInterface != nil {
 			newState, ok := newInterface.(*amqp.ChannelState)
 			if !ok {
+				if _, ok := newInterface.(*amqp.Heartbeat); ok {
+					// b.handleHeartbeat(conn)
+					client.ReceiveHeartbeat()
+					continue
+				}
 				log.Fatalf("Failed to cast request to amqp.ChannelState")
 			}
 			fmt.Printf("[DEBUG] New State: %+v\n", newState)
@@ -72,10 +108,6 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
 			b.processRequest(conn, newState)
-		} else {
-			if _, ok := newInterface.(amqp.Heartbeat); ok {
-				b.handleHeartbeat(conn)
-			}
 		}
 	}
 }

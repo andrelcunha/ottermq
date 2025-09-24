@@ -96,7 +96,6 @@ func (a DefaultAdminApi) GetTotalQueues() int {
 
 func (a DefaultAdminApi) ListConnections() []models.ConnectionInfoDTO {
 	b := a.broker
-
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	connections := make([]models.ConnectionInfo, 0, len(b.Connections))
