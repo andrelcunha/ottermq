@@ -30,6 +30,7 @@ type Broker struct {
 	Connections map[net.Conn]*models.ConnectionInfo `json:"-"`
 	mu          sync.Mutex                          `json:"-"`
 	framer      amqp.Framer
+	AdminApi    AdminApi
 }
 
 func NewBroker(config *config.Config) *Broker {
@@ -40,6 +41,7 @@ func NewBroker(config *config.Config) *Broker {
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")
 	b.framer = &amqp.DefaultFramer{}
+	b.AdminApi = &DefaultAdminApi{}
 	return b
 }
 
@@ -65,7 +67,7 @@ func (b *Broker) Start() {
 		"heartbeatInterval": b.config.HeartbeatIntervalMax,
 		"frameMax":          b.config.FrameMax,
 		"channelMax":        b.config.ChannelMax,
-		"ssl":               true,
+		"ssl":               false,
 		"protocol":          "AMQP 0-9-1",
 	}
 

@@ -5,7 +5,6 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/web/models"
-	_ "github.com/andrelcunha/ottermq/web/models"
 	"github.com/rabbitmq/amqp091-go"
 
 	"github.com/gofiber/fiber/v2"
@@ -21,7 +20,7 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues [get]
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues := broker.ListQueues(b)
+	queues := b.AdminApi.ListQueues()
 	if queues == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list exchanges",

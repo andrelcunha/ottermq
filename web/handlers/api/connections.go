@@ -15,7 +15,7 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/connections [get]
 func ListConnections(c *fiber.Ctx, b *broker.Broker) error {
-	connections := broker.ListConnections(b)
+	connections := b.AdminApi.ListConnections()
 	if connections == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list connections",

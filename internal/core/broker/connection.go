@@ -16,7 +16,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		conn.Close()
 		b.cleanupConnection(conn)
 	}()
-	channelNum := uint16(0)
+	channelNum := uint16(0) //initial
 	client, err := b.framer.Handshake(configurations, conn)
 	if err != nil {
 		log.Printf("Handshake failed: %v", err)

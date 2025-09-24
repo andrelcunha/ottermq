@@ -161,7 +161,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	return client, nil
 }
 
-func processStartOkContent(configurations *map[string]interface{}, startOkFrame *ConnectionStartOkFrame) error {
+func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOkFrame) error {
 	mechanism := startOkFrame.Mechanism
 	if mechanism != "PLAIN" {
 		return fmt.Errorf("mechanism invalid or %s not suported", mechanism)
