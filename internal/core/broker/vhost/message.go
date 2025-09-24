@@ -12,6 +12,7 @@ type MessageController interface {
 	Publish(exchange, routingKey string, body []byte, props *amqp.BasicProperties) (string, error)
 	GetMessage(queueName string) *amqp.Message
 	GetMessageCount(queueName string) (int, error)
+	Acknowledge(consumerID, msgID string) error
 }
 
 type DefaultMessageController struct {
@@ -19,7 +20,7 @@ type DefaultMessageController struct {
 }
 
 func (m *DefaultMessageController) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
-	return m.vhost.publish(exchangeName, routingKey, body, props)
+	return m.publish(exchangeName, routingKey, body, props)
 }
 
 func (m *DefaultMessageController) GetMessage(queueName string) *amqp.Message {
@@ -28,6 +29,10 @@ func (m *DefaultMessageController) GetMessage(queueName string) *amqp.Message {
 
 func (m *DefaultMessageController) GetMessageCount(queueName string) (int, error) {
 	return m.vhost.getMessageCount(queueName)
+}
+
+func (m *DefaultMessageController) Acknowledge(consumerID, msgID string) error {
+	return m.vhost.acknowledge(consumerID, msgID)
 }
 
 // acknowledge removes the message with the given ID frrom the unackedMessages map.
@@ -58,8 +63,8 @@ func (vh *VHost) getMessageCount(queueName string) (int, error) {
 	return queue.Len(), nil
 }
 
-func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
-	// vh := m.vhost
+func (m *DefaultMessageController) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+	vh := m.vhost
 	vh.mu.Lock()
 	exchange, ok := vh.Exchanges[exchangeName]
 	vh.mu.Unlock()
@@ -123,24 +128,24 @@ func (vh *VHost) getMessage(queueName string) *amqp.Message {
 	return msg
 }
 
-// func (vh *VHost) RegisterSessionAndConsummer(sessionID, consumerID string) string {
-// 	// sessionID := generateSessionID()
-// 	// consumerID := conn.RemoteAddr().String()
+func (vh *VHost) registerSessionAndConsummer(sessionID, consumerID string) string {
+	// sessionID := generateSessionID()
+	// consumerID := conn.RemoteAddr().String()
 
-// 	vh.registerConsumer(consumerID, "default", sessionID)
-// 	log.Println("New connection registered")
-// 	return consumerID
-// }
+	vh.registerConsumer(consumerID, "default", sessionID)
+	log.Println("New connection registered")
+	return consumerID
+}
 
-// func (vh *VHost) registerConsumer(consumerID, queue, sessionID string) {
-// 	vh.mu.Lock()
-// 	defer vh.mu.Unlock()
-// 	consumer := &Consumer{
-// 		ID:        consumerID,
-// 		Queue:     queue,
-// 		SessionID: sessionID,
-// 	}
-// 	vh.Consumers[consumerID] = consumer
-// 	vh.ConsumerSessions[sessionID] = consumerID
-// 	vh.ConsumerUnackMsgs[consumerID] = make(map[string]bool)
-// }
+func (vh *VHost) registerConsumer(consumerID, queue, sessionID string) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	consumer := &Consumer{
+		ID:        consumerID,
+		Queue:     queue,
+		SessionID: sessionID,
+	}
+	vh.Consumers[consumerID] = consumer
+	vh.ConsumerSessions[sessionID] = consumerID
+	vh.ConsumerUnackMsgs[consumerID] = make(map[string]amqp.Message)
+}
