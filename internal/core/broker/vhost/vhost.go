@@ -48,7 +48,7 @@ func NewVhost(vhostName string) *VHost {
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]amqp.Message),
 	}
-	vh.MsgCtrlr = &DefaultMessageController{}
+	vh.MsgCtrlr = &DefaultMessageController{vh}
 	vh.CreateExchange(DEFAULT_EXCHANGE, DIRECT)
 	// Admin expecific
 	// vh.CreateQueue(ADMIN_QUEUES)

@@ -72,6 +72,9 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			log.Printf("Error reading frame: %v", err)
 			return
 		}
+		if len(frame) > 7 { // any octet shall be valid as heartbeat #AMQP_compliance
+			client.ReceiveHeartbeat()
+		}
 
 		log.Printf("[DEBUG] received: %x\n", frame)
 
@@ -80,14 +83,12 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
+		if _, ok := newInterface.(*amqp.Heartbeat); ok {
+			continue
+		}
 		if newInterface != nil {
 			newState, ok := newInterface.(*amqp.ChannelState)
 			if !ok {
-				if _, ok := newInterface.(*amqp.Heartbeat); ok {
-					// b.handleHeartbeat(conn)
-					client.ReceiveHeartbeat()
-					continue
-				}
 				log.Fatalf("Failed to cast request to amqp.ChannelState")
 			}
 			fmt.Printf("[DEBUG] New State: %+v\n", newState)

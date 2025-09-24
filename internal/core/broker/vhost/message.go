@@ -10,6 +10,8 @@ import (
 
 type MessageController interface {
 	Publish(exchange, routingKey string, body []byte, props *amqp.BasicProperties) (string, error)
+	GetMessage(queueName string) *amqp.Message
+	GetMessageCount(queueName string) (int, error)
 }
 
 type DefaultMessageController struct {
@@ -18,6 +20,14 @@ type DefaultMessageController struct {
 
 func (m *DefaultMessageController) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	return m.vhost.publish(exchangeName, routingKey, body, props)
+}
+
+func (m *DefaultMessageController) GetMessage(queueName string) *amqp.Message {
+	return m.vhost.getMessage(queueName)
+}
+
+func (m *DefaultMessageController) GetMessageCount(queueName string) (int, error) {
+	return m.vhost.getMessageCount(queueName)
 }
 
 // acknowledge removes the message with the given ID frrom the unackedMessages map.
@@ -38,12 +48,12 @@ func (vh *VHost) acknowledge(consumerID, msgID string) error {
 	return nil
 }
 
-func (vh *VHost) GetMessageCount(name string) (int, error) {
+func (vh *VHost) getMessageCount(queueName string) (int, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	queue, ok := vh.Queues[name]
+	queue, ok := vh.Queues[queueName]
 	if !ok {
-		return 0, fmt.Errorf("queue %s not found", name)
+		return 0, fmt.Errorf("queue %s not found", queueName)
 	}
 	return queue.Len(), nil
 }
@@ -97,7 +107,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) GetMessage(queueName string) *amqp.Message {
+func (vh *VHost) getMessage(queueName string) *amqp.Message {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	queue, ok := vh.Queues[queueName]

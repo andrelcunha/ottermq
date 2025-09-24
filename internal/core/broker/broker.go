@@ -434,7 +434,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			vhost := b.VHosts["/"] // TODO: set the selected vhost
 			getMsg := request.Content.(*amqp.BasicGetMessage)
 			queue := getMsg.Queue
-			msgCount, err := vhost.GetMessageCount(queue)
+			msgCount, err := vhost.MsgCtrlr.GetMessageCount(queue)
 			if err != nil {
 				fmt.Printf("[ERROR] Error getting message count: %v", err)
 				return nil, err
@@ -457,7 +457,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 
 			// Send Basic.GetOk + header + body
-			msg := vhost.GetMessage(queue)
+			msg := vhost.MsgCtrlr.GetMessage(queue)
 			msgGetOk := &amqp.BasicGetOk{
 				DeliveryTag:  1,
 				Redelivered:  false,
