@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -90,57 +89,6 @@ func (b *Broker) Start() {
 		go b.handleConnection((&configurations), conn)
 	}
 }
-
-func (b *Broker) handleHeartbeat(conn net.Conn) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// b.Connections[conn].LastHeartbeat = time.Now()
-	b.Connections[conn].Client.LastHeartbeat = time.Now()
-
-	return nil
-}
-
-// func (b *Broker) sendHeartbeats(conn net.Conn) {
-// 	b.mu.Lock()
-// 	connectionInfo, ok := b.Connections[conn]
-// 	if !ok {
-// 		b.mu.Unlock()
-// 		return
-// 	}
-// 	heartbeatInterval := connectionInfo.HeartbeatInterval
-// 	done := connectionInfo.Done
-// 	b.mu.Unlock()
-//
-// 	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
-// 	defer ticker.Stop()
-//
-// 	for {
-// 		select {
-// 		case <-ticker.C:
-// 			b.mu.Lock()
-// 			if _, ok := b.Connections[conn]; !ok {
-// 				b.mu.Unlock()
-// 				log.Println("[DEBUG] Connection no longer exists in broker")
-// 				return
-// 			}
-// 			b.mu.Unlock()
-//
-// 			// sendHearbeat(conn)
-// 			heartbeatFrame := amqp.CreateHeartbeatFrame()
-// 			err := b.framer.SendFrame(conn, heartbeatFrame)
-// 			if err != nil {
-// 				log.Printf("[ERROR] Failed to send heartbeat: %v", err)
-// 				return
-// 			}
-// 			log.Println("[DEBUG] Heartbeat sent")
-//
-// 		case <-done:
-// 			log.Println("Stopping heartbeat goroutine for closed connection")
-// 			return
-// 		}
-//
-// 	}
-// }
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
@@ -410,7 +358,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			fmt.Printf("[DEBUG] Current state after all: %+v\n", currentState)
 			if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-				fmt.Printf("[DEBUG] All fields shall be filled -> current state: %+v\n", currentState)
+				fmt.Printf("[DEBUG] All fields must be filled -> current state: %+v\n", currentState)
 				if len(currentState.Body) != int(currentState.BodySize) {
 					fmt.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
 					return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
@@ -421,7 +369,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				body := currentState.Body
 				props := currentState.HeaderFrame.Properties
 				v := b.VHosts["/"]
-				// v.Publish(exchanege, routingKey, body, props)
 				_, err := v.MsgCtrlr.Publish(exchanege, routingKey, body, props)
 				if err == nil {
 					log.Printf("[DEBUG] Published message to exchange=%s, routingKey=%s, body=%s", exchanege, routingKey, string(body))

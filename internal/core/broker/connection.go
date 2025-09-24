@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
@@ -50,15 +51,9 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}
 
 	b.registerConnection(conn, client)
-
+	go b.sendHeartbeats(conn, client)
 	// keep reading commands in loop
 	for {
-		// verify if client is alive
-		if !client.IsAlive() {
-			log.Printf("[DEBUG] Connection terminated due heartbeat timeout")
-			// client.Done <- struct{}{}
-			// return
-		}
 		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -72,8 +67,8 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			log.Printf("Error reading frame: %v", err)
 			return
 		}
-		if len(frame) > 7 { // any octet shall be valid as heartbeat #AMQP_compliance
-			client.ReceiveHeartbeat()
+		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
+			b.handleHeartbeat(conn)
 		}
 
 		log.Printf("[DEBUG] received: %x\n", frame)
@@ -159,4 +154,55 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.Connections[conn].Channels, channel)
+}
+
+func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
+	b.mu.Lock()
+	// connectionInfo, ok := b.Connections[conn]
+	// if !ok {
+	// 	b.mu.Unlock()
+	// 	return
+	// }
+	heartbeatInterval := int(client.HeartbeatInterval >> 1)
+	done := client.Done
+	b.mu.Unlock()
+
+	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			b.mu.Lock()
+			if _, ok := b.Connections[conn]; !ok {
+				b.mu.Unlock()
+				log.Println("Connection no longer exists in broker")
+				return
+			}
+			b.mu.Unlock()
+
+			// sendHearbeat(conn)
+			// heartbeatFrame := amqp.CreateHeartbeatFrame()
+			// err := shared.SendFrame(conn, heartbeatFrame)
+			err := b.framer.SendHearbeat(conn)
+			if err != nil {
+				log.Printf("Failed to send heartbeat: %v", err)
+				return
+			}
+			log.Println("[DEBUG] Heartbeat sent")
+
+		case <-done:
+			log.Println("Stopping heartbeat  goroutine for closed connection")
+			return
+		}
+	}
+}
+
+func (b *Broker) handleHeartbeat(conn net.Conn) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// b.Connections[conn].LastHeartbeat = time.Now()
+	b.Connections[conn].Client.LastHeartbeat = time.Now()
+
+	return nil
 }
