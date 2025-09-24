@@ -1,4 +1,4 @@
-package shared
+package amqp
 
 import (
 	"log"
@@ -77,8 +77,8 @@ func (c *AmqpClient) StartHeartbeat() {
 		for {
 			select {
 			case <-ticker.C:
-				heartbeatFrame := CreateHeartbeatFrame()
-				err := SendFrame(c.Conn, heartbeatFrame)
+				heartbeatFrame := createHeartbeatFrame()
+				err := sendFrame(c.Conn, heartbeatFrame)
 				if err != nil {
 					log.Printf("[ERROR] Failed to send heartbeat: %v", err)
 					return

@@ -9,7 +9,6 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -30,6 +29,7 @@ type Broker struct {
 	config      *config.Config                      `json:"-"`
 	Connections map[net.Conn]*models.ConnectionInfo `json:"-"`
 	mu          sync.Mutex                          `json:"-"`
+	framer      amqp.Framer
 }
 
 func NewBroker(config *config.Config) *Broker {
@@ -39,6 +39,7 @@ func NewBroker(config *config.Config) *Broker {
 		config:      config,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")
+	b.framer = &amqp.DefaultFramer{}
 	return b
 }
 
@@ -123,8 +124,8 @@ func (b *Broker) handleHeartbeat(conn net.Conn) error {
 // 			b.mu.Unlock()
 //
 // 			// sendHearbeat(conn)
-// 			heartbeatFrame := shared.CreateHeartbeatFrame()
-// 			err := shared.SendFrame(conn, heartbeatFrame)
+// 			heartbeatFrame := amqp.CreateHeartbeatFrame()
+// 			err := b.framer.SendFrame(conn, heartbeatFrame)
 // 			if err != nil {
 // 				log.Printf("[ERROR] Failed to send heartbeat: %v", err)
 // 				return
@@ -155,7 +156,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				MethodID: uint16(amqp.CONNECTION_CLOSE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 		default:
 			log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
@@ -189,7 +190,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				},
 			}.FormatMethodFrame()
 
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		case uint16(amqp.CHANNEL_CLOSE):
@@ -205,7 +206,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				MethodID: uint16(amqp.CHANNEL_CLOSE_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		default:
@@ -240,7 +241,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		case uint16(amqp.EXCHANGE_DELETE):
@@ -269,7 +270,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
 
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		default:
@@ -324,7 +325,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 					},
 				},
 			}.FormatMethodFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		case uint16(amqp.QUEUE_BIND):
@@ -352,7 +353,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				MethodID: uint16(amqp.QUEUE_BIND_OK),
 				Content:  amqp.ContentList{},
 			}.FormatMethodFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		case uint16(amqp.QUEUE_DELETE):
@@ -449,7 +450,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
 				fmt.Printf("[DEBUG] Sending get-empty frame: %x\n", frame)
-				shared.SendFrame(conn, frame)
+				b.framer.SendFrame(conn, frame)
 				return nil, nil
 			}
 
@@ -470,7 +471,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				Content:  *amqp.EncodeGetOkToContentList(msgGetOk),
 			}.FormatMethodFrame()
 
-			err = shared.SendFrame(conn, frame)
+			err = b.framer.SendFrame(conn, frame)
 			log.Printf("[DEBUG] Sent message from queue %s: ID=%s", queue, msg.ID)
 
 			if err != nil {
@@ -486,10 +487,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			// Header
 			frame = responseContent.FormatHeaderFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			// Body
 			frame = responseContent.FormatBodyFrame()
-			shared.SendFrame(conn, frame)
+			b.framer.SendFrame(conn, frame)
 			return nil, nil
 
 		case uint16(amqp.BASIC_ACK):

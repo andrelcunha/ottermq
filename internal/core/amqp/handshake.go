@@ -1,17 +1,23 @@
-package shared
+package amqp
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
 	"strings"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
+// REGION Share
+// Probably should be called Handshake or something
+
+
+// handshake
 // Client sends ProtocolHeader
 // Server responds with connection.start
 // Client responds with connection.start-ok
@@ -19,22 +25,22 @@ import (
 // Client responds with connection.tune-ok
 // Client sends connection.open
 // Server responds with connection.open-ok
-func Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
+func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
 	// read the protocol header from the client
-	clientHeader, err := ReadProtocolHeader(conn)
+	clientHeader, err := readProtocolHeader(conn)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("[DEBUG] Handshake - Received: %x", clientHeader)
 	protocol := (*configurations)["protocol"].(string)
-	protocolHeader, err := BuildProtocolHeader(protocol)
+	protocolHeader, err := buildProtocolHeader(protocol)
 	if err != nil {
 		msg := "error parsing protocol"
 		log.Printf("[ERROR] %s", msg)
 		return nil, fmt.Errorf(msg)
 	}
 	if !bytes.Equal(clientHeader, protocolHeader) {
-		err := SendProtocolHeader(conn, protocolHeader)
+		err := sendProtocolHeader(conn, protocolHeader)
 		if err != nil {
 			return nil, err
 		}
@@ -44,23 +50,23 @@ func Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 
 	/** connection.start **/
 	// send connection.start frame
-	startFrame := CreateConnectionStartFrame()
-	if err := SendFrame(conn, startFrame); err != nil {
+	startFrame := createConnectionStartFrame()
+	if err := sendFrame(conn, startFrame); err != nil {
 		return nil, err
 	}
 
 	/** R connection.start-ok -> W connection.tune **/
 	// read connecion.start-ok frame
-	frame, err := ReadFrame(conn)
+	frame, err := readFrame(conn)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
-	response, err := ParseFrame(configurations, conn, 0, frame)
+	response, err := parseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return nil, err
 	}
-	state, ok := response.(*amqp.ChannelState)
+	state, ok := response.(*ChannelState)
 	if !ok {
 		return nil, fmt.Errorf("type assertion ChannelState failed")
 	}
@@ -88,21 +94,21 @@ func Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 		Heartbeat:  uint16(heartbeat),  //10
 	}
 	// create tune frame
-	tuneFrame := CreateConnectionTuneFrame(tune)
-	if err := SendFrame(conn, tuneFrame); err != nil {
+	tuneFrame := createConnectionTuneFrame(tune)
+	if err := sendFrame(conn, tuneFrame); err != nil {
 		return nil, err
 	}
 
 	// read connection.tune-ok frame
-	frame, err = ReadFrame(conn)
+	frame, err = readFrame(conn)
 	if err != nil {
 		return nil, err
 	}
-	response, err = ParseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return nil, err
 	}
-	state, ok = response.(*amqp.ChannelState)
+	state, ok = response.(*ChannelState)
 	if !ok {
 		return nil, fmt.Errorf("type assertion ChannelState failed")
 	}
@@ -123,17 +129,17 @@ func Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	log.Printf("[DEBUG] Handshake completed")
 
 	// read connection.open frame
-	frame, err = ReadFrame(conn)
+	frame, err = readFrame(conn)
 	if err != nil {
 		return nil, err
 	}
 	// set vhost on configurations
 
-	response, err = ParseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(configurations, conn, 0, frame)
 	if err != nil {
 		return nil, err
 	}
-	state, ok = response.(*amqp.ChannelState)
+	state, ok = response.(*ChannelState)
 	if !ok {
 		return nil, fmt.Errorf("type assertion ConnectionOpen failed")
 	}
@@ -146,12 +152,12 @@ func Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	client.VHostName = openFrame.VirtualHost
 
 	//send connection.open-ok frame
-	openOkFrame := CreateConnectionOpenOkFrame()
-	if err := SendFrame(conn, openOkFrame); err != nil {
+	openOkFrame := createConnectionOpenOkFrame()
+	if err := sendFrame(conn, openOkFrame); err != nil {
 		return nil, err
 	}
 	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
-	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	log.Printf("[DEBUG] Handshake Completed")
 
 	return client, nil
 }
@@ -184,7 +190,7 @@ func processStartOkContent(configurations *map[string]interface{}, startOkFrame 
 	return nil
 }
 
-func BuildProtocolHeader(protocol string) ([]byte, error) {
+func buildProtocolHeader(protocol string) ([]byte, error) {
 	parts := strings.Split(protocol, " ")
 	if len(parts) != 2 || parts[0] != "AMQP" {
 		return nil, fmt.Errorf("invalid protocol format: %s", protocol)
@@ -217,4 +223,82 @@ func BuildProtocolHeader(protocol string) ([]byte, error) {
 	}
 
 	return header, nil
+}
+
+func sendProtocolHeader(conn net.Conn, header []byte) error {
+	_, err := conn.Write(header)
+	return err
+}
+
+func readProtocolHeader(conn net.Conn) ([]byte, error) {
+	header := make([]byte, 8)
+	_, err := io.ReadFull(conn, header)
+	if err != nil {
+		return nil, err
+	}
+	return header, nil
+}
+
+func readHeader(conn net.Conn) ([]byte, error) {
+	header := make([]byte, 7)
+	_, err := io.ReadFull(conn, header)
+	if err != nil {
+		return nil, err
+	}
+	return header, nil
+}
+
+func readFrame(conn net.Conn) ([]byte, error) {
+	// all frames starts with a 7-octet header
+	frameHeader := make([]byte, 7)
+	_, err := io.ReadFull(conn, frameHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	// fist octet is the type of frame
+	// frameType := binary.BigEndian.Uint16(frameHeader[0:1])
+
+	// 2nd and 3rd octets (short) are the channel number
+	// channelNum := binary.BigEndian.Uint16(frameHeader[1:3])
+
+	// 4th to 7th octets (long) are the size of the payload
+	payloadSize := binary.BigEndian.Uint32(frameHeader[3:])
+
+	// read the framePayload
+	framePayload := make([]byte, payloadSize)
+	_, err = io.ReadFull(conn, framePayload)
+	if err != nil {
+		return nil, err
+	}
+
+	// frame-end is a 1-octet after the payload
+	frameEnd := make([]byte, 1)
+	_, err = io.ReadFull(conn, frameEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if the frame-end is correct (0xCE)
+	if frameEnd[0] != 0xCE {
+		// return nil, ErrInvalidFrameEnd
+		return nil, fmt.Errorf("invalid frame end octet")
+	}
+
+	return append(frameHeader, framePayload...), nil
+}
+
+func sendFrame(conn net.Conn, frame []byte) error {
+	fmt.Printf("[DEBUG] Sending frame: %x\n", frame)
+	_, err := conn.Write(frame)
+	return err
+}
+
+func createHeartbeatFrame() []byte {
+	frame := make([]byte, 8)
+	frame[0] = byte(TYPE_HEARTBEAT)
+	binary.BigEndian.PutUint16(frame[1:3], 0)
+	binary.BigEndian.PutUint32(frame[3:7], 0)
+	frame[7] = 0xCE
+	return frame
 }

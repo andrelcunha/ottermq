@@ -7,7 +7,6 @@ import (
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/amqp/shared"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
@@ -18,7 +17,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		b.cleanupConnection(conn)
 	}()
 	channelNum := uint16(0)
-	client, err := shared.Handshake(configurations, conn)
+	client, err := b.framer.Handshake(configurations, conn)
 	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
@@ -29,7 +28,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 
 	// keep reading commands in loop
 	for {
-		frame, err := shared.ReadFrame(conn)
+		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("[DEBUG] Connection timeout: %v", err)
@@ -46,7 +45,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		newInterface, err := shared.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := b.framer.ParseFrame(configurations, conn, channelNum, frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
@@ -74,14 +73,14 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			}
 			b.processRequest(conn, newState)
 		} else {
-			if _, ok := newInterface.(shared.Heartbeat); ok {
+			if _, ok := newInterface.(amqp.Heartbeat); ok {
 				b.handleHeartbeat(conn)
 			}
 		}
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, client *shared.AmqpClient) {
+func (b *Broker) registerConnection(conn net.Conn, client *amqp.AmqpClient) {
 	vhost := b.GetVHostFromName(client.VHostName)
 	if vhost == nil {
 		log.Fatalf("VHost not found: %s", client.VHostName)
