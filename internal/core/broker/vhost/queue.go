@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"fmt"
 	"log"
 	"sync"
 
@@ -104,29 +103,29 @@ func (q *Queue) Len() int {
 	return q.count
 }
 
-func (vh *VHost) deleteQueue(name string) error {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	if _, ok := vh.Queues[name]; ok {
-		return fmt.Errorf("queue %s not found", name)
-	}
-	if queue, ok := vh.Queues[name]; ok {
-		close(queue.messages)
-	}
-	delete(vh.Queues, name)
-	log.Printf("[DEBUG] Deleted queue %s", name)
-	vh.publishQueueUpdate()
-	return nil
-}
+// func (vh *VHost) deleteQueue(name string) error {
+// 	vh.mu.Lock()
+// 	defer vh.mu.Unlock()
+// 	if _, ok := vh.Queues[name]; ok {
+// 		return fmt.Errorf("queue %s not found", name)
+// 	}
+// 	if queue, ok := vh.Queues[name]; ok {
+// 		close(queue.messages)
+// 	}
+// 	delete(vh.Queues, name)
+// 	log.Printf("[DEBUG] Deleted queue %s", name)
+// 	// vh.publishQueueUpdate()
+// 	return nil
+// }
 
-func (vh *VHost) subscribe(consumerID, queueName string) {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	if _, ok := vh.Queues[queueName]; !ok {
-		vh.CreateQueue(queueName)
-	}
-	if consumer, ok := vh.Consumers[consumerID]; ok {
-		consumer.Queue = queueName
-		log.Printf("[DEBUG] Subscribed consumer %s to queue %s", consumerID, queueName)
-	}
-}
+// func (vh *VHost) subscribe(consumerID, queueName string) {
+// 	vh.mu.Lock()
+// 	defer vh.mu.Unlock()
+// 	if _, ok := vh.Queues[queueName]; !ok {
+// 		vh.CreateQueue(queueName)
+// 	}
+// 	if consumer, ok := vh.Consumers[consumerID]; ok {
+// 		consumer.Queue = queueName
+// 		log.Printf("[DEBUG] Subscribed consumer %s to queue %s", consumerID, queueName)
+// 	}
+// }

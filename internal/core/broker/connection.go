@@ -11,7 +11,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
-	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
+	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
 type ConnManager interface {
