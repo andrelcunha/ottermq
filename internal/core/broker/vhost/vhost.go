@@ -23,12 +23,6 @@ type VHost struct {
 	MsgCtrlr          MessageController
 }
 
-const (
-	ADMIN_QUEUES      = "ottermq.admin.queues"
-	ADMIN_EXCHANGES   = "ottermq.admin.exchanges"
-	ADMIN_BINDINGS    = "ottermq.admin.bindings"
-	ADMIN_CONNECTIONS = "ottermq.admin.connections"
-)
 
 type Consumer struct {
 	ID        string `json:"id"`

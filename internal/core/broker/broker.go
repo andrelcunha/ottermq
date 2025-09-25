@@ -14,9 +14,6 @@ import (
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
-var (
-	version = "0.6.0-alpha"
-)
 
 const (
 	platform = "golang"
@@ -45,6 +42,9 @@ func NewBroker(config *config.Config) *Broker {
 }
 
 func (b *Broker) Start() {
+	log.Println("OtterMQ version ", b.config.Version)
+	log.Println("Broker is starting...")
+
 	capabilities := map[string]any{
 		"basic.nack":             true,
 		"connection.blocked":     true,
@@ -55,7 +55,7 @@ func (b *Broker) Start() {
 	serverProperties := map[string]any{
 		"capabilities": capabilities,
 		"product":      product,
-		"version":      version,
+		"version":      b.config.Version,
 		"platform":     platform,
 	}
 
@@ -66,7 +66,7 @@ func (b *Broker) Start() {
 		"heartbeatInterval": b.config.HeartbeatIntervalMax,
 		"frameMax":          b.config.FrameMax,
 		"channelMax":        b.config.ChannelMax,
-		"ssl":               false,
+		"ssl":               b.config.Ssl,
 		"protocol":          "AMQP 0-9-1",
 	}
 
