@@ -13,9 +13,11 @@ import (
 type Framer interface {
 	ReadFrame(conn net.Conn) ([]byte, error)
 	SendFrame(conn net.Conn, frame []byte) error
-	Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error)
+	Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
 	SendHearbeat(conn net.Conn) error
+	CloseChannelFrame(channel uint16) []byte
+	CloseConnectionFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -28,7 +30,7 @@ func (d *DefaultFramer) SendFrame(conn net.Conn, frame []byte) error {
 	return sendFrame(conn, frame)
 }
 
-func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
+func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error) {
 	return handshake(configurations, conn)
 }
 
@@ -39,6 +41,14 @@ func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
 func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
 	heartbeatFrame := createHeartbeatFrame()
 	return sendFrame(conn, heartbeatFrame)
+}
+
+func (d *DefaultFramer) CloseChannelFrame(channel uint16) []byte {
+	return closeChannelFrame(channel)
+}
+
+func (d *DefaultFramer) CloseConnectionFrame(channel uint16) []byte {
+	return closeConnectionFrame(channel)
 }
 
 func decodeBasicHeaderFlags(short uint16) []string {
