@@ -18,14 +18,11 @@ type AmqpClient struct {
 	Protocol          string
 	SSL               bool
 	Done              chan struct{}
-	// interlaval        time.Duration
-	// maxDelay          time.Duration
-	// heartbeatChan     chan struct{}
+
 }
 
 type AmqpClientConfig struct {
 	Username string
-	// Vhost             string
 	HeartbeatInterval uint16
 	FrameMax          uint32
 	ChannelMax        uint16
@@ -38,7 +35,6 @@ func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
 	client := &AmqpClient{
 		Name: conn.RemoteAddr().String(),
 		User: config.Username,
-		// VHostName:         config.Vhost,
 		Protocol:          config.Protocol,
 		SSL:               config.SSL,
 		ConnectedAt:       time.Now(),
@@ -48,12 +44,9 @@ func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
 		ChannelMax:        config.ChannelMax,
 		Conn:              conn,
 		Done:              make(chan struct{}),
-		// interlaval:        time.Duration(config.HeartbeatInterval>>1) * time.Second,
-		// maxDelay:          time.Duration(config.HeartbeatInterval<<1) * time.Second,
-		// heartbeatChan:     make(chan struct{}, 1),
+
 	}
-	// client.startHeartbeat()
-	// client.startHeartbeatMonitor()
+
 	return client
 }
 

@@ -131,12 +131,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			if err != nil {
 				return nil, err
 			}
-			frame := amqp.ResponseMethodMessage{
-				Channel:  channel,
-				ClassID:  request.ClassID,
-				MethodID: uint16(amqp.EXCHANGE_DECLARE_OK),
-				Content:  amqp.ContentList{},
-			}.FormatMethodFrame()
+			frame := b.framer.CreateExchangeDeclareFrame(channel, request)
 
 			b.framer.SendFrame(conn, frame)
 			return nil, nil
@@ -151,8 +146,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			fmt.Printf("[DEBUG] Content: %+v\n", content)
 			exchangeName := content.ExchangeName
-			// ifUnused := content.IfUnused
-			// noWait := content.NoWait
 
 			err := vh.DeleteExchange(exchangeName)
 			if err != nil {
@@ -233,7 +226,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			queue := content.Queue
 			exchange := content.Exchange
 			routingKey := content.RoutingKey
-			// noWait := content.NoWait
 
 			err := vh.BindQueue(exchange, queue, routingKey)
 			if err != nil {
@@ -250,25 +242,11 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 
 		case uint16(amqp.QUEUE_DELETE):
-			// if len(parts) != 2 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// queueName := parts[1]
-			// err := b.deleteQueue(queueName)
-			// if err != nil {
-			// 	return common.CommandResponse{Status: "ERROR", Message: err.Error()}, nil
-			// }
-			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Queue %s deleted", queueName)}, nil
+			return nil, fmt.Errorf("not implemented")
 
 		case uint16(amqp.QUEUE_UNBIND):
-			// if len(parts) != 4 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// exchangeName := parts[1]
-			// queueName := parts[2]
-			// routingKey := parts[3]
-			// b.DeletBinding(exchangeName, queueName, routingKey)
-			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Binding deleted")}, nil
+			return nil, fmt.Errorf("not implemented")
+
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
@@ -384,18 +362,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 
 		case uint16(amqp.BASIC_ACK):
-			// if len(parts) != 2 {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Invalid command"}, nil
-			// }
-			// msgID := parts[1]
-			// // get queue from consumerID
-			// consumer, ok := b.Consumers[consumerID]
-			// if !ok {
-			// 	return common.CommandResponse{Status: "ERROR", Message: "Consumer not found"}, nil
-			// }
-			// queue := consumer.Queue
-			// b.acknowledge(queue, consumerID, msgID)
-			// return common.CommandResponse{Status: "OK", Message: fmt.Sprintf("Message ID %s acknowledged", msgID)}, nil
+			return nil, fmt.Errorf("not implemented")
 
 		case uint16(amqp.BASIC_REJECT):
 		case uint16(amqp.BASIC_RECOVER_ASYNC):

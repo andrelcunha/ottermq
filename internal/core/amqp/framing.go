@@ -18,6 +18,7 @@ type Framer interface {
 	SendHearbeat(conn net.Conn) error
 	CloseChannelFrame(channel uint16) []byte
 	CloseConnectionFrame(channel uint16) []byte
+	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
 }
 
 type DefaultFramer struct{}
@@ -49,6 +50,10 @@ func (d *DefaultFramer) CloseChannelFrame(channel uint16) []byte {
 
 func (d *DefaultFramer) CloseConnectionFrame(channel uint16) []byte {
 	return closeConnectionFrame(channel)
+}
+
+func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte {
+	return createExchangeDeclareFrame(channel, request)
 }
 
 func decodeBasicHeaderFlags(short uint16) []string {
