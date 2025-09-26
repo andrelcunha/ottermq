@@ -6,10 +6,9 @@ import (
 )
 
 type AmqpClient struct {
-	Name              string
-	User              string
-	VHostName         string
-	VHostId           string
+	Name string
+	User string
+
 	ConnectedAt       time.Time
 	LastHeartbeat     time.Time
 	HeartbeatInterval uint16
@@ -25,8 +24,8 @@ type AmqpClient struct {
 }
 
 type AmqpClientConfig struct {
-	Username          string
-	Vhost             string
+	Username string
+	// Vhost             string
 	HeartbeatInterval uint16
 	FrameMax          uint32
 	ChannelMax        uint16
@@ -37,9 +36,9 @@ type AmqpClientConfig struct {
 func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
 
 	client := &AmqpClient{
-		Name:              conn.RemoteAddr().String(),
-		User:              config.Username,
-		VHostName:         config.Vhost,
+		Name: conn.RemoteAddr().String(),
+		User: config.Username,
+		// VHostName:         config.Vhost,
 		Protocol:          config.Protocol,
 		SSL:               config.SSL,
 		ConnectedAt:       time.Now(),
@@ -78,4 +77,20 @@ func NewAmqpClientConfig(configurations *map[string]any) *AmqpClientConfig {
 
 func (c *AmqpClient) Stop() {
 	close(c.Done)
+}
+
+// ConnectionInfo represents the information of a connection to the AMQP server
+type ConnectionInfo struct {
+	VHostName string                   `json:"vhost"`
+	Client    *AmqpClient              `json:"client"`
+	Channels  map[uint16]*ChannelState `json:"channels"`
+}
+
+// NewConnectionInfo creates a new ConnectionInfo, receiving the `vhost` name
+func NewConnectionInfo(vhostName string) *ConnectionInfo {
+	return &ConnectionInfo{
+		VHostName: vhostName,
+		Client:    nil,
+		Channels:  make(map[uint16]*ChannelState),
+	}
 }
