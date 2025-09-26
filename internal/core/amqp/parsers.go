@@ -24,7 +24,7 @@ func parseFrame(frame []byte) (any, error) {
 
 	switch frameType {
 	case byte(TYPE_METHOD):
-		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
+		log.Printf("[TRACE] Received METHOD frame on channel %d\n", channel)
 		request, err := parseMethodFrame(channel, payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse method frame: %v", err)
@@ -32,19 +32,19 @@ func parseFrame(frame []byte) (any, error) {
 		return request, nil
 
 	case byte(TYPE_HEADER):
-		log.Printf("[DEBUG] Received HEADER frame on channel %d\n", channel)
+		log.Printf("[TRACE] Received HEADER frame on channel %d\n", channel)
 		return parseHeaderFrame(channel, payloadSize, payload)
 
 	case byte(TYPE_BODY):
-		log.Printf("[DEBUG] Received BODY frame on channel %d\n", channel)
+		log.Printf("[TRACE] Received BODY frame on channel %d\n", channel)
 		return parseBodyFrame(channel, payloadSize, payload)
 
 	case byte(TYPE_HEARTBEAT):
-		log.Printf("[DEBUG] Received HEARTBEAT frame on channel %d\n", channel)
+		log.Printf("[TRACE] Received HEARTBEAT frame on channel %d\n", channel)
 		return &Heartbeat{}, nil
 
 	default:
-		log.Printf("[DEBUG] Received: %x\n", frame)
+		log.Printf("[TRACE] Received: %x\n", frame)
 		return nil, fmt.Errorf("unknown frame type: %d", frameType)
 	}
 }
@@ -380,17 +380,22 @@ func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse connection.close frame: %v", err)
 		}
-		request.MethodID = uint16(CONNECTION_CLOSE_OK)
+		request.MethodID = methodID
 		content, ok := request.Content.(*ConnectionCloseMessage)
 		if !ok {
 			return nil, fmt.Errorf("invalid message content type")
 		}
-		log.Printf("[DEBUG] Received Connection.Close: (%d) '%s'\n", content.ReplyCode, content.ReplyText)
+		log.Printf("[TRACE] Received CONNECTION_CLOSE: (%d) '%s'", content.ReplyCode, content.ReplyText)
 		return request, nil
 
 	case uint16(CONNECTION_CLOSE_OK):
-		log.Printf("[DEBUG] Received CONNECTION_CLOSE_OK frame \n")
-		return parseConnectionCloseOkFrame(payload)
+		request, err := parseConnectionCloseOkFrame(payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CONNECTION_CLOSE_OK frame: %v", err)
+		}
+		request.MethodID = methodID
+		log.Printf("[TRACE] Received CONNECTION_CLOSE_OK")
+		return request, nil
 
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)

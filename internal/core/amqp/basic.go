@@ -234,3 +234,30 @@ func encodeLongStr(buf *bytes.Buffer, value string) error {
 	}
 	return nil
 }
+
+func decodeBasicHeaderFlags(short uint16) []string {
+	flagNames := []string{
+		"contentType",
+		"contentEncoding",
+		"headers",
+		"deliveryMode",
+		"priority",
+		"correlationID",
+		"replyTo",
+		"expiration",
+		"messageID",
+		"timestamp",
+		"type",
+		"userID",
+		"appID",
+		"reserved",
+	}
+	var flags []string
+	for i := 0; i < len(flagNames); i++ {
+		if (short & (1 << uint(15-i))) != 0 {
+			flags = append(flags, flagNames[i])
+		}
+	}
+	return flags
+}
+

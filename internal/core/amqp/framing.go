@@ -16,9 +16,11 @@ type Framer interface {
 	Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
 	SendHearbeat(conn net.Conn) error
-	CloseChannelFrame(channel uint16) []byte
-	CloseConnectionFrame(channel uint16) []byte
 	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
+	CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte
+	CreateChannelCloseFrame(channel uint16) []byte
+	CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte
+	CreateConnectionCloseOkFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -44,42 +46,24 @@ func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
 	return sendFrame(conn, heartbeatFrame)
 }
 
-func (d *DefaultFramer) CloseChannelFrame(channel uint16) []byte {
-	return closeChannelFrame(channel)
-}
-
-func (d *DefaultFramer) CloseConnectionFrame(channel uint16) []byte {
-	return createConnectionCloseFrame(channel)
-}
-
 func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte {
 	return createExchangeDeclareFrame(channel, request)
 }
 
-func decodeBasicHeaderFlags(short uint16) []string {
-	flagNames := []string{
-		"contentType",
-		"contentEncoding",
-		"headers",
-		"deliveryMode",
-		"priority",
-		"correlationID",
-		"replyTo",
-		"expiration",
-		"messageID",
-		"timestamp",
-		"type",
-		"userID",
-		"appID",
-		"reserved",
-	}
-	var flags []string
-	for i := 0; i < len(flagNames); i++ {
-		if (short & (1 << uint(15-i))) != 0 {
-			flags = append(flags, flagNames[i])
-		}
-	}
-	return flags
+func (d *DefaultFramer) CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte {
+	return createChannelOpenOkFrame(channel, request)
+}
+
+func (d *DefaultFramer) CreateChannelCloseFrame(channel uint16) []byte {
+	return closeChannelFrame(channel)
+}
+
+func (d *DefaultFramer) CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte {
+	return createConnectionCloseFrame(channel, replyCode, replyText, methodId, classId)
+}
+
+func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
+	return createConnectionCloseOkFrame(channel)
 }
 
 func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProperties, error) {
@@ -116,15 +100,9 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode delivery mode: %v", err)
 			}
-			if deliveryMode != 1 && deliveryMode != 2 {
+			if deliveryMode != 1 && deliveryMode != 2 { // 1: non-persistent, 2: persistent
 				return nil, fmt.Errorf("delivery mode must be 1 or 2")
 			}
-			// var deliveryModeStr string // 1: non-persistent, 2: persistent
-			// if deliveryMode == 1 {
-			// 	deliveryModeStr = "non-persistent"
-			// } else {
-			// 	deliveryModeStr = "persistent"
-			// }
 			props.DeliveryMode = deliveryMode
 
 		case "priority": // octet (0-9)
@@ -229,56 +207,6 @@ func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, me
 	frame = append(frame, 0xCE) // frame-end
 
 	return frame
-}
-
-func createConnectionTuneFrame(tune *ConnectionTune) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_TUNE
-
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionTuneOkFrame(tune *ConnectionTune) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_TUNE_OK
-
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionOpenOkFrame() []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_OPEN_OK
-
-	// Reserved-1 (bit) - set to 0
-	payloadBuf.WriteByte(0)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func fineTune(tune *ConnectionTune) *ConnectionTune {
-	// TODO: get values from config
-	tune.ChannelMax = getSmalestShortInt(2047, tune.ChannelMax)
-	tune.FrameMax = getSmalestLongInt(131072, tune.FrameMax)
-	tune.Heartbeat = getSmalestShortInt(10, tune.Heartbeat)
-
-	return tune
 }
 
 func getSmalestShortInt(a, b uint16) uint16 {

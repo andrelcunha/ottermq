@@ -272,7 +272,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 }
 
 func sendFrame(conn net.Conn, frame []byte) error {
-	fmt.Printf("[DEBUG] Sending frame: %x\n", frame)
+	log.Printf("[TRACE] Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
 }

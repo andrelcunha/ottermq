@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -19,12 +20,14 @@ const (
 )
 
 type Broker struct {
-	VHosts      map[string]*vhost.VHost
-	config      *config.Config                    `json:"-"`
-	Connections map[net.Conn]*amqp.ConnectionInfo `json:"-"`
-	mu          sync.Mutex                        `json:"-"`
-	framer      amqp.Framer
-	ManagerApi  ManagerApi
+	VHosts       map[string]*vhost.VHost
+	config       *config.Config                    `json:"-"`
+	Connections  map[net.Conn]*amqp.ConnectionInfo `json:"-"`
+	mu           sync.Mutex                        `json:"-"`
+	framer       amqp.Framer
+	ManagerApi   ManagerApi
+	ShuttingDown atomic.Bool
+	ActiveConns  sync.WaitGroup
 }
 
 func NewBroker(config *config.Config) *Broker {
@@ -80,10 +83,14 @@ func (b *Broker) Start() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("Failed to accept connection:", err)
+			log.Println("[DEBUG] Failed to accept connection:", err)
 			continue
 		}
-		log.Println("New client waiting for connection: ", conn.RemoteAddr())
+		if ok := b.ShuttingDown.Load(); ok {
+			log.Println("[DEBUG] Broker is shutting down, ignoring new connection")
+			continue
+		}
+		log.Println("[DEBUG] New client waiting for connection: ", conn.RemoteAddr())
 		go b.handleConnection((&configurations), conn)
 	}
 }
@@ -93,11 +100,22 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	channel := request.Channel
 	connInfo := b.Connections[conn]
 	vh := b.VHosts[connInfo.VHostName]
+	if ok := b.ShuttingDown.Load(); ok {
+		if request.ClassID != uint16(amqp.CONNECTION) ||
+			(request.MethodID != uint16(amqp.CONNECTION_CLOSE) &&
+				request.MethodID != uint16(amqp.CONNECTION_CLOSE_OK)) {
+			return nil, nil
+		}
+	}
+
 	switch request.ClassID {
 	case uint16(amqp.CONNECTION):
 		switch request.MethodID {
 		case uint16(amqp.CONNECTION_CLOSE):
-			return b.closeConnection(conn, channel)
+			return b.closeConnectionRequested(conn, channel)
+		case uint16(amqp.CONNECTION_CLOSE_OK):
+			b.connectionCloseOk(conn)
+			return nil, nil
 		default:
 			log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
 			return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
