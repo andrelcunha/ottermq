@@ -10,6 +10,9 @@ type AMQP_Key struct {
 type AMQP_Type struct {
 }
 
+// Received by client
+// -- this is legacy from client implementation
+// -- Dont use it!
 type ConnectionStartFrame struct {
 	VersionMajor     byte
 	VersionMinor     byte
@@ -18,19 +21,19 @@ type ConnectionStartFrame struct {
 	Locales          string
 }
 
-type ConnectionStartOkFrame struct {
-	ClientProperties map[string]interface{}
+type ConnectionStartOk struct {
+	ClientProperties map[string]any
 	Mechanism        string
 	Response         string
 	Locale           string
 }
 
-type ConnectionTuneFrame struct {
+type ConnectionTune struct {
 	ChannelMax uint16
 	FrameMax   uint32
 	Heartbeat  uint16
 }
 
-type ConnectionOpenFrame struct {
+type ConnectionOpen struct {
 	VirtualHost string
 }

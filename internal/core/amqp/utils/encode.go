@@ -7,7 +7,7 @@ import (
 )
 
 // encodeTable encodes a proper AMQP field table
-func EncodeTable(table map[string]interface{}) []byte {
+func EncodeTable(table map[string]any) []byte {
 	var buf bytes.Buffer
 
 	for key, value := range table {
@@ -25,7 +25,7 @@ func EncodeTable(table map[string]interface{}) []byte {
 			binary.Write(&buf, binary.BigEndian, int32(v))
 
 		// In the case map[string]interface:
-		case map[string]interface{}:
+		case map[string]any:
 			// Recursively encode the nested map
 			buf.WriteByte('F') // Field value type 'F' (field table)
 			encodedTable := EncodeTable(v)

@@ -114,12 +114,14 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	log.Println("Cleaning connection")
-	vhName := b.Connections[conn].VHostName
-	vh := b.GetVHost(vhName)
-	vh.CleanupConnection(conn)
-	b.mu.Lock()
-	delete(b.Connections, conn)
-	b.mu.Unlock()
+	if connInfo, ok := b.Connections[conn]; ok {
+		vhName := connInfo.VHostName
+		vh := b.GetVHost(vhName)
+		vh.CleanupConnection(conn)
+		b.mu.Lock()
+		delete(b.Connections, conn)
+		b.mu.Unlock()
+	}
 }
 
 // closeConnection closes a connection and sends a CONNECTION_CLOSE_OK frame

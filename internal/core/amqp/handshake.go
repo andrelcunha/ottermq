@@ -38,7 +38,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 
 	/** connection.start **/
 	// send connection.start frame
-	startFrame := createConnectionStartFrame()
+	startFrame := createConnectionStartFrame(configurations)
 	if err := sendFrame(conn, startFrame); err != nil {
 		return nil, err
 	}
@@ -61,7 +61,10 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 	if state.MethodFrame == nil {
 		return nil, fmt.Errorf("methodFrame is empty")
 	}
-	startOkFrame := state.MethodFrame.Content.(*ConnectionStartOkFrame)
+	startOkFrame, ok := state.MethodFrame.Content.(*ConnectionStartOk)
+	if !ok {
+		return nil, fmt.Errorf("type assertion ConnectionStartOkFrame failed")
+	}
 	if startOkFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionStartOkFrame failed")
 	}
@@ -76,7 +79,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 	frameMax, _ := (*configurations)["frameMax"].(uint32)
 	channelMax, _ := (*configurations)["channelMax"].(uint16)
 
-	tune := &ConnectionTuneFrame{
+	tune := &ConnectionTune{
 		ChannelMax: uint16(channelMax),
 		FrameMax:   uint32(frameMax),
 		Heartbeat:  uint16(heartbeat),
@@ -103,7 +106,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 	if state.MethodFrame == nil {
 		return nil, fmt.Errorf("MethodFrame is empty")
 	}
-	tuneOkFrame := state.MethodFrame.Content.(*ConnectionTuneFrame)
+	tuneOkFrame := state.MethodFrame.Content.(*ConnectionTune)
 	if tuneOkFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionTuneOkFrame failed")
 	}
@@ -135,8 +138,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 		return nil, fmt.Errorf("methodFrame is empty")
 	}
 
-	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpenFrame)
-	(*configurations)["vhost"] = openFrame.VirtualHost
+	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpen)
 	VHostName := openFrame.VirtualHost
 	connInfo := NewConnectionInfo(VHostName)
 	connInfo.Client = client
@@ -152,7 +154,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 	return connInfo, nil
 }
 
-func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOkFrame) error {
+func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOk) error {
 	mechanism := startOkFrame.Mechanism
 	if mechanism != "PLAIN" {
 		return fmt.Errorf("mechanism invalid or %s not suported", mechanism)

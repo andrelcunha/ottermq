@@ -49,7 +49,7 @@ func (d *DefaultFramer) CloseChannelFrame(channel uint16) []byte {
 }
 
 func (d *DefaultFramer) CloseConnectionFrame(channel uint16) []byte {
-	return closeConnectionFrame(channel)
+	return createConnectionCloseFrame(channel)
 }
 
 func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte {
@@ -207,52 +207,6 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 	return props, nil
 }
 
-func DecodeBasicGetFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"noAck", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func DecodeBasicPublishFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"mandatory", "immediate", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func createConnectionStartFrame() []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_START
-
-	payloadBuf.WriteByte(0) // version-major
-	payloadBuf.WriteByte(9) // version-minor
-
-	serverProperties := map[string]interface{}{
-		"product": "OtterMQ",
-	}
-	encodedProperties := utils.EncodeTable(serverProperties)
-	payloadBuf.Write(utils.EncodeLongStr(encodedProperties))
-
-	payloadBuf.Write(utils.EncodeLongStr([]byte("PLAIN")))
-
-	payloadBuf.Write(utils.EncodeLongStr([]byte("en_US")))
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-
-	return frame
-}
-
 func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, methodPayload []byte) []byte {
 	var payloadBuf bytes.Buffer
 
@@ -277,7 +231,7 @@ func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, me
 	return frame
 }
 
-func createConnectionTuneFrame(tune *ConnectionTuneFrame) []byte {
+func createConnectionTuneFrame(tune *ConnectionTune) []byte {
 	var payloadBuf bytes.Buffer
 	channelNum := uint16(0)
 	classID := CONNECTION
@@ -291,7 +245,7 @@ func createConnectionTuneFrame(tune *ConnectionTuneFrame) []byte {
 	return frame
 }
 
-func createConnectionTuneOkFrame(tune *ConnectionTuneFrame) []byte {
+func createConnectionTuneOkFrame(tune *ConnectionTune) []byte {
 	var payloadBuf bytes.Buffer
 	channelNum := uint16(0)
 	classID := CONNECTION
@@ -318,7 +272,7 @@ func createConnectionOpenOkFrame() []byte {
 	return frame
 }
 
-func fineTune(tune *ConnectionTuneFrame) *ConnectionTuneFrame {
+func fineTune(tune *ConnectionTune) *ConnectionTune {
 	// TODO: get values from config
 	tune.ChannelMax = getSmalestShortInt(2047, tune.ChannelMax)
 	tune.FrameMax = getSmalestLongInt(131072, tune.FrameMax)
