@@ -3,11 +3,12 @@ package broker
 import (
 	"fmt"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
-type AdminApi interface {
+type ManagerApi interface {
 	ListExchanges() []models.ExchangeDTO
 	GetTotalExchanges() int
 	ListQueues() []models.QueueDTO
@@ -16,15 +17,15 @@ type AdminApi interface {
 	ListBindings(vhostName, exchangeName string) map[string][]string
 }
 
-func NewDefaultAdminApi(broker *Broker) *DefaultAdminApi {
-	return &DefaultAdminApi{broker: broker}
+func NewDefaultManagerApi(broker *Broker) *DefaultManagerApi {
+	return &DefaultManagerApi{broker: broker}
 }
 
-type DefaultAdminApi struct {
+type DefaultManagerApi struct {
 	broker *Broker
 }
 
-func (a DefaultAdminApi) ListExchanges() []models.ExchangeDTO {
+func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	b := a.broker
 	exchanges := make([]models.ExchangeDTO, 0, a.GetTotalExchanges())
 	b.mu.Lock()
@@ -43,7 +44,7 @@ func (a DefaultAdminApi) ListExchanges() []models.ExchangeDTO {
 	return exchanges
 }
 
-func (a DefaultAdminApi) GetTotalExchanges() int {
+func (a DefaultManagerApi) GetTotalExchanges() int {
 	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -59,7 +60,7 @@ func (a DefaultAdminApi) GetTotalExchanges() int {
 	return total
 }
 
-func (a DefaultAdminApi) ListQueues() []models.QueueDTO {
+func (a DefaultManagerApi) ListQueues() []models.QueueDTO {
 	b := a.broker
 	queues := make([]models.QueueDTO, 0, a.GetTotalQueues())
 	b.mu.Lock()
@@ -78,7 +79,7 @@ func (a DefaultAdminApi) ListQueues() []models.QueueDTO {
 	return queues
 }
 
-func (a DefaultAdminApi) GetTotalQueues() int {
+func (a DefaultManagerApi) GetTotalQueues() int {
 	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -94,11 +95,11 @@ func (a DefaultAdminApi) GetTotalQueues() int {
 	return total
 }
 
-func (a DefaultAdminApi) ListConnections() []models.ConnectionInfoDTO {
+func (a DefaultManagerApi) ListConnections() []models.ConnectionInfoDTO {
 	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	connections := make([]models.ConnectionInfo, 0, len(b.Connections))
+	connections := make([]amqp.ConnectionInfo, 0, len(b.Connections))
 	for _, c := range b.Connections {
 		connections = append(connections, *c)
 	}
@@ -106,9 +107,9 @@ func (a DefaultAdminApi) ListConnections() []models.ConnectionInfoDTO {
 	return connectionsDTO
 }
 
-func (a DefaultAdminApi) ListBindings(vhostName, exchangeName string) map[string][]string {
+func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[string][]string {
 	b := a.broker
-	vh := b.GetVHostFromName(vhostName)
+	vh := b.GetVHost(vhostName)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if vh == nil {

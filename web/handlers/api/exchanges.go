@@ -17,7 +17,7 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/exchanges [get]
 func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
-	exchanges := b.AdminApi.ListExchanges()
+	exchanges := b.ManagerApi.ListExchanges()
 	if exchanges == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list exchanges",

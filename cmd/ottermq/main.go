@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	version = "0.6.1"
+	VERSION = ""
 )
 
 const (
@@ -51,11 +51,11 @@ func main() {
 		HeartbeatIntervalMax: HEARTBEAT,
 		ChannelMax:           5,
 		FrameMax:             131072,
+		Ssl:                  false,
+		Version:              VERSION,
 	}
 
 	b := broker.NewBroker(config)
-	log.Println("OtterMQ version ", version)
-	log.Println("Broker is starting...")
 
 	// Verify if the database file exists
 	dbPath := filepath.Join(dataDir, "ottermq.db")

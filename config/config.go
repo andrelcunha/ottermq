@@ -8,4 +8,6 @@ type Config struct {
 	HeartbeatIntervalMax uint16
 	ChannelMax           uint16
 	FrameMax             uint32
+	Version              string
+	Ssl                  bool
 }

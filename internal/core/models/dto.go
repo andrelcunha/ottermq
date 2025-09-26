@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 )
 
 type ConnectionInfoDTO struct {
@@ -19,7 +21,7 @@ type ConnectionInfoDTO struct {
 	Done chan struct{} `json:"-"`
 }
 
-func MapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
+func MapListConnectionsDTO(connections []amqp.ConnectionInfo) []ConnectionInfoDTO {
 	listConnectonsDTO := make([]ConnectionInfoDTO, len(connections))
 	for i, connection := range connections {
 		state := "disconnected"
@@ -28,8 +30,7 @@ func MapListConnectionsDTO(connections []ConnectionInfo) []ConnectionInfoDTO {
 		}
 		channels := len(connection.Channels)
 		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHostName: connection.Client.VHostName,
-			VHostId:   connection.Client.VHostId,
+			VHostName: connection.VHostName,
 			Name:      connection.Client.Name,
 			Username:  connection.Client.User,
 			State:     state,

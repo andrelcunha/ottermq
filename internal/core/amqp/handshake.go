@@ -13,19 +13,8 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
-// REGION Share
-// Probably should be called Handshake or something
-
-// handshake
-// Client sends ProtocolHeader
-// Server responds with connection.start
-// Client responds with connection.start-ok
-// Server responds with connection.tune
-// Client responds with connection.tune-ok
-// Client sends connection.open
-// Server responds with connection.open-ok
-func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
-	// read the protocol header from the client
+func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error) {
+	// gets the protocol header sent by the client
 	clientHeader, err := readProtocolHeader(conn)
 	if err != nil {
 		return nil, err
@@ -61,7 +50,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 		return nil, err
 	}
 	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
-	response, err := parseFrame(configurations, conn, 0, frame)
+	response, err := parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -88,9 +77,9 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	channelMax, _ := (*configurations)["channelMax"].(uint16)
 
 	tune := &ConnectionTuneFrame{
-		ChannelMax: uint16(channelMax), //2047,
-		FrameMax:   uint32(frameMax),   //131072,
-		Heartbeat:  uint16(heartbeat),  //10
+		ChannelMax: uint16(channelMax),
+		FrameMax:   uint32(frameMax),
+		Heartbeat:  uint16(heartbeat),
 	}
 	// create tune frame
 	tuneFrame := createConnectionTuneFrame(tune)
@@ -103,7 +92,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if err != nil {
 		return nil, err
 	}
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +123,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	}
 	// set vhost on configurations
 
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +137,9 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 
 	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpenFrame)
 	(*configurations)["vhost"] = openFrame.VirtualHost
-	client.VHostName = openFrame.VirtualHost
+	VHostName := openFrame.VirtualHost
+	connInfo := NewConnectionInfo(VHostName)
+	connInfo.Client = client
 
 	//send connection.open-ok frame
 	openOkFrame := createConnectionOpenOkFrame()
@@ -158,7 +149,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 	log.Printf("[DEBUG] Handshake Completed")
 
-	return client, nil
+	return connInfo, nil
 }
 
 func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOkFrame) error {

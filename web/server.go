@@ -12,6 +12,8 @@ import (
 
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/template/html/v2"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -152,4 +154,26 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	apiAdminGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
 	apiAdminGrp.Get("/users", api_admin.GetUsers)
 	apiAdminGrp.Post("/users", api_admin.AddUser)
+}
+
+func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
+	engine := html.New("./web/templates", ".html")
+
+	config := fiber.Config{
+
+		Prefork:               false,
+		AppName:               "ottermq-webadmin",
+		Views:                 engine,
+		ViewsLayout:           "layout",
+		DisableStartupMessage: true,
+	}
+	app := fiber.New(config)
+
+	// Enable CORS
+	app.Use(middleware.CORSMiddleware())
+
+	app.Use(logger.New(logger.Config{
+		Output: logFile,
+	}))
+	return app
 }

@@ -70,3 +70,40 @@ func Logout(c *fiber.Ctx) error {
 	})
 	return c.Redirect("/login")
 }
+
+func ListConnections(c *fiber.Ctx) error {
+	// get username from cookie
+	username := c.Cookies("username")
+	return c.Render("connections", fiber.Map{
+		"Title":    "Connections",
+		"Username": username,
+	})
+}
+
+func Dashboard(c *fiber.Ctx) error {
+	// get username from cookie
+	username := c.Cookies("username")
+	return c.Render("dashboard", fiber.Map{
+		"Title":    "Dashboard",
+		"Username": username,
+		"Greeting": "Welcome to the admin dashboard!",
+	})
+}
+
+func ListExchanges(c *fiber.Ctx) error {
+	// get username from cookie
+	username := c.Cookies("username")
+	return c.Render("exchanges", fiber.Map{
+		"Title":    "Exchange",
+		"Username": username,
+	})
+}
+
+func ListQueues(c *fiber.Ctx) error {
+	// get username from cookie
+	username := c.Cookies("username")
+	return c.Render("queues", fiber.Map{
+		"Title":    "Queues",
+		"Username": username,
+	})
+}
