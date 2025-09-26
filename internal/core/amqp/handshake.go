@@ -13,19 +13,8 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
-// REGION Share
-// Probably should be called Handshake or something
-
-// handshake
-// Client sends ProtocolHeader
-// Server responds with connection.start
-// Client responds with connection.start-ok
-// Server responds with connection.tune
-// Client responds with connection.tune-ok
-// Client sends connection.open
-// Server responds with connection.open-ok
-func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
-	// read the protocol header from the client
+func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error) {
+	// gets the protocol header sent by the client
 	clientHeader, err := readProtocolHeader(conn)
 	if err != nil {
 		return nil, err
@@ -49,7 +38,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 
 	/** connection.start **/
 	// send connection.start frame
-	startFrame := createConnectionStartFrame()
+	startFrame := createConnectionStartFrame(configurations)
 	if err := sendFrame(conn, startFrame); err != nil {
 		return nil, err
 	}
@@ -61,7 +50,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 		return nil, err
 	}
 	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
-	response, err := parseFrame(configurations, conn, 0, frame)
+	response, err := parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +61,10 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if state.MethodFrame == nil {
 		return nil, fmt.Errorf("methodFrame is empty")
 	}
-	startOkFrame := state.MethodFrame.Content.(*ConnectionStartOkFrame)
+	startOkFrame, ok := state.MethodFrame.Content.(*ConnectionStartOk)
+	if !ok {
+		return nil, fmt.Errorf("type assertion ConnectionStartOkFrame failed")
+	}
 	if startOkFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionStartOkFrame failed")
 	}
@@ -87,10 +79,10 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	frameMax, _ := (*configurations)["frameMax"].(uint32)
 	channelMax, _ := (*configurations)["channelMax"].(uint16)
 
-	tune := &ConnectionTuneFrame{
-		ChannelMax: uint16(channelMax), //2047,
-		FrameMax:   uint32(frameMax),   //131072,
-		Heartbeat:  uint16(heartbeat),  //10
+	tune := &ConnectionTune{
+		ChannelMax: uint16(channelMax),
+		FrameMax:   uint32(frameMax),
+		Heartbeat:  uint16(heartbeat),
 	}
 	// create tune frame
 	tuneFrame := createConnectionTuneFrame(tune)
@@ -103,7 +95,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if err != nil {
 		return nil, err
 	}
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +106,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if state.MethodFrame == nil {
 		return nil, fmt.Errorf("MethodFrame is empty")
 	}
-	tuneOkFrame := state.MethodFrame.Content.(*ConnectionTuneFrame)
+	tuneOkFrame := state.MethodFrame.Content.(*ConnectionTune)
 	if tuneOkFrame == nil {
 		return nil, fmt.Errorf("type assertion ConnectionTuneOkFrame failed")
 	}
@@ -134,7 +126,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	}
 	// set vhost on configurations
 
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -146,9 +138,10 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 		return nil, fmt.Errorf("methodFrame is empty")
 	}
 
-	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpenFrame)
-	(*configurations)["vhost"] = openFrame.VirtualHost
-	client.VHostName = openFrame.VirtualHost
+	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpen)
+	VHostName := openFrame.VirtualHost
+	connInfo := NewConnectionInfo(VHostName)
+	connInfo.Client = client
 
 	//send connection.open-ok frame
 	openOkFrame := createConnectionOpenOkFrame()
@@ -158,10 +151,10 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	log.Printf("[DEBUG] Handshake - connection (%s -> %s) Opened\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
 	log.Printf("[DEBUG] Handshake Completed")
 
-	return client, nil
+	return connInfo, nil
 }
 
-func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOkFrame) error {
+func processStartOkContent(configurations *map[string]any, startOkFrame *ConnectionStartOk) error {
 	mechanism := startOkFrame.Mechanism
 	if mechanism != "PLAIN" {
 		return fmt.Errorf("mechanism invalid or %s not suported", mechanism)
@@ -279,7 +272,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 }
 
 func sendFrame(conn net.Conn, frame []byte) error {
-	fmt.Printf("[DEBUG] Sending frame: %x\n", frame)
+	log.Printf("[TRACE] Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
 }

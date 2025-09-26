@@ -13,9 +13,14 @@ import (
 type Framer interface {
 	ReadFrame(conn net.Conn) ([]byte, error)
 	SendFrame(conn net.Conn, frame []byte) error
-	Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error)
-	ParseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error)
+	Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error)
+	ParseFrame(frame []byte) (any, error)
 	SendHearbeat(conn net.Conn) error
+	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
+	CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte
+	CreateChannelCloseFrame(channel uint16) []byte
+	CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte
+	CreateConnectionCloseOkFrame(channel uint16) []byte
 }
 
 type DefaultFramer struct{}
@@ -28,12 +33,12 @@ func (d *DefaultFramer) SendFrame(conn net.Conn, frame []byte) error {
 	return sendFrame(conn, frame)
 }
 
-func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error) {
+func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error) {
 	return handshake(configurations, conn)
 }
 
-func (d *DefaultFramer) ParseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error) {
-	return parseFrame(configurations, conn, currentChannel, frame)
+func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
+	return parseFrame(frame)
 }
 
 func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
@@ -41,30 +46,24 @@ func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
 	return sendFrame(conn, heartbeatFrame)
 }
 
-func decodeBasicHeaderFlags(short uint16) []string {
-	flagNames := []string{
-		"contentType",
-		"contentEncoding",
-		"headers",
-		"deliveryMode",
-		"priority",
-		"correlationID",
-		"replyTo",
-		"expiration",
-		"messageID",
-		"timestamp",
-		"type",
-		"userID",
-		"appID",
-		"reserved",
-	}
-	var flags []string
-	for i := 0; i < len(flagNames); i++ {
-		if (short & (1 << uint(15-i))) != 0 {
-			flags = append(flags, flagNames[i])
-		}
-	}
-	return flags
+func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte {
+	return createExchangeDeclareFrame(channel, request)
+}
+
+func (d *DefaultFramer) CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte {
+	return createChannelOpenOkFrame(channel, request)
+}
+
+func (d *DefaultFramer) CreateChannelCloseFrame(channel uint16) []byte {
+	return closeChannelFrame(channel)
+}
+
+func (d *DefaultFramer) CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte {
+	return createConnectionCloseFrame(channel, replyCode, replyText, methodId, classId)
+}
+
+func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
+	return createConnectionCloseOkFrame(channel)
 }
 
 func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProperties, error) {
@@ -101,15 +100,9 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode delivery mode: %v", err)
 			}
-			if deliveryMode != 1 && deliveryMode != 2 {
+			if deliveryMode != 1 && deliveryMode != 2 { // 1: non-persistent, 2: persistent
 				return nil, fmt.Errorf("delivery mode must be 1 or 2")
 			}
-			// var deliveryModeStr string // 1: non-persistent, 2: persistent
-			// if deliveryMode == 1 {
-			// 	deliveryModeStr = "non-persistent"
-			// } else {
-			// 	deliveryModeStr = "persistent"
-			// }
 			props.DeliveryMode = deliveryMode
 
 		case "priority": // octet (0-9)
@@ -192,52 +185,6 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 	return props, nil
 }
 
-func DecodeBasicGetFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"noAck", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func DecodeBasicPublishFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"mandatory", "immediate", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func createConnectionStartFrame() []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_START
-
-	payloadBuf.WriteByte(0) // version-major
-	payloadBuf.WriteByte(9) // version-minor
-
-	serverProperties := map[string]interface{}{
-		"product": "OtterMQ",
-	}
-	encodedProperties := utils.EncodeTable(serverProperties)
-	payloadBuf.Write(utils.EncodeLongStr(encodedProperties))
-
-	payloadBuf.Write(utils.EncodeLongStr([]byte("PLAIN")))
-
-	payloadBuf.Write(utils.EncodeLongStr([]byte("en_US")))
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-
-	return frame
-}
-
 func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, methodPayload []byte) []byte {
 	var payloadBuf bytes.Buffer
 
@@ -260,56 +207,6 @@ func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, me
 	frame = append(frame, 0xCE) // frame-end
 
 	return frame
-}
-
-func createConnectionTuneFrame(tune *ConnectionTuneFrame) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_TUNE
-
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionTuneOkFrame(tune *ConnectionTuneFrame) []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_TUNE_OK
-
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func createConnectionOpenOkFrame() []byte {
-	var payloadBuf bytes.Buffer
-	channelNum := uint16(0)
-	classID := CONNECTION
-	methodID := CONNECTION_OPEN_OK
-
-	// Reserved-1 (bit) - set to 0
-	payloadBuf.WriteByte(0)
-
-	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	return frame
-}
-
-func fineTune(tune *ConnectionTuneFrame) *ConnectionTuneFrame {
-	// TODO: get values from config
-	tune.ChannelMax = getSmalestShortInt(2047, tune.ChannelMax)
-	tune.FrameMax = getSmalestLongInt(131072, tune.FrameMax)
-	tune.Heartbeat = getSmalestShortInt(10, tune.Heartbeat)
-
-	return tune
 }
 
 func getSmalestShortInt(a, b uint16) uint16 {

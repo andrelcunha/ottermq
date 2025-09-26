@@ -72,7 +72,7 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 
 	weight := msg.Weight
 	bodySize := len(msg.Message.Body)
-	flag_list, flags, err := msg.Message.Properties.EncodeBasicProperties()
+	flag_list, flags, err := msg.Message.Properties.encodeBasicProperties()
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return nil

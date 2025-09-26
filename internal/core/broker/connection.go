@@ -5,13 +5,12 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
-	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
+	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
 type ConnManager interface {
@@ -27,7 +26,6 @@ type ConnManager interface {
 type DefaultConnManager struct {
 	broker *Broker
 	framer amqp.Framer
-	mu     sync.Mutex
 }
 
 // NewDefaultConnManager creates a new connection manager
@@ -40,18 +38,21 @@ func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManag
 
 func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
 	defer func() {
-		conn.Close()
+		defer b.ActiveConns.Done()
 		b.cleanupConnection(conn)
+		// log.Fatalf("Connection closed by server")
 	}()
 	channelNum := uint16(0) //initial
-	client, err := b.framer.Handshake(configurations, conn)
+	connInfo, err := b.framer.Handshake(configurations, conn)
 	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
 
-	b.registerConnection(conn, client)
-	go b.sendHeartbeats(conn, client)
+	b.registerConnection(conn, connInfo)
+	// TODO: create a goroutine to monitor heartbeat timeout
+	go b.sendHeartbeats(conn, connInfo.Client)
+	go b.monitorHeartbeatTimeout(conn, connInfo.Client)
 	// keep reading commands in loop
 	for {
 		frame, err := b.framer.ReadFrame(conn)
@@ -59,7 +60,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				log.Printf("[DEBUG] Connection timeout: %v", err)
 			}
-			if err == io.EOF {
+			if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
 				b.cleanupConnection(conn)
 				log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
 				return
@@ -68,13 +69,12 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			return
 		}
 		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
+
 			b.handleHeartbeat(conn)
 		}
 
-		log.Printf("[DEBUG] received: %x\n", frame)
-
 		//Process frame
-		newInterface, err := b.framer.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := b.framer.ParseFrame(frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
@@ -108,31 +108,81 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, client *amqp.AmqpClient) {
-	vhost := b.GetVHostFromName(client.VHostName)
-	if vhost == nil {
-		log.Fatalf("VHost not found: %s", client.VHostName)
+func (b *Broker) monitorHeartbeatTimeout(conn net.Conn, client *amqp.AmqpClient) {
+	maxTime := time.Duration(b.config.HeartbeatIntervalMax << 1)
+	if client.LastHeartbeat.Add(maxTime * time.Second).Before(time.Now()) {
+		b.connectionCloseOk(conn)
 	}
-	client.VHostId = vhost.Id
-	b.mu.Lock()
+}
 
-	b.Connections[conn] = &models.ConnectionInfo{
-		Client:   client,
-		Channels: make(map[uint16]*amqp.ChannelState),
-	}
+func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
+	b.mu.Lock()
+	previousCount := len(b.Connections)
+	b.Connections[conn] = connInfo
+	delta := len(b.Connections) - previousCount
+	b.ActiveConns.Add(delta)
+	log.Printf("[DEBUG] Connection delta changed: %d", delta)
 	b.mu.Unlock()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	log.Println("Cleaning connection")
-	b.mu.Lock()
-	delete(b.Connections, conn)
-	b.mu.Unlock()
-	for _, vhost := range b.VHosts {
-		vhost.CleanupConnection(conn)
+	if connInfo, ok := b.Connections[conn]; ok {
+		connInfo.Client.Done <- struct{}{} // should stop heartbeat verification
+		vhName := connInfo.VHostName
+		vh := b.GetVHost(vhName)
+		vh.CleanupConnection(conn)
+		b.mu.Lock()
+		previousCount := len(b.Connections)
+		delete(b.Connections, conn)
+		delta := len(b.Connections) - previousCount
+		b.ActiveConns.Add(delta)
+		log.Printf("[DEBUG] Connection delta changed: %d", delta)
+		b.mu.Unlock()
 	}
 }
 
+// closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame
+func (b *Broker) closeConnectionRequested(conn net.Conn, channel uint16) (any, error) {
+	frame := b.framer.CreateConnectionCloseOkFrame(channel)
+	err := b.framer.SendFrame(conn, frame)
+	b.cleanupConnection(conn)
+	return nil, err
+}
+
+// closeConnection sends `connection.close` when the server needs to shutdown for some reason
+func (b *Broker) sendCloseConnection(conn net.Conn, channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) (any, error) {
+	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, replyText, methodId, classId)
+	err := b.framer.SendFrame(conn, frame)
+
+	return nil, err
+}
+
+func (b *Broker) connectionCloseOk(conn net.Conn) {
+	b.cleanupConnection(conn)
+	conn.Close()
+	// TODO: Verify if heartbeater already stopped for this conn
+}
+
+// openChannel executes the AMQP command CHANNEL_OPEN
+func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn, channel uint16) (any, error) {
+	fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
+
+	// Check if the channel is already open
+	if b.checkChannel(conn, channel) {
+		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+		return nil, fmt.Errorf("channel already open")
+	}
+	b.registerChannel(conn, request)
+	fmt.Printf("[DEBUG] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
+
+	frame := b.framer.CreateChannelOpenOkFrame(channel, request)
+
+	b.framer.SendFrame(conn, frame)
+	return nil, nil
+}
+
+// checkChannel checks if a channel is already open
 func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -140,16 +190,27 @@ func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
 	return ok
 }
 
-// Add new Channel
-func (b *Broker) addChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
+func (b *Broker) closeChannel(conn net.Conn, channel uint16) (any, error) {
+	if b.checkChannel(conn, channel) {
+		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+		return nil, fmt.Errorf("channel already open")
+	}
+	b.removeChannel(conn, channel)
+	frame := b.framer.CreateChannelCloseFrame(channel)
+	b.framer.SendFrame(conn, frame)
+	return nil, nil
+}
+
+// registerChannel register a new channel to the connection
+func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// add new channel to the connectionInfo
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
 	fmt.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
 }
 
+// removeChannel removes a channel from the connection
 func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -158,11 +219,6 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 
 func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 	b.mu.Lock()
-	// connectionInfo, ok := b.Connections[conn]
-	// if !ok {
-	// 	b.mu.Unlock()
-	// 	return
-	// }
 	heartbeatInterval := int(client.HeartbeatInterval >> 1)
 	done := client.Done
 	b.mu.Unlock()
@@ -174,25 +230,23 @@ func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 		select {
 		case <-ticker.C:
 			b.mu.Lock()
-			if _, ok := b.Connections[conn]; !ok {
-				b.mu.Unlock()
-				log.Println("Connection no longer exists in broker")
+			defer b.mu.Unlock()
+			if ok := b.ShuttingDown.Load(); ok {
 				return
 			}
-			b.mu.Unlock()
+			if _, ok := b.Connections[conn]; !ok {
+				log.Println("[TRACE] Connection no longer exists in broker")
+				return
+			}
 
-			// sendHearbeat(conn)
-			// heartbeatFrame := amqp.CreateHeartbeatFrame()
-			// err := shared.SendFrame(conn, heartbeatFrame)
 			err := b.framer.SendHearbeat(conn)
 			if err != nil {
-				log.Printf("Failed to send heartbeat: %v", err)
+				log.Printf("[DEBUG] Failed to send heartbeat: %v", err)
 				return
 			}
-			log.Println("[DEBUG] Heartbeat sent")
 
 		case <-done:
-			log.Println("Stopping heartbeat  goroutine for closed connection")
+			log.Println("[TRACE] Stopping heartbeat goroutine for closed connection")
 			return
 		}
 	}
@@ -201,8 +255,15 @@ func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 func (b *Broker) handleHeartbeat(conn net.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	// b.Connections[conn].LastHeartbeat = time.Now()
 	b.Connections[conn].Client.LastHeartbeat = time.Now()
 
 	return nil
+}
+
+func (b *Broker) BroadcastConnectionClose() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for conn := range b.Connections {
+		b.sendCloseConnection(conn, 0, 320, "Server shutting down", 0, 0)
+	}
 }

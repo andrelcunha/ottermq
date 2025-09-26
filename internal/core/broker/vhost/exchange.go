@@ -42,7 +42,7 @@ func (vh *VHost) DeleteExchange(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	// If the exchange is the default exchange, return an error
-	if name == "default" {
+	if name == DEFAULT_EXCHANGE {
 		return fmt.Errorf("cannot delete default exchange")
 	}
 

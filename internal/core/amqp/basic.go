@@ -44,7 +44,7 @@ type BasicProperties struct {
 	Reserved        string         // shortstr
 }
 
-func (props *BasicProperties) EncodeBasicProperties() ([]byte, uint16, error) {
+func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	var buf bytes.Buffer
 	var flags uint16
 
@@ -139,6 +139,28 @@ func (props *BasicProperties) EncodeBasicProperties() ([]byte, uint16, error) {
 	return buf.Bytes(), flags, nil
 }
 
+func decodeBasicGetFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"noAck", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
+func decodeBasicPublishFlags(octet byte) map[string]bool {
+	flags := make(map[string]bool)
+	flagNames := []string{"mandatory", "immediate", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
+
+	for i := 0; i < 8; i++ {
+		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	}
+
+	return flags
+}
+
 func encodeShortStr(buf *bytes.Buffer, value string) error {
 	if err := buf.WriteByte(byte(len(value))); err != nil {
 		return err
@@ -212,3 +234,30 @@ func encodeLongStr(buf *bytes.Buffer, value string) error {
 	}
 	return nil
 }
+
+func decodeBasicHeaderFlags(short uint16) []string {
+	flagNames := []string{
+		"contentType",
+		"contentEncoding",
+		"headers",
+		"deliveryMode",
+		"priority",
+		"correlationID",
+		"replyTo",
+		"expiration",
+		"messageID",
+		"timestamp",
+		"type",
+		"userID",
+		"appID",
+		"reserved",
+	}
+	var flags []string
+	for i := 0; i < len(flagNames); i++ {
+		if (short & (1 << uint(15-i))) != 0 {
+			flags = append(flags, flagNames[i])
+		}
+	}
+	return flags
+}
+

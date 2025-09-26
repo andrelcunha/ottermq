@@ -20,7 +20,7 @@ import (
 // @Failure 500 {object} fiber.Map
 // @Router /api/queues [get]
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues := b.AdminApi.ListQueues()
+	queues := b.ManagerApi.ListQueues()
 	if queues == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to list exchanges",
@@ -154,5 +154,4 @@ func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"data": string(msg.Body),
 	})
-
 }
