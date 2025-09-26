@@ -14,7 +14,7 @@ type Framer interface {
 	ReadFrame(conn net.Conn) ([]byte, error)
 	SendFrame(conn net.Conn, frame []byte) error
 	Handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, error)
-	ParseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error)
+	ParseFrame(frame []byte) (any, error)
 	SendHearbeat(conn net.Conn) error
 }
 
@@ -32,8 +32,8 @@ func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn)
 	return handshake(configurations, conn)
 }
 
-func (d *DefaultFramer) ParseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error) {
-	return parseFrame(configurations, conn, currentChannel, frame)
+func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
+	return parseFrame(frame)
 }
 
 func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {

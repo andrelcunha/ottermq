@@ -61,7 +61,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 		return nil, err
 	}
 	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
-	response, err := parseFrame(configurations, conn, 0, frame)
+	response, err := parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	if err != nil {
 		return nil, err
 	}
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func handshake(configurations *map[string]any, conn net.Conn) (*AmqpClient, erro
 	}
 	// set vhost on configurations
 
-	response, err = parseFrame(configurations, conn, 0, frame)
+	response, err = parseFrame(frame)
 	if err != nil {
 		return nil, err
 	}

@@ -5,12 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
 
-func parseFrame(configurations *map[string]any, conn net.Conn, currentChannel uint16, frame []byte) (any, error) {
+func parseFrame(frame []byte) (any, error) {
 	if len(frame) < 7 {
 		return nil, fmt.Errorf("frame too short")
 	}
@@ -26,7 +25,7 @@ func parseFrame(configurations *map[string]any, conn net.Conn, currentChannel ui
 	switch frameType {
 	case byte(TYPE_METHOD):
 		log.Printf("[DEBUG] Received METHOD frame on channel %d\n", channel)
-		request, err := parseMethodFrame(configurations, channel, payload)
+		request, err := parseMethodFrame(channel, payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse method frame: %v", err)
 		}
@@ -50,7 +49,7 @@ func parseFrame(configurations *map[string]any, conn net.Conn, currentChannel ui
 	}
 }
 
-func parseMethodFrame(configurations *map[string]interface{}, channel uint16, payload []byte) (*ChannelState, error) {
+func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 	if len(payload) < 4 {
 		return nil, fmt.Errorf("payload too short")
 	}
@@ -372,9 +371,9 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 	flags := utils.DecodeQueueBindFlags(octet)
 	noWait := flags["noWait"]
-	arguments := make(map[string]interface{})
+	arguments := make(map[string]any)
 	if buf.Len() > 4 {
-		argumentsStr, err := utils.DecodeLongStr(buf)
+		argumentsStr, _ := utils.DecodeLongStr(buf)
 		arguments, err = utils.DecodeTable([]byte(argumentsStr))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read arguments: %v", err)
@@ -537,7 +536,7 @@ func parseConnectionMethod(methodID uint16, payload []byte) (interface{}, error)
 		log.Printf("[DEBUG] Received CONNECTION_TUNE_OK frame \n")
 		tuneResponse, err := parseConnectionTuneFrame(payload)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse connection.tune frame: %v", err)
+			return nil, fmt.Errorf("failed to parse connection.tune frame: %v", err)
 		}
 		tuneOkRequest := createConnectionTuneOkFrame(fineTune(tuneResponse))
 		return tuneOkRequest, nil
@@ -558,13 +557,13 @@ func parseConnectionMethod(methodID uint16, payload []byte) (interface{}, error)
 		log.Printf("[DEBUG] Received CONNECTION_CLOSE frame \n")
 		request, err := parseConnectionCloseFrame(payload)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse connection.close frame: %v", err)
+			return nil, fmt.Errorf("failed to parse connection.close frame: %v", err)
 		}
 		request.MethodID = uint16(CONNECTION_CLOSE_OK)
 		log.Printf("[DEBUG] connection close request: %+v\n", request)
 		content, ok := request.Content.(*ConnectionCloseMessage)
 		if !ok {
-			return nil, fmt.Errorf("Invalid message content type")
+			return nil, fmt.Errorf("invalid message content type")
 		}
 		log.Printf("Received connection.close: (%d) '%s'\n", content.ReplyCode, content.ReplyText)
 		return request, nil
@@ -835,12 +834,21 @@ func parseChannelCloseFrame(payload []byte) (*RequestMethodMessage, error) {
 	buf := bytes.NewReader(payload)
 	replyCode, err := utils.DecodeShortInt(buf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode reply code: %v", err)
+		return nil, fmt.Errorf("failed decoding reply code: %v", err)
+	}
+	replyText, err := utils.DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding reply text: %v", err)
+	}
+	classID, err := utils.DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding class id: %v", err)
+	}
+	methodID, err := utils.DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding method id: %v", err)
 	}
 
-	replyText, err := utils.DecodeShortStr(buf)
-	classID, err := utils.DecodeShortInt(buf)
-	methodID, err := utils.DecodeShortInt(buf)
 	msg := &ChannelCloseMessage{
 		ReplyCode: replyCode,
 		ReplyText: replyText,

@@ -74,7 +74,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		log.Printf("[DEBUG] received: %x\n", frame)
 
 		//Process frame
-		newInterface, err := b.framer.ParseFrame(configurations, conn, channelNum, frame)
+		newInterface, err := b.framer.ParseFrame(frame)
 		if err != nil {
 			log.Fatalf("ERROR parsing frame: %v", err)
 		}
