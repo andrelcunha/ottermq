@@ -23,7 +23,6 @@ type VHost struct {
 	MsgCtrlr          MessageController
 }
 
-
 type Consumer struct {
 	ID        string `json:"id"`
 	Queue     string `json:"queue"`

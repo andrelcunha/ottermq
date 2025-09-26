@@ -5,12 +5,10 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/models"
 	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
@@ -27,7 +25,6 @@ type ConnManager interface {
 type DefaultConnManager struct {
 	broker *Broker
 	framer amqp.Framer
-	mu     sync.Mutex
 }
 
 // NewDefaultConnManager creates a new connection manager
@@ -44,14 +41,14 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 		b.cleanupConnection(conn)
 	}()
 	channelNum := uint16(0) //initial
-	client, err := b.framer.Handshake(configurations, conn)
+	connInfo, err := b.framer.Handshake(configurations, conn)
 	if err != nil {
 		log.Printf("Handshake failed: %v", err)
 		return
 	}
 
-	b.registerConnection(conn, client)
-	go b.sendHeartbeats(conn, client)
+	b.registerConnection(conn, connInfo)
+	go b.sendHeartbeats(conn, connInfo.Client)
 	// keep reading commands in loop
 	for {
 		frame, err := b.framer.ReadFrame(conn)
@@ -108,31 +105,62 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 	}
 }
 
-func (b *Broker) registerConnection(conn net.Conn, client *amqp.AmqpClient) {
-	vhost := b.GetVHostFromName(client.VHostName)
-	if vhost == nil {
-		log.Fatalf("VHost not found: %s", client.VHostName)
-	}
-	client.VHostId = vhost.Id
+func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
 	b.mu.Lock()
 
-	b.Connections[conn] = &models.ConnectionInfo{
-		Client:   client,
-		Channels: make(map[uint16]*amqp.ChannelState),
-	}
+	b.Connections[conn] = connInfo
 	b.mu.Unlock()
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	log.Println("Cleaning connection")
+	vhName := b.Connections[conn].VHostName
+	vh := b.GetVHost(vhName)
+	vh.CleanupConnection(conn)
 	b.mu.Lock()
 	delete(b.Connections, conn)
 	b.mu.Unlock()
-	for _, vhost := range b.VHosts {
-		vhost.CleanupConnection(conn)
-	}
 }
 
+// closeConnection closes a connection and sends a CONNECTION_CLOSE_OK frame
+func (b *Broker) closeConnection(conn net.Conn, channel uint16) (any, error) {
+	frame := b.framer.CloseConnectionFrame(channel)
+	err := b.framer.SendFrame(conn, frame)
+	b.cleanupConnection(conn)
+	return nil, err
+}
+
+// openChannel executes the AMQP command CHANNEL_OPEN
+func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn, channel uint16) (any, error) {
+	fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
+
+	// Check if the channel is already open
+	if b.checkChannel(conn, channel) {
+		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+		return nil, fmt.Errorf("channel already open")
+	}
+	b.registerChannel(conn, request)
+	fmt.Printf("[DEBUG] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
+
+	frame := amqp.ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(amqp.CHANNEL_OPEN_OK),
+		Content: amqp.ContentList{
+			KeyValuePairs: []amqp.KeyValue{
+				{
+					Key:   amqp.INT_LONG,
+					Value: uint32(0),
+				},
+			},
+		},
+	}.FormatMethodFrame()
+
+	b.framer.SendFrame(conn, frame)
+	return nil, nil
+}
+
+// checkChannel checks if a channel is already open
 func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -140,16 +168,27 @@ func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
 	return ok
 }
 
-// Add new Channel
-func (b *Broker) addChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
+func (b *Broker) closeChannel(conn net.Conn, channel uint16) (any, error) {
+	if b.checkChannel(conn, channel) {
+		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+		return nil, fmt.Errorf("channel already open")
+	}
+	b.removeChannel(conn, channel)
+	frame := b.framer.CloseChannelFrame(channel)
+	b.framer.SendFrame(conn, frame)
+	return nil, nil
+}
+
+// registerChannel register a new channel to the connection
+func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// add new channel to the connectionInfo
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
 	fmt.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
 }
 
+// removeChannel removes a channel from the connection
 func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -158,11 +197,6 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 
 func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 	b.mu.Lock()
-	// connectionInfo, ok := b.Connections[conn]
-	// if !ok {
-	// 	b.mu.Unlock()
-	// 	return
-	// }
 	heartbeatInterval := int(client.HeartbeatInterval >> 1)
 	done := client.Done
 	b.mu.Unlock()
