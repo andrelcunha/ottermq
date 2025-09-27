@@ -201,7 +201,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				return nil, err
 			}
 
-			err = vh.BindToDefaultExchange(queueName)
+			err = vh.BindQueue(vhost.DEFAULT_EXCHANGE, queueName, queueName)
 			if err != nil {
 				fmt.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
 				return nil, err
