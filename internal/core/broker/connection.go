@@ -230,11 +230,13 @@ func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 		select {
 		case <-ticker.C:
 			b.mu.Lock()
-			defer b.mu.Unlock()
-			if ok := b.ShuttingDown.Load(); ok {
+			shuttingDown := b.ShuttingDown.Load()
+			_, exists := b.Connections[conn]
+			b.mu.Unlock()
+			if shuttingDown {
 				return
 			}
-			if _, ok := b.Connections[conn]; !ok {
+			if !exists {
 				log.Println("[TRACE] Connection no longer exists in broker")
 				return
 			}
