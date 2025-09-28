@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
 	"syscall"
 	"time"
 
@@ -21,7 +21,7 @@ var (
 
 const (
 	PORT      = "5672"
-	HOST      = "0.0.0.0"
+	HOST      = ""
 	HEARTBEAT = 60
 	USERNAME  = "guest"
 	PASSWORD  = "guest"
@@ -62,7 +62,8 @@ func main() {
 		Version:              VERSION,
 	}
 
-	b := broker.NewBroker(config)
+	ctx, cancel := context.WithCancel(context.Background())
+	b := broker.NewBroker(config, ctx, cancel)
 
 	// Verify if the database file exists
 	dbPath := filepath.Join(dataDir, "ottermq.db")
@@ -133,35 +134,30 @@ func main() {
 
 	<-stop
 	log.Println("Shutting down OtterMq...")
+	cancel()
 	b.ShuttingDown.Store(true)
 
 	// Broadcast connection close to all channels
 	b.BroadcastConnectionClose()
 	log.Println("Waiting for active connections to close...")
 
-	if WaitWithTimeout(&b.ActiveConns, 10*time.Second) {
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		b.ActiveConns.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
 		log.Println("All connections closed gracefully.")
-	} else {
+	case <-shutdownCtx.Done():
 		log.Println("Timeout reached. Forcing shutdown.")
 	}
 
 	b.Shutdown()
 	app.Shutdown() // TODO: deal with the web server shutdown
 	log.Println("Server gracefully stopped.")
-}
-
-func WaitWithTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
-	done := make(chan struct{})
-
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return true // completed successfully
-	case <-time.After(timeout):
-		return false // timed out
-	}
 }

@@ -25,19 +25,17 @@ func MapListConnectionsDTO(connections []amqp.ConnectionInfo) []ConnectionInfoDT
 	listConnectonsDTO := make([]ConnectionInfoDTO, len(connections))
 	for i, connection := range connections {
 		state := "disconnected"
-		if connection.Client.Done == nil {
+		if connection.Client.Ctx.Err() == nil {
 			state = "running"
 		}
 		channels := len(connection.Channels)
 		listConnectonsDTO[i] = ConnectionInfoDTO{
-			VHostName: connection.VHostName,
-			Name:      connection.Client.Name,
-			Username:  connection.Client.User,
-			State:     state,
-			// SSL:           false,
-			// Protocol:      "AMQP 0-9-1",
-			SSL:           connection.Client.SSL,
-			Protocol:      connection.Client.Protocol,
+			VHostName:     connection.VHostName,
+			Name:          connection.Client.RemoteAddr,
+			Username:      connection.Client.Config.Username,
+			State:         state,
+			SSL:           connection.Client.Config.SSL,
+			Protocol:      connection.Client.Config.Protocol,
 			Channels:      channels,
 			LastHeartbeat: connection.Client.LastHeartbeat,
 			ConnectedAt:   connection.Client.ConnectedAt,

@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -13,7 +14,7 @@ import (
 type Framer interface {
 	ReadFrame(conn net.Conn) ([]byte, error)
 	SendFrame(conn net.Conn, frame []byte) error
-	Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error)
+	Handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Context, rootCancel context.CancelFunc) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
 	SendHearbeat(conn net.Conn) error
 	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
@@ -33,8 +34,8 @@ func (d *DefaultFramer) SendFrame(conn net.Conn, frame []byte) error {
 	return sendFrame(conn, frame)
 }
 
-func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, error) {
-	return handshake(configurations, conn)
+func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Context, rootCancel context.CancelFunc) (*ConnectionInfo, error) {
+	return handshake(configurations, conn, rootCtx, rootCancel)
 }
 
 func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {

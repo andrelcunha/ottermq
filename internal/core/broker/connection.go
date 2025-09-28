@@ -99,8 +99,14 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 func (b *Broker) monitorHeartbeatTimeout(conn net.Conn, client *amqp.AmqpClient) {
 	maxTime := time.Duration(b.config.HeartbeatIntervalMax << 1)
-	if client.LastHeartbeat.Add(maxTime * time.Second).Before(time.Now()) {
-		b.connectionCloseOk(conn)
+	if !client.LastHeartbeat.IsZero() {
+		if client.LastHeartbeat.Add(maxTime * time.Second).Before(time.Now()) {
+			log.Printf("[DEBUG] client.LastHeartbeat: %v", client.LastHeartbeat)
+			log.Printf("[DEBUG] heartbeat overdue. Connection is closing")
+			b.cleanupConnection(conn)
+			conn.Close()
+			return
+		}
 	}
 }
 
@@ -117,7 +123,8 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	log.Println("Cleaning connection")
 	if connInfo, ok := b.Connections[conn]; ok {
-		connInfo.Client.Done <- struct{}{} // should stop heartbeat verification
+		// connInfo.Client.Done <- struct{}{} // should stop heartbeat verification
+		connInfo.Client.Cancel()
 		vhName := connInfo.VHostName
 		vh := b.GetVHost(vhName)
 		vh.CleanupConnection(conn)
@@ -208,10 +215,9 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 
 func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
 	b.mu.Lock()
-	heartbeatInterval := int(client.HeartbeatInterval >> 1)
-	done := client.Done
+	heartbeatInterval := int(client.Config.HeartbeatInterval >> 1)
+	done := client.Ctx.Done()
 	b.mu.Unlock()
-
 	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
 	defer ticker.Stop()
 

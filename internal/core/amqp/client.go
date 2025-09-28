@@ -1,28 +1,23 @@
 package amqp
 
 import (
+	"context"
 	"net"
 	"time"
 )
 
 type AmqpClient struct {
-	Name string
-	User string
-
-	ConnectedAt       time.Time
-	LastHeartbeat     time.Time
-	HeartbeatInterval uint16
-	FrameMax          uint32
-	ChannelMax        uint16
-	Conn              net.Conn
-	Protocol          string
-	SSL               bool
-	Done              chan struct{}
-
+	RemoteAddr    string
+	ConnectedAt   time.Time
+	LastHeartbeat time.Time
+	Conn          net.Conn
+	Ctx           context.Context
+	Cancel        context.CancelFunc
+	Config        *AmqpClientConfig
 }
 
 type AmqpClientConfig struct {
-	Username string
+	Username          string
 	HeartbeatInterval uint16
 	FrameMax          uint32
 	ChannelMax        uint16
@@ -30,21 +25,15 @@ type AmqpClientConfig struct {
 	SSL               bool
 }
 
-func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
+func NewAmqpClient(conn net.Conn, config *AmqpClientConfig, connCtx context.Context, cancel context.CancelFunc) *AmqpClient {
 
 	client := &AmqpClient{
-		Name: conn.RemoteAddr().String(),
-		User: config.Username,
-		Protocol:          config.Protocol,
-		SSL:               config.SSL,
-		ConnectedAt:       time.Now(),
-		HeartbeatInterval: config.HeartbeatInterval,
-		LastHeartbeat:     time.Now(),
-		FrameMax:          config.FrameMax,
-		ChannelMax:        config.ChannelMax,
-		Conn:              conn,
-		Done:              make(chan struct{}),
-
+		RemoteAddr:  conn.RemoteAddr().String(),
+		ConnectedAt: time.Now(),
+		Conn:        conn,
+		Ctx:         connCtx,
+		Cancel:      cancel,
+		Config:      config,
 	}
 
 	return client
@@ -66,10 +55,6 @@ func NewAmqpClientConfig(configurations *map[string]any) *AmqpClientConfig {
 		Protocol:          protocol,
 		SSL:               ssl,
 	}
-}
-
-func (c *AmqpClient) Stop() {
-	close(c.Done)
 }
 
 // ConnectionInfo represents the information of a connection to the AMQP server

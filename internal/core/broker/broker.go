@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -29,13 +30,17 @@ type Broker struct {
 	ManagerApi   ManagerApi
 	ShuttingDown atomic.Bool
 	ActiveConns  sync.WaitGroup
+	rootCtx      context.Context
+	rootCancel   context.CancelFunc
 }
 
-func NewBroker(config *config.Config) *Broker {
+func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
 	b := &Broker{
 		VHosts:      make(map[string]*vhost.VHost),
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		config:      config,
+		rootCtx:     rootCtx,
+		rootCancel:  rootCancel,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/")
 	b.framer = &amqp.DefaultFramer{}
@@ -102,7 +107,7 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 			continue
 		}
 		log.Println("[DEBUG] New client waiting for connection: ", conn.RemoteAddr())
-		connInfo, err := b.framer.Handshake(&configurations, conn)
+		connInfo, err := b.framer.Handshake(&configurations, conn, b.rootCtx, b.rootCancel)
 		if err != nil {
 			log.Printf("[INFO] Handshake failed: %v", err)
 			continue
