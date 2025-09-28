@@ -89,7 +89,10 @@ func main() {
 
 	// Start the broker in a goroutine
 	go func() {
-		b.Start()
+		err := b.Start()
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
 	}()
 
 	// Initialize the web admin server

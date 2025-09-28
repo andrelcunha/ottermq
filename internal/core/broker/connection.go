@@ -36,24 +36,13 @@ func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManag
 	}
 }
 
-func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn) {
+func (b *Broker) handleConnection(conn net.Conn) {
 	defer func() {
 		defer b.ActiveConns.Done()
 		b.cleanupConnection(conn)
-		// log.Fatalf("Connection closed by server")
 	}()
 	channelNum := uint16(0) //initial
-	connInfo, err := b.framer.Handshake(configurations, conn)
-	if err != nil {
-		log.Printf("Handshake failed: %v", err)
-		return
-	}
 
-	b.registerConnection(conn, connInfo)
-	// TODO: create a goroutine to monitor heartbeat timeout
-	go b.sendHeartbeats(conn, connInfo.Client)
-	go b.monitorHeartbeatTimeout(conn, connInfo.Client)
-	// keep reading commands in loop
 	for {
 		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
@@ -86,13 +75,13 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 			if !ok {
 				log.Fatalf("Failed to cast request to amqp.ChannelState")
 			}
-			fmt.Printf("[DEBUG] New State: %+v\n", newState)
+			log.Printf("[DEBUG] New State: %+v\n", newState)
 
 			if newState.MethodFrame != nil {
 				request := newState.MethodFrame
 				if channelNum != request.Channel {
 					channelNum = newState.MethodFrame.Channel
-					fmt.Printf("[DEBUG] Newchannel shall be added: %d\n", request.Channel)
+					log.Printf("[TRACE] Newchannel shall be added: %d\n", request.Channel)
 				}
 			} else {
 				if newState.HeaderFrame != nil {
@@ -101,7 +90,7 @@ func (b *Broker) handleConnection(configurations *map[string]any, conn net.Conn)
 					log.Printf("[DEBUG] Body: %+v\n", newState.Body)
 				}
 				newState.MethodFrame = b.Connections[conn].Channels[channelNum].MethodFrame
-				fmt.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
+				log.Printf("[DEBUG] Request: %+v\n", newState.MethodFrame)
 			}
 			b.processRequest(conn, newState)
 		}
@@ -166,15 +155,15 @@ func (b *Broker) connectionCloseOk(conn net.Conn) {
 
 // openChannel executes the AMQP command CHANNEL_OPEN
 func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn, channel uint16) (any, error) {
-	fmt.Printf("[DEBUG] Received channel open request: %+v\n", request)
+	log.Printf("[DEBUG] Received channel open request: %+v\n", request)
 
 	// Check if the channel is already open
 	if b.checkChannel(conn, channel) {
-		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
+		log.Printf("[DEBUG] Channel %d already open\n", channel)
 		return nil, fmt.Errorf("channel already open")
 	}
 	b.registerChannel(conn, request)
-	fmt.Printf("[DEBUG] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
+	log.Printf("[TRACE] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
 
 	frame := b.framer.CreateChannelOpenOkFrame(channel, request)
 
@@ -207,7 +196,7 @@ func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage
 	defer b.mu.Unlock()
 
 	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
-	fmt.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
+	log.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
 }
 
 // removeChannel removes a channel from the connection

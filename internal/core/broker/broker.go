@@ -22,6 +22,7 @@ const (
 type Broker struct {
 	VHosts       map[string]*vhost.VHost
 	config       *config.Config                    `json:"-"`
+	listener     net.Listener                      `json:"-"`
 	Connections  map[net.Conn]*amqp.ConnectionInfo `json:"-"`
 	mu           sync.Mutex                        `json:"-"`
 	framer       amqp.Framer
@@ -42,10 +43,26 @@ func NewBroker(config *config.Config) *Broker {
 	return b
 }
 
-func (b *Broker) Start() {
+func (b *Broker) Start() error {
 	log.Println("OtterMQ version ", b.config.Version)
 	log.Println("Broker is starting...")
 
+	configurations := b.setConfigurations()
+
+	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("Failed to start vhost: %v", err)
+	}
+	b.listener = listener
+	defer listener.Close()
+	log.Printf("Started TCP listener on %s", addr)
+
+	return b.acceptLoop(configurations)
+}
+
+func (b *Broker) setConfigurations() map[string]any {
 	capabilities := map[string]any{
 		"basic.nack":             true,
 		"connection.blocked":     true,
@@ -70,18 +87,12 @@ func (b *Broker) Start() {
 		"ssl":               b.config.Ssl,
 		"protocol":          "AMQP 0-9-1",
 	}
+	return configurations
+}
 
-	addr := fmt.Sprintf("%s:%s", b.config.Host, b.config.Port)
-
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Failed to start vhost: %v", err)
-	}
-	defer listener.Close()
-	log.Printf("Started TCP listener on %s", addr)
-
+func (b *Broker) acceptLoop(configurations map[string]any) error {
 	for {
-		conn, err := listener.Accept()
+		conn, err := b.listener.Accept()
 		if err != nil {
 			log.Println("[DEBUG] Failed to accept connection:", err)
 			continue
@@ -91,7 +102,16 @@ func (b *Broker) Start() {
 			continue
 		}
 		log.Println("[DEBUG] New client waiting for connection: ", conn.RemoteAddr())
-		go b.handleConnection((&configurations), conn)
+		connInfo, err := b.framer.Handshake(&configurations, conn)
+		if err != nil {
+			log.Printf("[INFO] Handshake failed: %v", err)
+			continue
+		}
+		b.registerConnection(conn, connInfo)
+		go b.sendHeartbeats(conn, connInfo.Client)
+		go b.monitorHeartbeatTimeout(conn, connInfo.Client)
+
+		go b.handleConnection(conn)
 	}
 }
 
@@ -130,7 +150,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			log.Printf("[DEBUG] Unknown channel method: %d", request.MethodID)
 			return nil, fmt.Errorf("unknown channel method: %d", request.MethodID)
 		}
-
 	case uint16(amqp.EXCHANGE):
 		switch request.MethodID {
 		case uint16(amqp.EXCHANGE_DECLARE):
@@ -183,7 +202,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 		default:
 			return nil, fmt.Errorf("unsupported command")
 		}
-
 	case uint16(amqp.QUEUE):
 		switch request.MethodID {
 		case uint16(amqp.QUEUE_DECLARE):
