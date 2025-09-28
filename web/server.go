@@ -2,15 +2,16 @@ package web
 
 import (
 	"os"
-	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
+	_ "github.com/andrelcunha/ottermq/web/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
 	"github.com/andrelcunha/ottermq/web/handlers/webui"
 	"github.com/andrelcunha/ottermq/web/middleware"
 
-	"github.com/gofiber/contrib/swagger"
+	"github.com/gofiber/swagger"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/template/html/v2"
@@ -18,12 +19,12 @@ import (
 )
 
 type WebServer struct {
-	brokerAddr        string
-	heartbeatInterval time.Duration
-	config            *Config
-	Broker            *broker.Broker
-	Client            *amqp091.Connection
-	Channel           *amqp091.Channel
+	// brokerAddr        string
+	// heartbeatInterval time.Duration
+	config  *Config
+	Broker  *broker.Broker
+	Client  *amqp091.Connection
+	Channel *amqp091.Channel
 }
 
 type Config struct {
@@ -35,24 +36,17 @@ type Config struct {
 }
 
 func (ws *WebServer) Close() {
-	// ws.conn.Close()
+	ws.Channel.Close()
+	ws.Client.Close()
 }
 
 func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connection) (*WebServer, error) {
-	// connectionSting := fmt.Sprintf("amqp://%s:%s@%s:%s/", config.Username, config.Password, config.BrokerHost, config.BrokerPort)
-	// conn, err := getBrokerClient(connectionSting)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, err
 	}
 
 	return &WebServer{
-		// brokerAddr: brokerAddr,
-		// conn:              conn,
-		// heartbeatInterval: time.Duration(config.HeartbeatInterval) * time.Second,
 		config:  config,
 		Broker:  broker,
 		Client:  conn,
@@ -67,7 +61,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	// ws.Client = conn
 	app := ws.configServer(logFile)
 
-	ws.AddSwagger(app)
+	app.Get("/docs/*", swagger.HandlerDefault)
 
 	// Serve static files
 	app.Static("/", "./web/static")
@@ -126,14 +120,6 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 }
 
 func (ws *WebServer) AddSwagger(app *fiber.App) {
-	swaggerCfg := swagger.Config{
-		BasePath: "/api/",
-		FilePath: "./web/static/docs/swagger.json",
-		Path:     "docs",
-		Title:    "OtterMQ API",
-	}
-	swaggerHandler := swagger.New(swaggerCfg)
-	app.Use(swaggerHandler)
 }
 
 func (ws *WebServer) AddUI(app *fiber.App) {

@@ -1,14 +1,15 @@
 VERSION=$(shell git describe --tags --always)
 BINARY_NAME=ottermq
 BUILD_DIR=bin
+MAIN_PATH=cmd/ottermq/main.go
 
 build: 
 	@mkdir -p $(BUILD_DIR)
-	@go build -ldflags "-X main.VERSION=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./cmd/ottermq/main.go
+	@go build -ldflags "-X main.VERSION=$(VERSION)" -o ./$(BUILD_DIR)/$(BINARY_NAME) ./${MAIN_PATH}
 
 
 docs:
-	@$(shell go env GOPATH)/bin/swag init --parseInternal  -g ../../../cmd/ottermq/main.go --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/static/docs -ot json
+	@$(shell go env GOPATH)/bin/swag init -g ../../../${MAIN_PATH} --pd -d web/handlers/api,web/handlers/api_admin -exclude web/handlers/webui/ -o ./web/docs --ot go
 
 install:
 	@mkdir -p $(shell go env GOPATH)/bin

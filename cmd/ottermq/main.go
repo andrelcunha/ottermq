@@ -28,6 +28,11 @@ const (
 	VHOST     = "/"
 )
 
+// @title OtterMQ API
+// @version 1.0
+// @description API documentation for OtterMQ broker
+// @host localhost:3000
+// @BasePath /api/
 func main() {
 	// Determine the directory of the running binary
 	executablePath, err := os.Executable()
