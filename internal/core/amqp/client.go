@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"context"
+	"log"
 	"net"
 	"time"
 )
@@ -70,5 +71,49 @@ func NewConnectionInfo(vhostName string) *ConnectionInfo {
 		VHostName: vhostName,
 		Client:    nil,
 		Channels:  make(map[uint16]*ChannelState),
+	}
+}
+
+func (c *AmqpClient) StartHeartbeat() {
+	go c.sendHeartbeats()
+	go c.monitorHeartbeatTimeout()
+}
+
+func (c *AmqpClient) sendHeartbeats() {
+	interval := time.Duration(c.Config.HeartbeatInterval>>1) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := sendHeartbeat(c.Conn)
+			if err != nil {
+				log.Printf("[ERROR] Heartbeat failed: %v", err)
+				return
+			}
+		case <-c.Ctx.Done():
+			log.Println("[INFO] Heartbeat stopped due to context cancel")
+			return
+		}
+	}
+}
+
+func (c *AmqpClient) monitorHeartbeatTimeout() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			maxInterval := time.Duration(c.Config.HeartbeatInterval<<1) * time.Second
+			if time.Since(c.LastHeartbeat) > maxInterval {
+				log.Printf("[WARN] Heartbeat timeout for %s", c.RemoteAddr)
+				c.Cancel() // triggers cleanup
+				return
+			}
+		case <-c.Ctx.Done():
+			return
+		}
 	}
 }

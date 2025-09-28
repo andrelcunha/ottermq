@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -99,7 +100,11 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 	for {
 		conn, err := b.listener.Accept()
 		if err != nil {
-			log.Println("[DEBUG] Failed to accept connection:", err)
+			if errors.Is(err, net.ErrClosed) || b.rootCtx.Err() != nil {
+				log.Printf("[INFO] Listener closed or context canceled: %v", err)
+				return err
+			}
+			log.Printf("[DEBUG] Accept failed: %v", err)
 			continue
 		}
 		if ok := b.ShuttingDown.Load(); ok {
@@ -107,17 +112,24 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 			continue
 		}
 		log.Println("[DEBUG] New client waiting for connection: ", conn.RemoteAddr())
-		connInfo, err := b.framer.Handshake(&configurations, conn, b.rootCtx, b.rootCancel)
+		connCtx, connCancel := context.WithCancel(b.rootCtx)
+		defer connCancel()
+		connInfo, err := b.framer.Handshake(&configurations, conn, connCtx)
 		if err != nil {
 			log.Printf("[INFO] Handshake failed: %v", err)
 			continue
 		}
 		b.registerConnection(conn, connInfo)
-		go b.sendHeartbeats(conn, connInfo.Client)
-		go b.monitorHeartbeatTimeout(conn, connInfo.Client)
+		go b.monitorConnectionLifecycle(conn, connInfo.Client)
 
-		go b.handleConnection(conn)
+		go b.handleConnection(conn, connInfo)
 	}
+}
+
+func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient) {
+	<-client.Ctx.Done()
+	log.Printf("[INFO] Connection %s closed", conn.RemoteAddr())
+	b.cleanupConnection(conn)
 }
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {

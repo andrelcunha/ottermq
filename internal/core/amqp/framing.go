@@ -14,9 +14,9 @@ import (
 type Framer interface {
 	ReadFrame(conn net.Conn) ([]byte, error)
 	SendFrame(conn net.Conn, frame []byte) error
-	Handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Context, rootCancel context.CancelFunc) (*ConnectionInfo, error)
+	Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
-	SendHearbeat(conn net.Conn) error
+	// SendHearbeat(conn net.Conn) error
 	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
 	CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte
 	CreateChannelCloseFrame(channel uint16) []byte
@@ -34,15 +34,19 @@ func (d *DefaultFramer) SendFrame(conn net.Conn, frame []byte) error {
 	return sendFrame(conn, frame)
 }
 
-func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Context, rootCancel context.CancelFunc) (*ConnectionInfo, error) {
-	return handshake(configurations, conn, rootCtx, rootCancel)
+func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error) {
+	return handshake(configurations, conn, connCtxt)
 }
 
 func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
 	return parseFrame(frame)
 }
 
-func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
+// func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
+// 	return sendHeartbeat(conn)
+// }
+
+func sendHeartbeat(conn net.Conn) error {
 	heartbeatFrame := createHeartbeatFrame()
 	return sendFrame(conn, heartbeatFrame)
 }

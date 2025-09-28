@@ -14,7 +14,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
-func handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Context, rootCancel context.CancelFunc) (*ConnectionInfo, error) {
+func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Context) (*ConnectionInfo, error) {
 	// gets the protocol header sent by the client
 	clientHeader, err := readProtocolHeader(conn)
 	if err != nil {
@@ -117,9 +117,11 @@ func handshake(configurations *map[string]any, conn net.Conn, rootCtx context.Co
 	(*configurations)["channelMax"] = tuneOkFrame.ChannelMax
 
 	config := NewAmqpClientConfig(configurations)
-	connCtx, cancel := context.WithCancel(rootCtx)
+	connCtx, cancel := context.WithCancel(connCtx)
 	client := NewAmqpClient(conn, config, connCtx, cancel)
-	log.Printf("[DEBUG] Connection tunned") // TODO: The heartbeat should start here
+	log.Printf("[DEBUG] Connection successfully tunned")
+
+	client.StartHeartbeat()
 
 	// read connection.open frame
 	frame, err = readFrame(conn)
