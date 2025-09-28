@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"time"
 )
 
@@ -235,7 +236,7 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	}
 
 	if uint32(buf.Len()) < strLen {
-		fmt.Printf("Rached EOF.  buf.Len(): %d\n", buf.Len())
+		log.Printf("[DEBUG] Reached EOF.  buf.Len(): %d\n", buf.Len())
 		return "", io.EOF
 	}
 

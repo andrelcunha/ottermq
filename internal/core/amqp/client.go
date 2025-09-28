@@ -1,28 +1,24 @@
 package amqp
 
 import (
+	"context"
+	"log"
 	"net"
 	"time"
 )
 
 type AmqpClient struct {
-	Name string
-	User string
-
-	ConnectedAt       time.Time
-	LastHeartbeat     time.Time
-	HeartbeatInterval uint16
-	FrameMax          uint32
-	ChannelMax        uint16
-	Conn              net.Conn
-	Protocol          string
-	SSL               bool
-	Done              chan struct{}
-
+	RemoteAddr    string
+	ConnectedAt   time.Time
+	LastHeartbeat time.Time
+	Conn          net.Conn
+	Ctx           context.Context
+	Cancel        context.CancelFunc
+	Config        *AmqpClientConfig
 }
 
 type AmqpClientConfig struct {
-	Username string
+	Username          string
 	HeartbeatInterval uint16
 	FrameMax          uint32
 	ChannelMax        uint16
@@ -30,21 +26,15 @@ type AmqpClientConfig struct {
 	SSL               bool
 }
 
-func NewAmqpClient(conn net.Conn, config *AmqpClientConfig) *AmqpClient {
+func NewAmqpClient(conn net.Conn, config *AmqpClientConfig, connCtx context.Context, cancel context.CancelFunc) *AmqpClient {
 
 	client := &AmqpClient{
-		Name: conn.RemoteAddr().String(),
-		User: config.Username,
-		Protocol:          config.Protocol,
-		SSL:               config.SSL,
-		ConnectedAt:       time.Now(),
-		HeartbeatInterval: config.HeartbeatInterval,
-		LastHeartbeat:     time.Now(),
-		FrameMax:          config.FrameMax,
-		ChannelMax:        config.ChannelMax,
-		Conn:              conn,
-		Done:              make(chan struct{}),
-
+		RemoteAddr:  conn.RemoteAddr().String(),
+		ConnectedAt: time.Now(),
+		Conn:        conn,
+		Ctx:         connCtx,
+		Cancel:      cancel,
+		Config:      config,
 	}
 
 	return client
@@ -68,10 +58,6 @@ func NewAmqpClientConfig(configurations *map[string]any) *AmqpClientConfig {
 	}
 }
 
-func (c *AmqpClient) Stop() {
-	close(c.Done)
-}
-
 // ConnectionInfo represents the information of a connection to the AMQP server
 type ConnectionInfo struct {
 	VHostName string                   `json:"vhost"`
@@ -85,5 +71,49 @@ func NewConnectionInfo(vhostName string) *ConnectionInfo {
 		VHostName: vhostName,
 		Client:    nil,
 		Channels:  make(map[uint16]*ChannelState),
+	}
+}
+
+func (c *AmqpClient) StartHeartbeat() {
+	go c.sendHeartbeats()
+	go c.monitorHeartbeatTimeout()
+}
+
+func (c *AmqpClient) sendHeartbeats() {
+	interval := time.Duration(c.Config.HeartbeatInterval>>1) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			err := sendHeartbeat(c.Conn)
+			if err != nil {
+				log.Printf("[ERROR] Heartbeat failed: %v", err)
+				return
+			}
+		case <-c.Ctx.Done():
+			log.Println("[INFO] Heartbeat stopped due to context cancel")
+			return
+		}
+	}
+}
+
+func (c *AmqpClient) monitorHeartbeatTimeout() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			maxInterval := time.Duration(c.Config.HeartbeatInterval<<1) * time.Second
+			if time.Since(c.LastHeartbeat) > maxInterval {
+				log.Printf("[WARN] Heartbeat timeout for %s", c.RemoteAddr)
+				c.Cancel() // triggers cleanup
+				return
+			}
+		case <-c.Ctx.Done():
+			return
+		}
 	}
 }
