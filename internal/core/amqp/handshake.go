@@ -124,7 +124,6 @@ func handshake(configurations *map[string]any, conn net.Conn) (*ConnectionInfo, 
 	if err != nil {
 		return nil, err
 	}
-	// set vhost on configurations
 
 	response, err = parseFrame(frame)
 	if err != nil {
@@ -160,9 +159,9 @@ func processStartOkContent(configurations *map[string]any, startOkFrame *Connect
 		return fmt.Errorf("mechanism invalid or %s not suported", mechanism)
 	}
 	// parse username and password from startOkFrame.Response
-	fmt.Printf("Response: '%s'\n", startOkFrame.Response)
+	log.Printf("Response: '%s'\n", startOkFrame.Response)
 	credentials := strings.Split(strings.Trim(startOkFrame.Response, " "), " ")
-	fmt.Printf("Credentials: username: '%s' password: '%s'\n", credentials[0], credentials[1])
+	log.Printf("[DEBUG] Credentials: username: '%s' password: '%s'\n", credentials[0], credentials[1])
 	if len(credentials) != 2 {
 		return fmt.Errorf("failed to parse credentials: invalid format")
 	}

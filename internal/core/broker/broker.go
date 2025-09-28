@@ -134,14 +134,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.EXCHANGE):
 		switch request.MethodID {
 		case uint16(amqp.EXCHANGE_DECLARE):
-			fmt.Printf("[DEBUG] Received exchange declare request: %+v\n", request)
-			fmt.Printf("[DEBUG] Channel: %d\n", channel)
+			log.Printf("[DEBUG] Received exchange declare request: %+v\n", request)
+			log.Printf("[DEBUG] Channel: %d\n", channel)
 			content, ok := request.Content.(*amqp.ExchangeDeclareMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
+				log.Printf("[ERROR] Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 			}
-			fmt.Printf("[DEBUG] Content: %+v\n", content)
+			log.Printf("[DEBUG] Content: %+v\n", content)
 			typ := content.ExchangeType
 			exchangeName := content.ExchangeName
 
@@ -155,14 +155,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 
 		case uint16(amqp.EXCHANGE_DELETE):
-			fmt.Printf("[DEBUG] Received exchange.delete request: %+v\n", request)
-			fmt.Printf("[DEBUG] Channel: %d\n", channel)
+			log.Printf("[DEBUG] Received exchange.delete request: %+v\n", request)
+			log.Printf("[DEBUG] Channel: %d\n", channel)
 			content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for ExchangeDeleteMessage")
+				log.Printf("[ERROR] Invalid content type for ExchangeDeleteMessage")
 				return nil, fmt.Errorf("invalid content type for ExchangeDeleteMessage")
 			}
-			fmt.Printf("[DEBUG] Content: %+v\n", content)
+			log.Printf("[DEBUG] Content: %+v\n", content)
 			exchangeName := content.ExchangeName
 
 			err := vh.DeleteExchange(exchangeName)
@@ -187,13 +187,13 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	case uint16(amqp.QUEUE):
 		switch request.MethodID {
 		case uint16(amqp.QUEUE_DECLARE):
-			fmt.Printf("[DEBUG] Received queue declare request: %+v\n", request)
+			log.Printf("[DEBUG] Received queue declare request: %+v\n", request)
 			content, ok := request.Content.(*amqp.QueueDeclareMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for ExchangeDeclareMessage")
+				log.Printf("[ERROR] Invalid content type for ExchangeDeclareMessage")
 				return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 			}
-			fmt.Printf("[DEBUG] Content: %+v\n", content)
+			log.Printf("[DEBUG] Content: %+v\n", content)
 			queueName := content.QueueName
 
 			queue, err := vh.CreateQueue(queueName)
@@ -203,7 +203,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 			err = vh.BindQueue(vhost.DEFAULT_EXCHANGE, queueName, queueName)
 			if err != nil {
-				fmt.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
+				log.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
 				return nil, err
 			}
 			messageCount := uint32(queue.Len())
@@ -234,20 +234,20 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			return nil, nil
 
 		case uint16(amqp.QUEUE_BIND):
-			fmt.Printf("[DEBUG] Received queue bind request: %+v\n", request)
+			log.Printf("[DEBUG] Received queue bind request: %+v\n", request)
 			content, ok := request.Content.(*amqp.QueueBindMessage)
 			if !ok {
-				fmt.Printf("Invalid content type for QueueBindMessage")
+				log.Printf("[ERROR] Invalid content type for QueueBindMessage")
 				return nil, fmt.Errorf("invalid content type for QueueBindMessage")
 			}
-			fmt.Printf("[DEBUG] Content: %+v\n", content)
+			log.Printf("[DEBUG] Content: %+v\n", content)
 			queue := content.Queue
 			exchange := content.Exchange
 			routingKey := content.RoutingKey
 
 			err := vh.BindQueue(exchange, queue, routingKey)
 			if err != nil {
-				fmt.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
+				log.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
 				return nil, err
 			}
 			frame := amqp.ResponseMethodMessage{
@@ -281,7 +281,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			if currentState.MethodFrame != newState.MethodFrame {
 				b.Connections[conn].Channels[channel].MethodFrame = newState.MethodFrame
-				fmt.Printf("[DEBUG] Current state after update method : %+v\n", b.getCurrentState(conn, channel))
+				log.Printf("[DEBUG] Current state after update method : %+v\n", b.getCurrentState(conn, channel))
 				return nil, nil
 			}
 			// if the class and method are not the same as the current state,
@@ -289,17 +289,17 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
 				b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
 				b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
-				fmt.Printf("[DEBUG] Current state after update header: %+v\n", b.getCurrentState(conn, channel))
+				log.Printf("[DEBUG] Current state after update header: %+v\n", b.getCurrentState(conn, channel))
 				return nil, nil
 			}
 			if currentState.Body == nil && newState.Body != nil {
 				b.Connections[conn].Channels[channel].Body = newState.Body
 			}
-			fmt.Printf("[DEBUG] Current state after all: %+v\n", currentState)
+			log.Printf("[DEBUG] Current state after all: %+v\n", currentState)
 			if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-				fmt.Printf("[DEBUG] All fields must be filled -> current state: %+v\n", currentState)
+				log.Printf("[DEBUG] All fields must be filled -> current state: %+v\n", currentState)
 				if len(currentState.Body) != int(currentState.BodySize) {
-					fmt.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
+					log.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
 					return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
 				}
 				publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishMessage)
@@ -320,7 +320,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			queue := getMsg.Queue
 			msgCount, err := vh.MsgCtrlr.GetMessageCount(queue)
 			if err != nil {
-				fmt.Printf("[ERROR] Error getting message count: %v", err)
+				log.Printf("[ERROR] Error getting message count: %v", err)
 				return nil, err
 			}
 			if msgCount == 0 {
@@ -335,7 +335,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 					MethodID: uint16(amqp.BASIC_GET_EMPTY),
 					Content:  amqp.ContentList{KeyValuePairs: []amqp.KeyValue{reserved1}},
 				}.FormatMethodFrame()
-				fmt.Printf("[DEBUG] Sending get-empty frame: %x\n", frame)
+				log.Printf("[DEBUG] Sending get-empty frame: %x\n", frame)
 				b.framer.SendFrame(conn, frame)
 				return nil, nil
 			}
@@ -361,7 +361,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			log.Printf("[DEBUG] Sent message from queue %s: ID=%s", queue, msg.ID)
 
 			if err != nil {
-				fmt.Printf("[DEBUG] Error sending frame: %v\n", err)
+				log.Printf("[DEBUG] Error sending frame: %v\n", err)
 				return nil, err
 			}
 
@@ -429,10 +429,10 @@ func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amq
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	fmt.Printf("[DEBUG] Getting current state for channel %d\n", channel)
+	log.Printf("[DEBUG] Getting current state for channel %d\n", channel)
 	state, ok := b.Connections[conn].Channels[channel]
 	if !ok {
-		fmt.Printf("[DEBUG] No channel found\n")
+		log.Printf("[DEBUG] No channel found\n")
 		return nil
 	}
 	return state
