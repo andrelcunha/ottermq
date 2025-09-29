@@ -69,7 +69,7 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			}
 
 			if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
-				b.handleHeartbeat(conn)
+				b.registerHeartbeat(conn)
 			}
 
 			//Process frame
@@ -118,19 +118,6 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 	}
 }
 
-// func (b *Broker) monitorHeartbeatTimeout(conn net.Conn, client *amqp.AmqpClient) {
-// 	maxTime := time.Duration(b.config.HeartbeatIntervalMax << 1)
-// 	if !client.LastHeartbeat.IsZero() {
-// 		if client.LastHeartbeat.Add(maxTime * time.Second).Before(time.Now()) {
-// 			log.Printf("[DEBUG] client.LastHeartbeat: %v", client.LastHeartbeat)
-// 			log.Printf("[DEBUG] heartbeat overdue. Connection is closing")
-// 			b.cleanupConnection(conn)
-// 			conn.Close()
-// 			return
-// 		}
-// 	}
-// }
-
 func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
 	b.mu.Lock()
 	b.Connections[conn] = connInfo
@@ -138,17 +125,14 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
-	log.Println("Cleaning connection")
+	log.Println("[DEBUG] Cleaning connection")
 	if connInfo, ok := b.Connections[conn]; ok {
-		// connInfo.Client.Done <- struct{}{} // should stop heartbeat verification
-		// connInfo.Client.Cancel()
 		connInfo.Client.Ctx.Done()
 		vhName := connInfo.VHostName
 		vh := b.GetVHost(vhName)
 		vh.CleanupConnection(conn)
 		b.mu.Lock()
 		delete(b.Connections, conn)
-		b.ActiveConns.Add(-1)
 		b.mu.Unlock()
 	}
 }
@@ -227,45 +211,11 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 	delete(b.Connections[conn].Channels, channel)
 }
 
-// func (b *Broker) sendHeartbeats(conn net.Conn, client *amqp.AmqpClient) {
-// 	b.mu.Lock()
-// 	heartbeatInterval := int(client.Config.HeartbeatInterval >> 1)
-// 	done := client.Ctx.Done()
-// 	b.mu.Unlock()
-// 	ticker := time.NewTicker(time.Duration(heartbeatInterval) * time.Second)
-// 	defer ticker.Stop()
-// 	for {
-// 		select {
-// 		case <-ticker.C:
-// 			b.mu.Lock()
-// 			shuttingDown := b.ShuttingDown.Load()
-// 			_, exists := b.Connections[conn]
-// 			b.mu.Unlock()
-// 			if shuttingDown {
-// 				return
-// 			}
-// 			if !exists {
-// 				log.Println("[TRACE] Connection no longer exists in broker")
-// 				return
-// 			}
-//
-// 			// // err := b.framer.SendHearbeat(conn)
-// 			// if err != nil {
-// 			// 	log.Printf("[DEBUG] Failed to send heartbeat: %v", err)
-// 			// 	return
-// 			// }
-// 		case <-done:
-// 			log.Println("[TRACE] Stopping heartbeat goroutine for closed connection")
-// 			return
-// 		}
-// 	}
-// }
-
-func (b *Broker) handleHeartbeat(conn net.Conn) error {
+// registerHeartbeat registers a heartbeat for a connection
+func (b *Broker) registerHeartbeat(conn net.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.Connections[conn].Client.LastHeartbeat = time.Now()
-
 	return nil
 }
 

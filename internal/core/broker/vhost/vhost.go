@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -52,15 +53,16 @@ func NewVhost(vhostName string) *VHost {
 	return vh
 }
 
-func (vh *VHost) CleanupConnection(conn net.Conn) {
+func (vh *VHost) CleanupConnection(conn net.Conn) error {
 	log.Println("[DEBUG] Cleaning vhost connection")
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
-	sessionId, ok := vh.getSessionID(conn)
-	if ok {
+	if sessionId, ok := vh.getSessionID(conn); ok {
 		vh.handleConsumerDisconnection(sessionId)
+		return nil
 	}
+	return fmt.Errorf("session not found")
 	// publishConnectionUpdate(nil) // Trigger update afte cleanup
 }
 
@@ -93,8 +95,8 @@ func (vh *VHost) handleConsumerDisconnection(sessionID string) {
 }
 
 func (vh *VHost) getSessionID(conn net.Conn) (string, bool) {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
+	// vh.mu.Lock()
+	// defer vh.mu.Unlock()
 	for sessionID, consumerID := range vh.ConsumerSessions {
 		if conn.RemoteAddr().String() == consumerID {
 			return sessionID, true
