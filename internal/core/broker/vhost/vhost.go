@@ -43,7 +43,7 @@ func NewVhost(vhostName string) *VHost {
 		ConsumerUnackMsgs: make(map[string]map[string]amqp.Message),
 	}
 	vh.MsgCtrlr = &DefaultMessageController{vh}
-	vh.CreateExchange(DEFAULT_EXCHANGE, DIRECT)
+	vh.createMandatoryStructure()
 	// Admin expecific
 	// vh.CreateQueue(ADMIN_QUEUES)
 	// vh.CreateQueue(ADMIN_EXCHANGES)
@@ -51,6 +51,10 @@ func NewVhost(vhostName string) *VHost {
 	// vh.CreateQueue(ADMIN_CONNECTIONS)
 	// vh.bindAdminQueues()
 	return vh
+}
+
+func (vh *VHost) createMandatoryStructure() {
+	vh.createMandatoryExchanges()
 }
 
 func (vh *VHost) CleanupConnection(conn net.Conn) error {
