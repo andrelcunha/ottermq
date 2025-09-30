@@ -44,6 +44,31 @@ type BasicProperties struct {
 	Reserved        string         // shortstr
 }
 
+func createBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
+	// Send Basic.GetEmpty
+	reserved1 := KeyValue{
+		Key:   STRING_SHORT,
+		Value: "",
+	}
+	frame := ResponseMethodMessage{
+		Channel:  request.Channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(BASIC_GET_EMPTY),
+		Content:  ContentList{KeyValuePairs: []KeyValue{reserved1}},
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  request.Channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(BASIC_GET_OK),
+		Content:  *EncodeGetOkToContentList(msgGetOk),
+	}.FormatMethodFrame()
+	return frame
+}
+
 func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	var buf bytes.Buffer
 	var flags uint16
@@ -260,4 +285,3 @@ func decodeBasicHeaderFlags(short uint16) []string {
 	}
 	return flags
 }
-

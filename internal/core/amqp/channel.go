@@ -1,8 +1,8 @@
 package amqp
 
-func closeChannelFrame(channel uint16) []byte {
+func closeChannelFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  channel,
+		Channel:  request.Channel,
 		ClassID:  uint16(CHANNEL),
 		MethodID: uint16(CHANNEL_CLOSE_OK),
 		Content:  ContentList{},
@@ -10,9 +10,9 @@ func closeChannelFrame(channel uint16) []byte {
 	return frame
 }
 
-func createChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte {
+func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  channel,
+		Channel:  request.Channel,
 		ClassID:  request.ClassID,
 		MethodID: uint16(CHANNEL_OPEN_OK),
 		Content: ContentList{

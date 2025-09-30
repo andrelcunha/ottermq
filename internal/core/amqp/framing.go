@@ -16,12 +16,21 @@ type Framer interface {
 	SendFrame(conn net.Conn, frame []byte) error
 	Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
-	// SendHearbeat(conn net.Conn) error
-	CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte
-	CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte
-	CreateChannelCloseFrame(channel uint16) []byte
-	CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte
-	CreateConnectionCloseOkFrame(channel uint16) []byte
+
+	// Basic Methods
+	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
+	CreateBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte
+
+	// Exchange Methods
+	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
+
+	// Channel Methods
+	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
+	CreateChannelCloseFrame(request *RequestMethodMessage) []byte
+
+	// Connection Methods
+	CreateConnectionCloseFrame(channel, replyCode, methodId, classId uint16, replyText string) []byte
+	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
 }
 
 type DefaultFramer struct{}
@@ -51,24 +60,32 @@ func sendHeartbeat(conn net.Conn) error {
 	return sendFrame(conn, heartbeatFrame)
 }
 
-func (d *DefaultFramer) CreateExchangeDeclareFrame(channel uint16, request *RequestMethodMessage) []byte {
-	return createExchangeDeclareFrame(channel, request)
+func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
+	return createExchangeDeclareFrame(request)
 }
 
-func (d *DefaultFramer) CreateChannelOpenOkFrame(channel uint16, request *RequestMethodMessage) []byte {
-	return createChannelOpenOkFrame(channel, request)
+func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte {
+	return createChannelOpenOkFrame(request)
 }
 
-func (d *DefaultFramer) CreateChannelCloseFrame(channel uint16) []byte {
-	return closeChannelFrame(channel)
+func (d *DefaultFramer) CreateChannelCloseFrame(request *RequestMethodMessage) []byte {
+	return closeChannelFrame(request)
 }
 
-func (d *DefaultFramer) CreateConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) []byte {
-	return createConnectionCloseFrame(channel, replyCode, replyText, methodId, classId)
+func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, methodId, classId uint16, replyText string) []byte {
+	return createConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
 }
 
-func (d *DefaultFramer) CreateConnectionCloseOkFrame(channel uint16) []byte {
-	return createConnectionCloseOkFrame(channel)
+func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
+	return createConnectionCloseOkFrame(request)
+}
+
+func (d *DefaultFramer) CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
+	return createBasicGetEmptyFrame(request)
+}
+
+func (d *DefaultFramer) CreateBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte {
+	return createBasicGetOkFrame(request, msgGetOk)
 }
 
 func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProperties, error) {

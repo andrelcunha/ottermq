@@ -9,8 +9,7 @@ import (
 )
 
 // createConnectionCloseFrame creates a connection close frame,
-// Params: channel, replyCode, replyText, classID, methodID
-func createConnectionCloseFrame(channel uint16, replyCode uint16, replyText string, classID uint16, methodID uint16) []byte {
+func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
 	replyCodeKv := KeyValue{
 		Key:   INT_SHORT,
 		Value: replyCode,
@@ -39,9 +38,9 @@ func createConnectionCloseFrame(channel uint16, replyCode uint16, replyText stri
 	return frame
 }
 
-func createConnectionCloseOkFrame(channel uint16) []byte {
+func createConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
-		Channel:  channel,
+		Channel:  request.Channel,
 		ClassID:  uint16(CONNECTION),
 		MethodID: uint16(CONNECTION_CLOSE_OK),
 		Content:  ContentList{},
