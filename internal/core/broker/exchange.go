@@ -51,12 +51,7 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			return nil, err
 		}
 
-		frame := amqp.ResponseMethodMessage{
-			Channel:  channel,
-			ClassID:  request.ClassID,
-			MethodID: uint16(amqp.EXCHANGE_DELETE_OK),
-			Content:  amqp.ContentList{},
-		}.FormatMethodFrame()
+		frame := b.framer.CreateExchangeDeleteFrame(request)
 
 		b.framer.SendFrame(conn, frame)
 		return nil, nil

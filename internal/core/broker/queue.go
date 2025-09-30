@@ -10,7 +10,6 @@ import (
 )
 
 func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
-	channel := request.Channel
 	switch request.MethodID {
 	case uint16(amqp.QUEUE_DECLARE):
 		log.Printf("[DEBUG] Received queue declare request: %+v\n", request)
@@ -27,7 +26,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			return nil, err
 		}
 
-		err = vh.BindQueue(vhost.DEFAULT_EXCHANGE, queueName, queueName)
+		err = vh.BindToDefaultExchange(queueName)
 		if err != nil {
 			log.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
 			return nil, err
@@ -35,27 +34,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		messageCount := uint32(queue.Len())
 		counsumerCount := uint32(0)
 
-		frame := amqp.ResponseMethodMessage{
-			Channel:  channel,
-			ClassID:  request.ClassID,
-			MethodID: uint16(amqp.QUEUE_DECLARE_OK),
-			Content: amqp.ContentList{
-				KeyValuePairs: []amqp.KeyValue{
-					{
-						Key:   amqp.STRING_SHORT,
-						Value: queueName,
-					},
-					{
-						Key:   amqp.INT_LONG,
-						Value: messageCount,
-					},
-					{
-						Key:   amqp.INT_LONG,
-						Value: counsumerCount,
-					},
-				},
-			},
-		}.FormatMethodFrame()
+		frame := b.framer.CreateQueueDeclareFrame(request, queueName, messageCount, counsumerCount)
 		b.framer.SendFrame(conn, frame)
 		return nil, nil
 
@@ -73,15 +52,10 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 
 		err := vh.BindQueue(exchange, queue, routingKey)
 		if err != nil {
-			log.Printf("[DEBUG] Error binding to default exchange: %v\n", err)
+			log.Printf("[DEBUG] Error binding to exchange: %v\n", err)
 			return nil, err
 		}
-		frame := amqp.ResponseMethodMessage{
-			Channel:  channel,
-			ClassID:  request.ClassID,
-			MethodID: uint16(amqp.QUEUE_BIND_OK),
-			Content:  amqp.ContentList{},
-		}.FormatMethodFrame()
+		frame := b.framer.CreateQueueBindOkFrame(request)
 		b.framer.SendFrame(conn, frame)
 		return nil, nil
 

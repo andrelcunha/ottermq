@@ -231,16 +231,8 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 			// Send Basic.GetOk + header + body
 			msg := vh.MsgCtrlr.GetMessage(queue)
-			msgGetOk := &amqp.BasicGetOk{
-				DeliveryTag:  1,
-				Redelivered:  false,
-				Exchange:     msg.Exchange,
-				RoutingKey:   msg.RoutingKey,
-				MessageCount: uint32(msgCount),
-			}
 
-			frame := b.framer.CreateBasicGetOkFrame(request, msgGetOk)
-
+			frame := b.framer.CreateBasicGetOkFrame(request, msg.Exchange, msg.RoutingKey, uint32(msgCount))
 			err = b.framer.SendFrame(conn, frame)
 			log.Printf("[DEBUG] Sent message from queue %s: ID=%s", queue, msg.ID)
 

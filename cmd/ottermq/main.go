@@ -160,4 +160,5 @@ func main() {
 	b.Shutdown()
 	app.Shutdown() // TODO: deal with the web server shutdown
 	log.Println("Server gracefully stopped.")
+	os.Exit(0) // if came so far it means the server has stopped gracefully
 }

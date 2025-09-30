@@ -19,10 +19,15 @@ type Framer interface {
 
 	// Basic Methods
 	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
-	CreateBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte
+	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
+
+	// Queue Methods
+	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte
+	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
 
 	// Exchange Methods
 	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
+	CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte
 
 	// Channel Methods
 	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
@@ -51,17 +56,20 @@ func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
 	return parseFrame(frame)
 }
 
-// func (d *DefaultFramer) SendHearbeat(conn net.Conn) error {
-// 	return sendHeartbeat(conn)
-// }
+func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
+	return createQueueDeclareFrame(request, queueName, messageCount, counsumerCount)
+}
 
-func sendHeartbeat(conn net.Conn) error {
-	heartbeatFrame := createHeartbeatFrame()
-	return sendFrame(conn, heartbeatFrame)
+func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {
+	return createQueueBindOkFrame(request)
 }
 
 func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
 	return createExchangeDeclareFrame(request)
+}
+
+func (d *DefaultFramer) CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte {
+	return createExchangeDeleteFrame(request)
 }
 
 func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte {
@@ -84,8 +92,8 @@ func (d *DefaultFramer) CreateBasicGetEmptyFrame(request *RequestMethodMessage) 
 	return createBasicGetEmptyFrame(request)
 }
 
-func (d *DefaultFramer) CreateBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte {
-	return createBasicGetOkFrame(request, msgGetOk)
+func (d *DefaultFramer) CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
+	return createBasicGetOkFrame(request, exchange, routingkey, msgCount)
 }
 
 func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProperties, error) {
