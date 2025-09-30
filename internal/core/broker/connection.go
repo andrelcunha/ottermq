@@ -37,12 +37,17 @@ func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManag
 }
 
 func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
+	b.ActiveConns.Add(1)
 	client := connInfo.Client
 	ctx := client.Ctx
 
-	b.ActiveConns.Add(1)
 	defer func() {
 		defer b.ActiveConns.Done()
+		if len(b.Connections) == 0 {
+			log.Println("[DEBUG] No connections to clean")
+			return
+		}
+		log.Println("[DEBUG] Cleaning connection")
 		b.cleanupConnection(conn)
 	}()
 
@@ -125,15 +130,13 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
-	log.Println("[DEBUG] Cleaning connection")
 	if connInfo, ok := b.Connections[conn]; ok {
+		log.Printf("Cleaning connection. inside loop")
 		connInfo.Client.Ctx.Done()
 		vhName := connInfo.VHostName
 		vh := b.GetVHost(vhName)
 		vh.CleanupConnection(conn)
-		b.mu.Lock()
 		delete(b.Connections, conn)
-		b.mu.Unlock()
 	}
 }
 
@@ -215,8 +218,11 @@ func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
 func (b *Broker) registerHeartbeat(conn net.Conn) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.Connections[conn].Client.LastHeartbeat = time.Now()
-	return nil
+	if connInfo, exists := b.Connections[conn]; exists {
+		connInfo.Client.LastHeartbeat = time.Now()
+		return nil
+	}
+	return fmt.Errorf("connection not found")
 }
 
 func (b *Broker) BroadcastConnectionClose() {

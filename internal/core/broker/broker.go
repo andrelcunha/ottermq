@@ -50,8 +50,9 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 }
 
 func (b *Broker) Start() error {
-	log.Println("OtterMQ version ", b.config.Version)
-	log.Println("Broker is starting...")
+	b.Logo()
+	log.Printf("OtterMQ version %s", b.config.Version)
+	log.Printf("Broker is starting...")
 
 	configurations := b.setConfigurations()
 
@@ -66,6 +67,20 @@ func (b *Broker) Start() error {
 	log.Printf("Started TCP listener on %s", addr)
 
 	return b.acceptLoop(configurations)
+}
+
+func (b *Broker) Logo() {
+	// TODO: create a better logo: 🦦
+	log.Printf(
+		`
+
+  oooooo     o8     o8                        oooo     oooo  oooooo  
+o888   888o o888oo o888oo oooooooo8 oo ooooo   8888o   888 o888  888o
+888     888  888    888  888ooooo8   888   888 88 888o8 88 888    888
+888o   o888  888    888  888         888       88  888  88 888o  o888
+   88o88     888o   888o  88ooo888  o888o     o88o  8  o88o  88oo88  
+                                                                 88o8
+`)
 }
 
 func (b *Broker) setConfigurations() map[string]any {
@@ -135,7 +150,11 @@ func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClie
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
 	channel := request.Channel
-	connInfo := b.Connections[conn]
+	connInfo, exists := b.Connections[conn]
+	if !exists {
+		log.Printf("[DEBUG] Connection not found: %s", conn.RemoteAddr())
+		return nil, nil
+	}
 	vh := b.VHosts[connInfo.VHostName]
 	if ok := b.ShuttingDown.Load(); ok {
 		if request.ClassID != uint16(amqp.CONNECTION) ||
