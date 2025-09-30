@@ -141,16 +141,16 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 }
 
 // closeConnectionRequested closes a connection and sends a CONNECTION_CLOSE_OK frame
-func (b *Broker) closeConnectionRequested(conn net.Conn, channel uint16) (any, error) {
-	frame := b.framer.CreateConnectionCloseOkFrame(channel)
+func (b *Broker) closeConnectionRequested(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	frame := b.framer.CreateConnectionCloseOkFrame(request)
 	err := b.framer.SendFrame(conn, frame)
 	b.cleanupConnection(conn)
 	return nil, err
 }
 
 // closeConnection sends `connection.close` when the server needs to shutdown for some reason
-func (b *Broker) sendCloseConnection(conn net.Conn, channel uint16, replyCode uint16, replyText string, methodId uint16, classId uint16) (any, error) {
-	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, replyText, methodId, classId)
+func (b *Broker) sendCloseConnection(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) (any, error) {
+	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
 	err := b.framer.SendFrame(conn, frame)
 
 	return nil, err
@@ -159,59 +159,6 @@ func (b *Broker) sendCloseConnection(conn net.Conn, channel uint16, replyCode ui
 func (b *Broker) connectionCloseOk(conn net.Conn) {
 	b.cleanupConnection(conn)
 	conn.Close()
-}
-
-// openChannel executes the AMQP command CHANNEL_OPEN
-func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn, channel uint16) (any, error) {
-	log.Printf("[DEBUG] Received channel open request: %+v\n", request)
-
-	// Check if the channel is already open
-	if b.checkChannel(conn, channel) {
-		log.Printf("[DEBUG] Channel %d already open\n", channel)
-		return nil, fmt.Errorf("channel already open")
-	}
-	b.registerChannel(conn, request)
-	log.Printf("[TRACE] New state added: %+v\n", b.Connections[conn].Channels[request.Channel])
-
-	frame := b.framer.CreateChannelOpenOkFrame(channel, request)
-
-	b.framer.SendFrame(conn, frame)
-	return nil, nil
-}
-
-// checkChannel checks if a channel is already open
-func (b *Broker) checkChannel(conn net.Conn, channel uint16) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	_, ok := b.Connections[conn].Channels[channel]
-	return ok
-}
-
-func (b *Broker) closeChannel(conn net.Conn, channel uint16) (any, error) {
-	if b.checkChannel(conn, channel) {
-		fmt.Printf("[DEBUG] Channel %d already open\n", channel)
-		return nil, fmt.Errorf("channel already open")
-	}
-	b.removeChannel(conn, channel)
-	frame := b.framer.CreateChannelCloseFrame(channel)
-	b.framer.SendFrame(conn, frame)
-	return nil, nil
-}
-
-// registerChannel register a new channel to the connection
-func (b *Broker) registerChannel(conn net.Conn, frame *amqp.RequestMethodMessage) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.Connections[conn].Channels[frame.Channel] = &amqp.ChannelState{MethodFrame: frame}
-	log.Printf("[DEBUG] New channel added: %d\n", frame.Channel)
-}
-
-// removeChannel removes a channel from the connection
-func (b *Broker) removeChannel(conn net.Conn, channel uint16) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	delete(b.Connections[conn].Channels, channel)
 }
 
 // registerHeartbeat registers a heartbeat for a connection
@@ -229,6 +176,22 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		b.sendCloseConnection(conn, 0, 320, "Server shutting down", 0, 0)
+		for channel := range b.Connections[conn].Channels {
+			b.sendCloseConnection(conn, channel, 320, 0, 0, "Server shutting down")
+			break // don't need to send to other channels
+		}
+	}
+}
+
+func (b *Broker) connectionHandler(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
+	switch request.MethodID {
+	case uint16(amqp.CONNECTION_CLOSE):
+		return b.closeConnectionRequested(request, conn)
+	case uint16(amqp.CONNECTION_CLOSE_OK):
+		b.connectionCloseOk(conn)
+		return nil, nil
+	default:
+		log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
+		return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
 	}
 }

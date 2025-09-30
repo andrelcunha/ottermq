@@ -10,13 +10,10 @@ type AMQP_Key struct {
 type AMQP_Type struct {
 }
 
-// Received by client
-// -- this is legacy from client implementation
-// -- Dont use it!
 type ConnectionStartFrame struct {
 	VersionMajor     byte
 	VersionMinor     byte
-	ServerProperties map[string]interface{}
+	ServerProperties map[string]any
 	Mechanisms       string
 	Locales          string
 }
