@@ -39,7 +39,7 @@ func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManag
 func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
 	b.ActiveConns.Add(1)
 	client := connInfo.Client
-	ctx := client.Ctx
+	// ctx := client.Ctx
 
 	defer func() {
 		defer b.ActiveConns.Done()
@@ -54,72 +54,65 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 	channelNum := uint16(0)
 
 	for {
-		select {
-		case <-ctx.Done():
-			log.Printf("[DEBUG] Connection context canceled: %v", conn.RemoteAddr())
+		frame, err := b.framer.ReadFrame(conn)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				log.Printf("[DEBUG] Connection timeout: %v", err)
+			}
+			if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
+				log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
+			} else {
+				log.Printf("Error reading frame: %v", err)
+			}
+			client.Cancel()
 			return
-		default:
-			frame, err := b.framer.ReadFrame(conn)
-			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					log.Printf("[DEBUG] Connection timeout: %v", err)
-				}
-				if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
-					log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
-				} else {
-					log.Printf("Error reading frame: %v", err)
-				}
-				client.Cancel()
-				return
-			}
+		}
 
-			if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
-				b.registerHeartbeat(conn)
-			}
+		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
+			b.registerHeartbeat(conn)
+		}
 
-			//Process frame
-			newInterface, err := b.framer.ParseFrame(frame)
-			if err != nil {
-				log.Printf("[ERROR] Failed parsing frame: %v", err)
-				client.Cancel()
-				return
+		//Process frame
+		newInterface, err := b.framer.ParseFrame(frame)
+		if err != nil {
+			log.Printf("[ERROR] Failed parsing frame: %v", err)
+			client.Cancel()
+			return
+		}
+		if _, ok := newInterface.(*amqp.Heartbeat); ok {
+			continue
+		}
+
+		newState, ok := newInterface.(*amqp.ChannelState)
+		if !ok {
+			log.Printf(" [ERROR] Failed to cast request to ChannelState")
+			client.Cancel()
+			return
+		}
+
+		log.Printf("[TRACE] New State: %+v\n", newState)
+
+		if newState.MethodFrame != nil {
+			request := newState.MethodFrame
+			if channelNum != request.Channel {
+				channelNum = newState.MethodFrame.Channel
+				log.Printf("[DEBUG] Switching to channel: %d\n", request.Channel)
 			}
-			if _, ok := newInterface.(*amqp.Heartbeat); ok {
+		} else {
+			if newState.HeaderFrame != nil {
+				log.Printf("[DEBUG] HeaderFrame: %+v\n", newState.HeaderFrame)
+			} else if newState.Body != nil {
+				log.Printf("[DEBUG] Body: %+v\n", newState.Body)
+			}
+			if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
+				newState.MethodFrame = previousState.MethodFrame
+				log.Printf("[DEBUG] Recovered method frame: %+v", previousState.MethodFrame)
+			} else {
+				log.Printf("[DEBUG] Channel %d not found", channelNum)
 				continue
 			}
-
-			newState, ok := newInterface.(*amqp.ChannelState)
-			if !ok {
-				log.Printf(" [ERROR] Failed to cast request to ChannelState")
-				client.Cancel()
-				return
-			}
-
-			log.Printf("[DEBUG] New State: %+v\n", newState)
-
-			if newState.MethodFrame != nil {
-				request := newState.MethodFrame
-				if channelNum != request.Channel {
-					channelNum = newState.MethodFrame.Channel
-					log.Printf("[DEBUG] Switching to channel: %d\n", request.Channel)
-				}
-			} else {
-				if newState.HeaderFrame != nil {
-					log.Printf("[DEBUG] HeaderFrame: %+v\n", newState.HeaderFrame)
-				} else if newState.Body != nil {
-					log.Printf("[DEBUG] Body: %+v\n", newState.Body)
-				}
-				if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
-					newState.MethodFrame = previousState.MethodFrame
-					log.Printf("[DEBUG] Recovered method frame: %+v", previousState.MethodFrame)
-				} else {
-					log.Printf("[DEBUG] Channel %d not found", channelNum)
-					continue
-				}
-			}
-			b.processRequest(conn, newState)
-
 		}
+		b.processRequest(conn, newState)
 	}
 }
 
@@ -131,7 +124,6 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
 	if connInfo, ok := b.Connections[conn]; ok {
-		log.Printf("Cleaning connection. inside loop")
 		connInfo.Client.Ctx.Done()
 		vhName := connInfo.VHostName
 		vh := b.GetVHost(vhName)
@@ -176,10 +168,7 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		for channel := range b.Connections[conn].Channels {
-			b.sendCloseConnection(conn, channel, 320, 0, 0, "Server shutting down")
-			break // don't need to send to other channels
-		}
+		b.sendCloseConnection(conn, 0, 320, 0, 0, "Server shutting down")
 	}
 }
 

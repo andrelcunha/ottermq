@@ -125,7 +125,10 @@ func main() {
 
 	// Start the web admin server in a goroutine
 	go func() {
-		log.Fatal(app.Listen(":3000"))
+		err := app.Listen(":3000")
+		if err != nil {
+			log.Fatalf("Error: %v", err)
+		}
 	}()
 
 	// Handle OS signals for graceful shutdown
@@ -158,7 +161,9 @@ func main() {
 	}
 
 	b.Shutdown()
-	app.Shutdown() // TODO: deal with the web server shutdown
+	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
+		log.Fatalf("Failed to shutdown web server: %v", err)
+	}
 	log.Println("Server gracefully stopped.")
 	os.Exit(0) // if came so far it means the server has stopped gracefully
 }
