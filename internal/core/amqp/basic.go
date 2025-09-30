@@ -59,7 +59,15 @@ func createBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
 	return frame
 }
 
-func createBasicGetOkFrame(request *RequestMethodMessage, msgGetOk *BasicGetOk) []byte {
+func createBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
+	msgGetOk := &BasicGetOk{
+		DeliveryTag:  1,
+		Redelivered:  false,
+		Exchange:     exchange,
+		RoutingKey:   routingkey,
+		MessageCount: msgCount,
+	}
+
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
 		ClassID:  request.ClassID,

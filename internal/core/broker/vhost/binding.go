@@ -13,9 +13,6 @@ func (vh *VHost) BindToDefaultExchange(queueName string) error {
 func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	if exchangeName == "" {
-		exchangeName = DEFAULT_EXCHANGE
-	}
 
 	// Find the exchange
 	exchange, ok := vh.Exchanges[exchangeName]

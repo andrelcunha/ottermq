@@ -8,6 +8,41 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
 
+func createQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  request.Channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(QUEUE_DECLARE_OK),
+		Content: ContentList{
+			KeyValuePairs: []KeyValue{
+				{
+					Key:   STRING_SHORT,
+					Value: queueName,
+				},
+				{
+					Key:   INT_LONG,
+					Value: messageCount,
+				},
+				{
+					Key:   INT_LONG,
+					Value: counsumerCount,
+				},
+			},
+		},
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createQueueBindOkFrame(request *RequestMethodMessage) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  request.Channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(QUEUE_BIND_OK),
+		Content:  ContentList{},
+	}.FormatMethodFrame()
+	return frame
+}
+
 // Fields:
 // 0-1: reserved short int
 // 2: exchange name - length (short)

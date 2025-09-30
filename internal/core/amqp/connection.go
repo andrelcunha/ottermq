@@ -4,9 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"log"
+	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
+
+func sendHeartbeat(conn net.Conn) error {
+	heartbeatFrame := createHeartbeatFrame()
+	return sendFrame(conn, heartbeatFrame)
+}
 
 // createConnectionCloseFrame creates a connection close frame,
 func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
