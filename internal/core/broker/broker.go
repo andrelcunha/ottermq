@@ -149,7 +149,10 @@ func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClie
 
 func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any, error) {
 	request := newState.MethodFrame
-	connInfo := b.Connections[conn]
+	connInfo, exist := b.Connections[conn]
+	if !exist {
+		return nil, fmt.Errorf("connection not found")
+	}
 	vh := b.VHosts[connInfo.VHostName]
 	if ok := b.ShuttingDown.Load(); ok {
 		if request.ClassID != uint16(amqp.CONNECTION) ||

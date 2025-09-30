@@ -119,9 +119,6 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Post("/login", api_admin.Login)
 }
 
-func (ws *WebServer) AddSwagger(app *fiber.App) {
-}
-
 func (ws *WebServer) AddUI(app *fiber.App) {
 	// Web Interface Routes
 	webGrp := app.Group("/", middleware.AuthRequired)
