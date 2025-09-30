@@ -4,8 +4,6 @@ import (
 	"fmt"
 )
 
-const DEFAULT_EXCHANGE = "AMQP_default"
-
 type Exchange struct {
 	Name     string              `json:"name"`
 	Queues   map[string]*Queue   `json:"queues"`
@@ -19,6 +17,38 @@ const (
 	DIRECT ExchangeType = "direct"
 	FANOUT ExchangeType = "fanout"
 )
+
+type MandatoryExchange struct {
+	Name string       `json:"name"`
+	Type ExchangeType `json:"type"`
+}
+
+const (
+	DEFAULT_EXCHANGE = "amq.default"
+	EMPTY_EXCHANGE   = ""
+	MANDATORY_TOPIC  = "amq.topic"
+	MANDATORY_DIRECT = "amq.direct"
+	MANDATORY_FANOUT = "amq.fanout"
+)
+
+var mandatoryExchanges = []MandatoryExchange{
+	{Name: DEFAULT_EXCHANGE, Type: DIRECT},
+	{Name: MANDATORY_TOPIC, Type: DIRECT},
+	{Name: MANDATORY_DIRECT, Type: DIRECT},
+	{Name: MANDATORY_FANOUT, Type: FANOUT},
+}
+
+func (vh *VHost) createMandatoryExchanges() {
+	for _, mandatoryExchange := range mandatoryExchanges {
+		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type)
+	}
+
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	if defaultExchange, exists := vh.Exchanges[DEFAULT_EXCHANGE]; exists {
+		vh.Exchanges[EMPTY_EXCHANGE] = defaultExchange
+	}
+}
 
 func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
 	vh.mu.Lock()
@@ -42,8 +72,10 @@ func (vh *VHost) DeleteExchange(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	// If the exchange is the default exchange, return an error
-	if name == DEFAULT_EXCHANGE {
-		return fmt.Errorf("cannot delete default exchange")
+	for _, mandatoryExchange := range mandatoryExchanges {
+		if name == mandatoryExchange.Name {
+			return fmt.Errorf("cannot delete default exchange")
+		}
 	}
 
 	// Check if the exchange exists
