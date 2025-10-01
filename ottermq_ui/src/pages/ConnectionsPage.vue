@@ -94,17 +94,6 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 </script>
 
 <style scoped lang="scss">
-.small-square { 
-    height: .7em; 
-    width: .7em; 
-    // background: #fff; 
-    border: 50%; 
-    padding: 2px; 
-    margin-right: 4px; 
-    display: inline-block; 
-}
-.small-square--green { background: #0f0}
-.small-square--red { background: #c10015}
 .show-time { font-size: 1em; margin-bottom: 2px; }
 .show-date { font-size: .8em; color: #999; }
 </style>

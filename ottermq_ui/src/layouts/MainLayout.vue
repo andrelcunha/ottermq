@@ -3,7 +3,7 @@
     <q-header elevated>
       <q-toolbar>
 
-        <q-toolbar-title> Ottermq </q-toolbar-title>
+        <q-toolbar-title> OtterMQ </q-toolbar-title>
 
         <div>User: {{username}}</div>
         <q-btn flat label="Logout" @click="logout" />
@@ -55,4 +55,15 @@ header .container {
   max-width: 1200px;
   margin: 0 auto;
 }
+
+.small-square { 
+    height: .7em; 
+    width: .7em; 
+    border: 1px solid lightslategray;
+    padding: 2px; 
+    margin-right: 4px; 
+    display: inline-block; 
+}
+.small-square--green { background: #0f0}
+.small-square--red { background: #c10015}
 </style>
