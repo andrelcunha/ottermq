@@ -517,13 +517,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.QueueListResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -808,6 +808,34 @@ const docTemplate = `{
                 },
                 "routing_key": {
                     "type": "string"
+                }
+            }
+        },
+        "models.QueueDTO": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                },
+                "vhost_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.QueueListResponse": {
+            "type": "object",
+            "properties": {
+                "queues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.QueueDTO"
+                    }
                 }
             }
         },

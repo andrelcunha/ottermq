@@ -15,3 +15,7 @@ type ConnectionListResponse struct {
 type ExchangeListResponse struct {
 	Exchanges []ExchangeDTO `json:"exchanges"`
 }
+
+type QueueListResponse struct {
+	Queues []QueueDTO `json:"queues"`
+}

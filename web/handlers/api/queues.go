@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
+	dto "github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/rabbitmq/amqp091-go"
 
@@ -16,18 +17,18 @@ import (
 // @Tags queues
 // @Accept json
 // @Produce json
-// @Success 200 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
+// @Success 200 {object} dto.QueueListResponse
+// @Failure 500 {object} dto.ErrorResponse
 // @Router /api/queues [get]
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 	queues := b.ManagerApi.ListQueues()
 	if queues == nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to list exchanges",
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Error: "failed to list exchanges",
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"queues": queues,
+	return c.Status(fiber.StatusOK).JSON(dto.QueueListResponse{
+		Queues: queues,
 	})
 }
 
