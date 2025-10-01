@@ -1,6 +1,7 @@
 package api_admin
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 	"github.com/gofiber/fiber/v2"
 )
@@ -11,38 +12,30 @@ import (
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body persistdb.UserCreateDTO true "User details"
-// @Success 200 {object} fiber.Map
+// @Param user body models.UserCreateRequest true "User details"
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Security ApiKeyAuth
 // @Router /api/admin/users [post]
 func AddUser(c *fiber.Ctx) error {
-	var user persistdb.UserCreateDTO
+	var user models.UserCreateRequest
 	if err := c.BodyParser(&user); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	if user.Password != user.ConfirmPassword {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Passwords do not match",
-		})
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: "Passwords do not match"})
 	}
 	err := persistdb.OpenDB()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	defer persistdb.CloseDB()
-	err = persistdb.AddUser(user)
+	err = persistdb.AddUser(user.ToPersist())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "User added successfully",
-	})
+	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{Message: "User added successfully"})
 }
 
 // GetUsers godoc
@@ -51,24 +44,28 @@ func AddUser(c *fiber.Ctx) error {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Success 200 {object} []persistdb.User
-// @Failure 500 {object} fiber.Map
+// @Success 200 {object} models.UserListResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /api/admin/users [get]
 func GetUsers(c *fiber.Ctx) error {
 	err := persistdb.OpenDB()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	defer persistdb.CloseDB()
-	users, err := persistdb.GetUsers()
+	list, err := persistdb.GetUsers()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
-	return c.Status(fiber.StatusOK).JSON(users)
+	out := make([]models.UserSummary, 0, len(list))
+	for _, u := range list {
+		userdto, err := u.MapUserToUserDTO()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
+		}
+		out = append(out, models.FromPersistUserListDTO(userdto))
+	}
+	return c.Status(fiber.StatusOK).JSON(models.UserListResponse{Users: out})
 }
 
 // Login godoc
@@ -77,57 +74,43 @@ func GetUsers(c *fiber.Ctx) error {
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param user body persistdb.User true "User details"
-// @Success 200 {object} fiber.Map
-// @Failure 401 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
+// @Param user body models.AuthRequest true "User details"
+// @Success 200 {object} models.AuthResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
 // @Router /api/admin/login [post]
 func Login(c *fiber.Ctx) error {
-	var user persistdb.User
-	if err := c.BodyParser(&user); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+	var req models.AuthRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	err := persistdb.OpenDB()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	defer persistdb.CloseDB()
 
-	ok, err := persistdb.AuthenticateUser(user.Username, user.Password)
+	ok, err := persistdb.AuthenticateUser(req.Username, req.Password)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid username or password",
-		})
+		return c.Status(fiber.StatusUnauthorized).JSON(models.ErrorResponse{Error: "Invalid username or password"})
 	}
 	// get user
-	persistedUser, err := persistdb.GetUserByUsername(user.Username)
+	persistedUser, err := persistdb.GetUserByUsername(req.Username)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 
-	userdto, err := persistdb.MaapUserToUserDTO(persistedUser)
+	userdto, err := persistedUser.MapUserToUserDTO()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	token, err := persistdb.GenerateJWTToken(userdto)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"token": token})
+	return c.Status(fiber.StatusOK).JSON(models.AuthResponse{Token: token})
 
 }

@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/persistdb.User"
+                            "$ref": "#/definitions/models.AuthRequest"
                         }
                     }
                 ],
@@ -43,19 +43,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.AuthResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -78,16 +78,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/persistdb.User"
-                            }
+                            "$ref": "#/definitions/models.UserListResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -116,7 +113,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/persistdb.UserCreateDTO"
+                            "$ref": "#/definitions/models.UserCreateRequest"
                         }
                     }
                 ],
@@ -124,7 +121,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -158,19 +167,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -202,19 +211,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -246,19 +255,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.BindingListResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -340,7 +349,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_andrelcunha_ottermq_web_models.CreateExchangeRequest"
+                            "$ref": "#/definitions/models.CreateExchangeRequest"
                         }
                     }
                 ],
@@ -438,19 +447,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -482,19 +491,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/models.FiberMap"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -555,19 +564,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -599,19 +608,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -643,19 +652,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -663,17 +672,21 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "fiber.Map": {
-            "type": "object",
-            "additionalProperties": true
-        },
-        "github_com_andrelcunha_ottermq_web_models.CreateExchangeRequest": {
+        "models.AuthRequest": {
             "type": "object",
             "properties": {
-                "exchange_name": {
+                "password": {
                     "type": "string"
                 },
-                "exchange_type": {
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
                     "type": "string"
                 }
             }
@@ -689,6 +702,20 @@ const docTemplate = `{
                 },
                 "routing_key": {
                     "type": "string"
+                }
+            }
+        },
+        "models.BindingListResponse": {
+            "type": "object",
+            "properties": {
+                "bindings": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
                 }
             }
         },
@@ -735,6 +762,17 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.ConnectionInfoDTO"
                     }
+                }
+            }
+        },
+        "models.CreateExchangeRequest": {
+            "type": "object",
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "exchange_type": {
+                    "type": "string"
                 }
             }
         },
@@ -793,10 +831,6 @@ const docTemplate = `{
                 }
             }
         },
-        "models.FiberMap": {
-            "type": "object",
-            "additionalProperties": true
-        },
         "models.PublishMessageRequest": {
             "type": "object",
             "properties": {
@@ -847,24 +881,7 @@ const docTemplate = `{
                 }
             }
         },
-        "persistdb.User": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "role_id": {
-                    "type": "integer"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "persistdb.UserCreateDTO": {
+        "models.UserCreateRequest": {
             "type": "object",
             "properties": {
                 "confirm_password": {
@@ -875,6 +892,34 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UserListResponse": {
+            "type": "object",
+            "properties": {
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserSummary"
+                    }
+                }
+            }
+        },
+        "models.UserSummary": {
+            "type": "object",
+            "properties": {
+                "has_password": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string"
                 },
                 "username": {
                     "type": "string"

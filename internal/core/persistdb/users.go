@@ -95,14 +95,14 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func MaapUserToUserDTO(user User) (UserListDTO, error) {
-	role, err := GetRoleByID(user.RoleID)
+func (u User) MapUserToUserDTO() (UserListDTO, error) {
+	role, err := GetRoleByID(u.RoleID)
 	if err != nil {
 		return UserListDTO{}, err
 	}
 	return UserListDTO{
-		ID:          user.ID,
-		Username:    user.Username,
+		ID:          u.ID,
+		Username:    u.Username,
 		HasPassword: true,
 		Role:        role.Name,
 	}, nil
