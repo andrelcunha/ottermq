@@ -16,6 +16,7 @@ type ExchangeType string
 const (
 	DIRECT ExchangeType = "direct"
 	FANOUT ExchangeType = "fanout"
+	TOPIC  ExchangeType = "topic"
 )
 
 type MandatoryExchange struct {
@@ -36,6 +37,18 @@ var mandatoryExchanges = []MandatoryExchange{
 	{Name: MANDATORY_TOPIC, Type: DIRECT},
 	{Name: MANDATORY_DIRECT, Type: DIRECT},
 	{Name: MANDATORY_FANOUT, Type: FANOUT},
+}
+
+// Candidate to be on an ExchangeManager interface
+func ParseExchangeType(s string) (ExchangeType, error) {
+	switch s {
+	case string(DIRECT):
+		return DIRECT, nil
+	case string(FANOUT):
+		return FANOUT, nil
+	default:
+		return "", fmt.Errorf("invalid exchange type: %s", s)
+	}
 }
 
 func (vh *VHost) createMandatoryExchanges() {

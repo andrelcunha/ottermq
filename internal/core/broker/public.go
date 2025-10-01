@@ -10,6 +10,8 @@ import (
 
 type ManagerApi interface {
 	ListExchanges() []models.ExchangeDTO
+	CreateExchange(dto models.ExchangeDTO) error
+	GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error)
 	GetTotalExchanges() int
 	ListQueues() []models.QueueDTO
 	GetTotalQueues() int
@@ -35,13 +37,40 @@ func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
 			exchanges = append(exchanges, models.ExchangeDTO{
 				VHostName: vhost.Name,
-				VHostId:   vhost.Id,
 				Name:      exchange.Name,
 				Type:      string(exchange.Typ),
 			})
 		}
 	}
 	return exchanges
+}
+
+func (a DefaultManagerApi) GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error) {
+	b := a.broker
+	vh := b.GetVHost(vhostName)
+	if vh == nil {
+		return nil, fmt.Errorf("vhost %s not found", vhostName)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	exchange, ok := vh.Exchanges[exchangeName]
+	if !ok {
+		return nil, fmt.Errorf("exchange %s not found in vhost %s", exchangeName, vhostName)
+	}
+	return exchange, nil
+}
+
+func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
+	b := a.broker
+	vh := b.GetVHost(dto.VHostName)
+	if vh == nil {
+		return fmt.Errorf("vhost %s not found", dto.VHostName)
+	}
+	typ, err := vhost.ParseExchangeType(dto.Type)
+	if err != nil {
+		return err
+	}
+	return vh.CreateExchange(dto.Name, typ)
 }
 
 func (a DefaultManagerApi) GetTotalExchanges() int {
@@ -140,6 +169,9 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 		}
 		bindings["fanout"] = queues
 		return bindings
+	case vhost.TOPIC:
+		// not implemented
+
 	}
 	return nil
 }

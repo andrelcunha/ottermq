@@ -100,7 +100,8 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListExchanges(c, ws.Broker)
 	})
 	apiGrp.Post("/exchanges", func(c *fiber.Ctx) error {
-		return api.CreateExchange(c, ws.Channel)
+		// return api.CreateExchange(c, ws.Channel)
+		return api.CreateExchange(c, ws.Broker)
 	})
 
 	apiGrp.Delete("/exchanges/:exchange", func(c *fiber.Ctx) error {
