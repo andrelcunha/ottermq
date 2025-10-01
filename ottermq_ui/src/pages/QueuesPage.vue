@@ -1,10 +1,7 @@
 <template>
   <q-page padding>
     <div class="container">
-
-      <div class="q-mt-md">
         <div class="text-h6 q-mb-md">Queues</div>
-
         <q-form class="row q-gutter-sm q-mb-md" @submit.prevent="create">
             <q-input v-model="newQueue" label="Queue name" dense outlined />
             <q-btn label="Add" color="primary" type="submit" />
@@ -19,10 +16,14 @@
             @row-click="(_, row) => select(row)"
           >
             <template #body-cell-status="props">
-              <q-td :props="props">
-                <span class="small-green-square" /> running
-              </q-td>
-            </template>
+            <q-td :props="props">
+              <span 
+              class="small-square q-mx-xs"
+              :class="props.row.status === 'running'? 'small-square--green' : 'small-square--red'"
+              />
+              {{ props.row.status || '-' }}
+            </q-td>
+          </template>
 
             <template #body-cell-actions="props">
               <q-td :props="props">
@@ -45,7 +46,6 @@
             </q-card>
           </div>
       </div>
-    </div>
   </q-page>
 </template>
 
@@ -59,19 +59,22 @@ const selectedName = ref('')
 
 const columns = [
   { name: 'vhost', label: 'VHost', field: 'vhost' },
-  { name: 'name', label: 'Name', field: 'name', format: (v) => String(v) },
+  { name: 'name', label: 'Name', field: 'name' },
   { name: 'status', label: 'Status', field: 'status' },
-  { name: 'messages', label: 'Messages', field: 'messages', align: 'right' },
-  { name: 'x', label: 'X', field: 'x', align: 'right' },
-  { name: 'y', label: 'Y', field: 'y', align: 'right' },
-  { name: 'z', label: 'Z', field: 'z', align: 'right' },
+  { name: 'messages', label: 'Ready', field: 'messages', align: 'right' },
+  { name: 'unacked', label: 'Unacked', field: 'unacked', align: 'right' },
+  { name: 'persisted', label: 'Persisted', field: 'persisted', align: 'right' },
+  { name: 'total', label: 'Total', field: 'total', align: 'right' },
   { name: 'actions', label: 'Actions', field: 'actions' }
 ]
 
 const rows = computed(() =>
   store.items.map(q => ({
     ...q,
-    x: 0, y: 0, z: 0
+    status: 'running',
+    unacked: (q.messages_unacknowledged || 0),
+    persisted: (q.messages_persistent || 0),
+    total: (q.messages || 0)
   }))
 )
 
@@ -100,7 +103,5 @@ onMounted(store.fetch)
 </script>
 
 <style scoped lang="scss">
-.small-green-square {
-  height: 5px; width: 5px; background: #0f0; border: 1px solid lightslategray; padding: 2px; margin-right: 4px; display: inline-block;
-}
+
 </style>

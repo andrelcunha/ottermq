@@ -14,9 +14,10 @@ lastMessage: null,
       this.loading = true; this.error = null
       try {
         const {data} = await api.get('/queues')
-        this.items = data.queues || []
+        this.items = Array.isArray(data?.queues) ? data.queues : []
       } catch (err) {
-        this.error = err
+        this.error = err?.response?.data?.error || err.message
+        this.items = []
       } finally {
         this.loading = false
       }
