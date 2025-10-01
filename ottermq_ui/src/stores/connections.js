@@ -8,13 +8,19 @@ export const useConnectionsStore = defineStore("connections", {
     error: null,
   }),
   actions: {
-    async fetchConnections() {
-      this.loading = true ; this.error = null
+    async fetch() {
+      this.loading = true ; 
+      this.error = null
       try {
         const {data} = await api.get("/connections")
-        this.items = data.connections || []
-      } catch (error) { this.error = error } 
-      finally { this.loading = false }
+        const list = data?.connections ?? data?.data?.connections ?? []
+        this.items = Array.isArray(list) ? list : []
+      } catch (error) {
+        this.error = error?.response?.data?.error || error.message || String(error)
+        this.items = []
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

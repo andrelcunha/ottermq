@@ -12,9 +12,13 @@
           bordered
           :loading="store.loading"
         >
-          <template #body-cell-status="props">
+          <template #body-cell-state="props">
             <q-td :props="props">
-              <span class="small-green-square" /> running
+              <span 
+              class="small-square q-mx-xs"
+              :class="props.row.state === 'running'? 'small-square--green' : 'small-square--red'"
+              />
+              {{ props.row.state || '-' }}
             </q-td>
           </template>
 
@@ -44,7 +48,7 @@ const columns = [
   { name: 'vhost', label: 'VHost', field: 'vhost' },
   { name: 'name', label: 'Name', field: 'name' },
   { name: 'user_name', label: 'User', field: 'user_name' },
-  { name: 'status', label: 'Status', field: 'status' },
+  { name: 'state', label: 'State', field: 'state' },
   { name: 'ssl', label: 'SSL', field: 'ssl', align: 'center' },
   { name: 'protocol', label: 'Protocol', field: 'protocol', align: 'right' },
   { name: 'channels', label: 'Channels', field: 'channels', align: 'right' },
@@ -90,15 +94,17 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 </script>
 
 <style scoped lang="scss">
-.small-green-square { 
-    height: 5px; 
-    width: 5px; 
-    background: #0f0; 
-    border: 1px solid lightslategray; 
+.small-square { 
+    height: .7em; 
+    width: .7em; 
+    // background: #fff; 
+    border: 50%; 
     padding: 2px; 
     margin-right: 4px; 
     display: inline-block; 
 }
+.small-square--green { background: #0f0}
+.small-square--red { background: #c10015}
 .show-time { font-size: 1em; margin-bottom: 2px; }
 .show-date { font-size: .8em; color: #999; }
 </style>
