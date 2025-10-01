@@ -46,7 +46,6 @@ func MapListConnectionsDTO(connections []amqp.ConnectionInfo) []ConnectionInfoDT
 
 type ExchangeDTO struct {
 	VHostName string `json:"vhost"`
-	VHostId   string `json:"vhost_id"`
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 }
