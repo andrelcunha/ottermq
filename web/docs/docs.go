@@ -281,13 +281,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ConnectionListResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -310,13 +310,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ExchangeListResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -340,7 +340,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.CreateExchangeRequest"
+                            "$ref": "#/definitions/github_com_andrelcunha_ottermq_web_models.CreateExchangeRequest"
                         }
                     }
                 ],
@@ -348,19 +348,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -392,19 +392,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/models.ErrorResponse"
                         }
                     }
                 }
@@ -667,6 +667,17 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": true
         },
+        "github_com_andrelcunha_ottermq_web_models.CreateExchangeRequest": {
+            "type": "object",
+            "properties": {
+                "exchange_name": {
+                    "type": "string"
+                },
+                "exchange_type": {
+                    "type": "string"
+                }
+            }
+        },
         "models.BindQueueRequest": {
             "type": "object",
             "properties": {
@@ -681,14 +692,49 @@ const docTemplate = `{
                 }
             }
         },
-        "models.CreateExchangeRequest": {
+        "models.ConnectionInfoDTO": {
             "type": "object",
             "properties": {
-                "exchange_name": {
+                "channels": {
+                    "type": "integer"
+                },
+                "connected_at": {
                     "type": "string"
                 },
-                "exchange_type": {
+                "last_heartbeat": {
                     "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "ssl": {
+                    "type": "boolean"
+                },
+                "state": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                },
+                "vhost_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ConnectionListResponse": {
+            "type": "object",
+            "properties": {
+                "connections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ConnectionInfoDTO"
+                    }
                 }
             }
         },
@@ -714,6 +760,39 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ExchangeDTO": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "vhost": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ExchangeListResponse": {
+            "type": "object",
+            "properties": {
+                "exchanges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ExchangeDTO"
+                    }
+                }
+            }
+        },
         "models.FiberMap": {
             "type": "object",
             "additionalProperties": true
@@ -728,6 +807,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "routing_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
                     "type": "string"
                 }
             }

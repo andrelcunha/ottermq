@@ -10,41 +10,49 @@
       </q-toolbar>
     </q-header>
 
-    <q-tabs
-      v-model="tab"
-      class="bg-primary text-primary"
-      align="justify"
-      dense
-      active-color="primary"
-      indicator-color="primary"
-    >
-      <q-tab name="overview" label="Overview" @click="navigate('overview')"/>
-      <q-tab name="connections" label="Connections" @click="navigate('connections')"/>
-      <q-tab name="exchanges" label="Exchanges" @click="navigate('exchanges')"/>
-      <q-tab name="queues" label="Queues" @click="navigate('queues')"/>
-    </q-tabs>
+
 
     <q-page-container>
+      <q-tabs
+        v-model="tab"
+        active-color="white"
+        indicator-color="white"
+        inline-label
+        align="left"
+        class="bg-primary"
+      >
+        <q-route-tab to="/overview" name="overview" label="Overview" />
+        <q-route-tab to="/connections" name="connections" label="Connections" />
+        <q-route-tab to="/exchanges" name="exchanges" label="Exchanges" />
+        <q-route-tab to="/queues" name="queues" label="Queues" />
+      </q-tabs>
+
       <router-view />
     </q-page-container>
   </q-layout>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
-const tab = ref('overview')
-const username = ref('guest')
 const router = useRouter()
+const route = useRoute()
 
+const username = ref('guest')
+const tab = ref(route.path.split('/')[1] || 'overview')
+watch(() => route.path, (p) => {
+  tab.value = (p.split('/')[1] || 'overview')
+})
 function logout() {
   // clear auth and redirect -- Mocked for now
   router.push('/login')
 }
-
-const navigate = (route) => {
-  router.push(route)
-}
-
 </script>
+
+<style scoped lang="scss">
+header .container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+</style>

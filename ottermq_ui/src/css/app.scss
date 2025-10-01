@@ -1,1 +1,30 @@
 // app global css in SCSS form
+// Quasar already resets; we carry over your container/table helpers
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+textarea {
+  resize: none;
+  max-width: 400px;
+  min-width: 400px;
+  max-height: 200px;
+  min-height: 200px;
+}
+
+.centered { text-align: center; }
+.right { text-align: right; }
+.left { text-align: left; }
+
+.logout-button { font-size: .8em; }
+.logout-container { display: flex; align-items: center; gap: 10px; }
+.error-message { color: red; font-size: .8em; margin-top: 4px; }
