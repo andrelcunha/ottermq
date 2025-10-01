@@ -9,7 +9,7 @@ export const useConnectionsStore = defineStore("connections", {
   }),
   actions: {
     async fetch() {
-      this.loading = true ; 
+      this.loading = true;
       this.error = null
       try {
         const {data} = await api.get("/connections")

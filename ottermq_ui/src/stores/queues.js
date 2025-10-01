@@ -3,7 +3,7 @@ import api from 'src/services/api'
 
 export const useQueuesStore = defineStore('queues', {
   state: () => ({
-items:[],
+items: [],
 loading: false,
 error: null,
 selected: null,
@@ -11,7 +11,8 @@ lastMessage: null,
   }),
   actions: {
     async fetch() {
-      this.loading = true; this.error = null
+      this.loading = true;
+      this.error = null;
       try {
         const {data} = await api.get('/queues')
         this.items = Array.isArray(data?.queues) ? data.queues : []
@@ -40,5 +41,4 @@ lastMessage: null,
       this.selected = queue
     }
   },
-  select(queue) { this.selected = queue }
 })

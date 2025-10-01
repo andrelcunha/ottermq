@@ -119,6 +119,6 @@ func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(dtos.SuccessResponse{
-		Message: "Exchange delete successfully",
+		Message: "Exchange deleted successfully",
 	})
 }

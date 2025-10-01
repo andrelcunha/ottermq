@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	dto "github.com/andrelcunha/ottermq/internal/core/models"
+	dtos "github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/andrelcunha/ottermq/web/models"
 	"github.com/rabbitmq/amqp091-go"
 
@@ -23,11 +23,11 @@ import (
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 	queues := b.ManagerApi.ListQueues()
 	if queues == nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+		return c.Status(fiber.StatusInternalServerError).JSON(dtos.ErrorResponse{
 			Error: "failed to list exchanges",
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(dto.QueueListResponse{
+	return c.Status(fiber.StatusOK).JSON(dtos.QueueListResponse{
 		Queues: queues,
 	})
 }
