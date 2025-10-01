@@ -13,14 +13,11 @@ export const useConnectionsStore = defineStore("connections", {
       this.error = null
       try {
         const {data} = await api.get("/connections")
-        const list = data?.connections ?? data?.data?.connections ?? []
-        this.items = Array.isArray(list) ? list : []
-      } catch (error) {
-        this.error = error?.response?.data?.error || error.message || String(error)
+        this.items = Array.isArray(data?.connections) ? data.connections : []
+      } catch (e) {
+        this.error = e?.response?.data?.error || e.message
         this.items = []
-      } finally {
-        this.loading = false
-      }
+      } finally { this.loading = false }
     }
   }
 })

@@ -35,17 +35,20 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from 'src/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
-const username = ref('guest')
+const username = ref(auth.username || 'guest')
+
 const tab = ref(route.path.split('/')[1] || 'overview')
 watch(() => route.path, (p) => {
   tab.value = (p.split('/')[1] || 'overview')
 })
 function logout() {
-  // clear auth and redirect -- Mocked for now
+  auth.logout()
   router.push('/login')
 }
 </script>
