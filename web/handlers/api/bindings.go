@@ -17,8 +17,10 @@ import (
 // @Param binding body models.BindQueueRequest true "Binding details"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
 // @Router /api/bindings [post]
+// @Security BearerAuth
 func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.BindQueueRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -54,8 +56,10 @@ func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Param exchange path string true "Exchange name"
 // @Success 200 {object} models.BindingListResponse
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/bindings/{exchange} [get]
+// @Router /bindings/{exchange} [get]
+// @Security BearerAuth
 func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 
 	exchangeName := c.Params("exchange")
@@ -84,10 +88,12 @@ func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param binding body models.DeleteBindingRequest true "Binding to delete"
-// @Success 200 {object} models.SuccessResponse
+// @Success 204 {object} nil
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/bindings [delete]
+// @Router /bindings [delete]
+// @Security BearerAuth
 func DeleteBinding(c *fiber.Ctx) error {
 	// var request models.DeleteBindingRequest
 	// if err := c.BodyParser(&request); err != nil {
@@ -118,9 +124,7 @@ func DeleteBinding(c *fiber.Ctx) error {
 	// 		Error: commandResponse.Message,
 	// 	})
 	// } else {
-	// 	return c.Status(http.StatusOK).JSON(models.SuccessResponse{
-	// 		Message: commandResponse.Message,
-	// 	})
+	// 	return c.Status(http.StatusNoContent).Send(nil)
 	// }
 	return nil // just to make the function compile
 }

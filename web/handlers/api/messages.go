@@ -15,8 +15,10 @@ import (
 // @Param message body models.PublishMessageRequest true "Message details"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/messages [post]
+// @Router /messages [post]
+// @Security BearerAuth
 func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.PublishMessageRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -55,8 +57,10 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Param id path string true "Message ID"
 // @Success 200 {object} models.SuccessResponse
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/messages/{id}/ack [post]
+// @Router /messages/{id}/ack [post]
+// @Security BearerAuth
 func AckMessage(c *fiber.Ctx) error {
 	// msgID := c.Params("id")
 	// if msgID == "" {

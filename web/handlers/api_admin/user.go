@@ -13,11 +13,13 @@ import (
 // @Accept json
 // @Produce json
 // @Param user body models.UserCreateRequest true "User details"
-// @Success 200 {object} models.SuccessResponse
+// @Success 200 {object} models.SuccessResponse "User added successfully"
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
 // @Security ApiKeyAuth
-// @Router /api/admin/users [post]
+// @Router /admin/users [post]
+// @Security BearerAuth
 func AddUser(c *fiber.Ctx) error {
 	var user models.UserCreateRequest
 	if err := c.BodyParser(&user); err != nil {
@@ -45,8 +47,10 @@ func AddUser(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Success 200 {object} models.UserListResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/admin/users [get]
+// @Router /admin/users [get]
+// @Security BearerAuth
 func GetUsers(c *fiber.Ctx) error {
 	err := persistdb.OpenDB()
 	if err != nil {
@@ -71,14 +75,14 @@ func GetUsers(c *fiber.Ctx) error {
 // Login godoc
 // @Summary Login
 // @Description Login
-// @Tags users
+// @Tags auth
 // @Accept json
 // @Produce json
 // @Param user body models.AuthRequest true "User details"
 // @Success 200 {object} models.AuthResponse
-// @Failure 401 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Invalid username or password"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/admin/login [post]
+// @Router /login [post]
 func Login(c *fiber.Ctx) error {
 	var req models.AuthRequest
 	if err := c.BodyParser(&req); err != nil {

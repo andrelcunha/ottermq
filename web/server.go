@@ -81,6 +81,10 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 func (ws *WebServer) AddApi(app *fiber.App) {
 	// API routes
 	apiGrp := app.Group("/api")
+	apiGrp.Post("/login", api_admin.Login)
+
+	apiGrp.Use(middleware.JwtMiddleware(ws.config.JwtKey))
+
 	apiGrp.Get("/queues", func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})
@@ -100,7 +104,6 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 		return api.ListExchanges(c, ws.Broker)
 	})
 	apiGrp.Post("/exchanges", func(c *fiber.Ctx) error {
-		// return api.CreateExchange(c, ws.Channel)
 		return api.CreateExchange(c, ws.Broker)
 	})
 
@@ -117,7 +120,6 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/connections", func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)
 	})
-	apiGrp.Post("/login", api_admin.Login)
 }
 
 func (ws *WebServer) AddUI(app *fiber.App) {

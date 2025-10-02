@@ -33,6 +33,9 @@ const (
 // @description API documentation for OtterMQ broker
 // @host localhost:3000
 // @BasePath /api/
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	// Determine the directory of the running binary
 	executablePath, err := os.Executable()

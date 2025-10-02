@@ -19,9 +19,12 @@ type AuthResponse struct {
 	Token string `json:"token"`
 }
 
-// (Optional) If you ever need to return 1 user (e.g., create/read)
 type UserResponse struct {
 	ID       int    `json:"id"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+}
+
+type UnauthorizedErrorResponse struct {
+	Error string `json:"error"`
 }

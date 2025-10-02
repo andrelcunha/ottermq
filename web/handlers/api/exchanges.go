@@ -15,13 +15,15 @@ import (
 // @Accept json
 // @Produce json
 // @Success 200 {object} models.ExchangeListResponse
-// @Failure 500 {object} models.ErrorResponse
-// @Router /api/exchanges [get]
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to list exchanges"
+// @Router /exchanges [get]
+// @Security BearerAuth
 func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 	exchanges := b.ManagerApi.ListExchanges()
 	if exchanges == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "failed to list exchanges",
+			Error: "Failed to list exchanges",
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.ExchangeListResponse{
@@ -36,42 +38,17 @@ func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param exchange body models.CreateExchangeRequest true "Exchange to create"
-// @Success 200 {object} models.SuccessResponse
+// @Success 200 {object} models.SuccessResponse "Exchange created successfully"
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/exchanges [post]
+// @Router /exchanges [post]
+// @Security BearerAuth
 func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
-	// func CreateExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
-	// var request models.CreateExchangeRequest
-	// if err := c.BodyParser(&request); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-	// 		Error: err.Error(),
-	// 	})
-	// }
-
-	// err := ch.ExchangeDeclare(
-	// 	request.ExchangeName,
-	// 	request.ExchangeType,
-	// 	true,  // durable
-	// 	false, // auto-deleted
-	// 	false, // internal
-	// 	false, // no-wait
-	// 	nil,   // arguments
-	// )
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: err.Error(),
-	// 	})
-	// }
-	// return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 	"message": "Exchange created successfully",
-	// })
-	// verify if this exchange already exists
-
 	var request models.CreateExchangeRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "failed to create exchange: " + err.Error(),
+			Error: err.Error(),
 		})
 	}
 	exchangeDto := models.ExchangeDTO{
@@ -83,7 +60,7 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 	err := b.ManagerApi.CreateExchange(exchangeDto)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "failed to create exchange: " + err.Error(),
+			Error: err.Error(),
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
@@ -98,10 +75,12 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param exchange path string true "Exchange name"
-// @Success 200 {object} models.SuccessResponse
+// @Success 204 {object} nil
 // @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/exchanges/{exchange} [delete]
+// @Router /exchanges/{exchange} [delete]
+// @Security BearerAuth
 func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
 	exchangeName := c.Params("exchange")
 	if exchangeName == "" {
@@ -113,11 +92,9 @@ func DeleteExchange(c *fiber.Ctx, ch *amqp091.Channel) error {
 	err := ch.ExchangeDelete(exchangeName, false, false)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "failed to delete exchange: " + err.Error(),
+			Error: err.Error(),
 		})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
-		Message: "Exchange deleted successfully",
-	})
+	return c.Status(fiber.StatusNoContent).Send(nil)
 }
