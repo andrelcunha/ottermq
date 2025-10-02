@@ -8,11 +8,21 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
 )
 
+type Alias map[string](string)
+
+const DEFAULT_EXCHANGE_ALIAS = "(AMQP default)"
+
+var defaultAlias Alias = Alias{
+	vhost.DEFAULT_EXCHANGE: DEFAULT_EXCHANGE_ALIAS,
+	vhost.EMPTY_EXCHANGE:   DEFAULT_EXCHANGE_ALIAS,
+	DEFAULT_EXCHANGE_ALIAS: vhost.DEFAULT_EXCHANGE,
+}
+
 type ManagerApi interface {
 	ListExchanges() []models.ExchangeDTO
 	CreateExchange(dto models.ExchangeDTO) error
 	GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error)
-	GetTotalExchanges() int
+	GetExchangeUniqueNames() map[string]bool
 	ListQueues() ([]models.QueueDTO, error)
 	GetTotalQueues() int
 	ListConnections() []models.ConnectionInfoDTO
@@ -29,17 +39,25 @@ type DefaultManagerApi struct {
 
 func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	b := a.broker
-	exchanges := make([]models.ExchangeDTO, 0, a.GetTotalExchanges())
+	names := a.GetExchangeUniqueNames()
+	exchanges := make([]models.ExchangeDTO, 0, len(names))
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for vhostName := range b.VHosts {
-		vhost := b.VHosts[vhostName]
-		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
-			exchanges = append(exchanges, models.ExchangeDTO{
-				VHostName: vhost.Name,
-				Name:      exchange.Name,
-				Type:      string(exchange.Typ),
-			})
+	for _, vh := range b.VHosts {
+		for exchangeName := range names {
+			if exchange, ok := vh.Exchanges[exchangeName]; ok {
+				var name string
+				if alias, ok := defaultAlias[exchange.Name]; ok {
+					name = alias
+				} else {
+					name = exchange.Name
+				}
+				exchanges = append(exchanges, models.ExchangeDTO{
+					VHostName: vh.Name,
+					Name:      name,
+					Type:      string(exchange.Typ),
+				})
+			}
 		}
 	}
 	return exchanges
@@ -70,23 +88,26 @@ func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	if err != nil {
 		return err
 	}
+	// prevent creating exchanges with the name of default aliases
+	if _, ok := defaultAlias[dto.Name]; ok {
+		return fmt.Errorf("cannot create exchange with the name %s", dto.Name)
+	}
 	return vh.CreateExchange(dto.Name, typ)
 }
 
-func (a DefaultManagerApi) GetTotalExchanges() int {
+func (a DefaultManagerApi) GetExchangeUniqueNames() map[string]bool {
 	b := a.broker
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	total := 0
-	for vhostName := range b.VHosts {
-		vhost := b.VHosts[vhostName]
-		for _, exchange := range b.VHosts[vhost.Name].Exchanges {
-			if exchange.Name != "" {
-				total++
+	exchangeNames := make(map[string]bool)
+	for _, vh := range b.VHosts {
+		for _, exchange := range vh.Exchanges {
+			if exchange.Name != vhost.EMPTY_EXCHANGE {
+				exchangeNames[exchange.Name] = true
 			}
 		}
 	}
-	return total
+	return exchangeNames
 }
 
 func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
@@ -116,9 +137,8 @@ func (a DefaultManagerApi) GetTotalQueues() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	total := 0
-	for vhostName := range b.VHosts {
-		vhost := b.VHosts[vhostName]
-		for _, queue := range b.VHosts[vhost.Name].Queues {
+	for _, vh := range b.VHosts {
+		for _, queue := range vh.Queues {
 			if queue.Name != "" {
 				total++
 			}
@@ -146,6 +166,10 @@ func (a DefaultManagerApi) ListBindings(vhostName, exchangeName string) map[stri
 	defer b.mu.Unlock()
 	if vh == nil {
 		return nil
+	}
+	// get the exchange from alias if it exists
+	if realName, ok := defaultAlias[exchangeName]; ok {
+		exchangeName = realName
 	}
 	fmt.Printf("exchangeName: %s, Vhost: %s", exchangeName, vh.Name)
 	exchange, ok := vh.Exchanges[exchangeName]

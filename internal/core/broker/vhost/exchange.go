@@ -55,7 +55,6 @@ func (vh *VHost) createMandatoryExchanges() {
 	for _, mandatoryExchange := range mandatoryExchanges {
 		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type)
 	}
-
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	if defaultExchange, exists := vh.Exchanges[DEFAULT_EXCHANGE]; exists {
