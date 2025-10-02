@@ -1,14 +1,7 @@
 package api
 
 import (
-	// "encoding/json"
-	// "fmt"
-
-	// "github.com/andrelcunha/ottermq/pkg/common/communication/api"
-	// "github.com/andrelcunha/ottermq/web/models"
-	// "github.com/andrelcunha/ottermq/web/utils"
-
-	"github.com/andrelcunha/ottermq/web/models"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -20,15 +13,17 @@ import (
 // @Accept json
 // @Produce json
 // @Param message body models.PublishMessageRequest true "Message details"
-// @Success 200 {object} models.FiberMap
-// @Failure 400 {object} models.FiberMap
-// @Failure 500 {object} models.FiberMap
-// @Router /api/messages [post]
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /messages [post]
+// @Security BearerAuth
 func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.PublishMessageRequest
 	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: err.Error(),
 		})
 	}
 
@@ -44,12 +39,12 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 		msg,
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Message published",
+	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
+		Message: "Message published",
 	})
 }
 
@@ -60,39 +55,41 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Message ID"
-// @Success 200 {object} models.FiberMap
-// @Failure 400 {object} models.FiberMap
-// @Failure 500 {object} models.FiberMap
-// @Router /api/messages/{id}/ack [post]
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /messages/{id}/ack [post]
+// @Security BearerAuth
 func AckMessage(c *fiber.Ctx) error {
 	// msgID := c.Params("id")
 	// if msgID == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "message ID is required",
+	// 	return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+	// 		Error: "message ID is required",
 	// 	})
 	// }
 	// command := fmt.Sprintf("ACK %s", msgID)
 	// response, err := utils.SendCommand(command)
 	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: err.Error(),
 	// 	})
 	// }
 
 	// var commandResponse api.CommandResponse
 	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: "failed to parse response",
 	// 	})
 	// }
 
 	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: commandResponse.Message,
 	// 	})
 	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
+	// 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
+	// 		Message: commandResponse.Message,
 	// 	})
 	// }
 	return nil // just to make the compiler happy

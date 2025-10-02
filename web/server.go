@@ -79,45 +79,46 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 }
 
 func (ws *WebServer) AddApi(app *fiber.App) {
-	// API routes
+	// Public API routes
+	app.Post("/api/login", api_admin.Login)
+
+	// Protected API routes
 	apiGrp := app.Group("/api")
-	apiGrp.Get("/queues", func(c *fiber.Ctx) error {
+	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})
-	apiGrp.Post("/queues", func(c *fiber.Ctx) error {
+	apiGrp.Post("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateQueue(c, ws.Channel)
 	})
-	apiGrp.Delete("/queues/:queue", api.DeleteQueue)
-	apiGrp.Post("/queues/:queue/consume", func(c *fiber.Ctx) error {
+	apiGrp.Delete("/queues/:queue", middleware.JwtMiddleware(ws.config.JwtKey), api.DeleteQueue)
+	apiGrp.Post("/queues/:queue/consume", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.GetMessage(c, ws.Channel)
 	})
-	apiGrp.Post("/messages/:id/ack", api.AckMessage)
-	apiGrp.Post("/messages", func(c *fiber.Ctx) error {
+	apiGrp.Post("/messages/:id/ack", middleware.JwtMiddleware(ws.config.JwtKey), api.AckMessage)
+	apiGrp.Post("/messages", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.PublishMessage(c, ws.Channel)
 	})
 
-	apiGrp.Get("/exchanges", func(c *fiber.Ctx) error {
+	apiGrp.Get("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListExchanges(c, ws.Broker)
 	})
-	apiGrp.Post("/exchanges", func(c *fiber.Ctx) error {
-		// return api.CreateExchange(c, ws.Channel)
+	apiGrp.Post("/exchanges", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.CreateExchange(c, ws.Broker)
 	})
 
-	apiGrp.Delete("/exchanges/:exchange", func(c *fiber.Ctx) error {
+	apiGrp.Delete("/exchanges/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.DeleteExchange(c, ws.Channel)
 	})
-	apiGrp.Get("/bindings/:exchange", func(c *fiber.Ctx) error {
+	apiGrp.Get("/bindings/:exchange", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListBindings(c, ws.Broker)
 	})
-	apiGrp.Post("/bindings", func(c *fiber.Ctx) error {
+	apiGrp.Post("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.BindQueue(c, ws.Channel)
 	})
-	apiGrp.Delete("/bindings", api.DeleteBinding)
-	apiGrp.Get("/connections", func(c *fiber.Ctx) error {
+	apiGrp.Delete("/bindings", middleware.JwtMiddleware(ws.config.JwtKey), api.DeleteBinding)
+	apiGrp.Get("/connections", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)
 	})
-	apiGrp.Post("/login", api_admin.Login)
 }
 
 func (ws *WebServer) AddUI(app *fiber.App) {

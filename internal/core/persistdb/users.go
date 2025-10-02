@@ -57,11 +57,8 @@ func GetUserByUsername(username string) (User, error) {
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
 		log.Printf("Failed to query user: %v\n", err)
-		// return UserListDTO{}, err
 		return User{}, err
 	}
-
-	// return mapUserToUserDTO(user)
 	return user, nil
 }
 
@@ -95,14 +92,14 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func MaapUserToUserDTO(user User) (UserListDTO, error) {
-	role, err := GetRoleByID(user.RoleID)
+func (u User) ToUserListDTO() (UserListDTO, error) {
+	role, err := GetRoleByID(u.RoleID)
 	if err != nil {
 		return UserListDTO{}, err
 	}
 	return UserListDTO{
-		ID:          user.ID,
-		Username:    user.Username,
+		ID:          u.ID,
+		Username:    u.Username,
 		HasPassword: true,
 		Role:        role.Name,
 	}, nil

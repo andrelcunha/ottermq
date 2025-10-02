@@ -13,13 +13,15 @@ import (
 // @Accept json
 // @Produce json
 // @Success 200 {object} models.ConnectionListResponse
-// @Failure 500 {object} models.ErrorResponse
-// @Router /api/connections [get]
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to list connections"
+// @Router /connections [get]
+// @Security BearerAuth
 func ListConnections(c *fiber.Ctx, b *broker.Broker) error {
 	connections := b.ManagerApi.ListConnections()
 	if connections == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "failed to list connections",
+			Error: "Failed to list connections",
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.ConnectionListResponse{

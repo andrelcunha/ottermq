@@ -19,3 +19,11 @@ type ExchangeListResponse struct {
 type QueueListResponse struct {
 	Queues []QueueDTO `json:"queues"`
 }
+
+type QueueDeleteResponse struct {
+	Message string `json:"message"`
+}
+
+type BindingListResponse struct {
+	Bindings map[string][]string `json:"bindings"`
+}

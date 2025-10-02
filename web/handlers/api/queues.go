@@ -1,11 +1,8 @@
 package api
 
 import (
-	"fmt"
-
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	dtos "github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/web/models"
+	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/rabbitmq/amqp091-go"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,17 +14,19 @@ import (
 // @Tags queues
 // @Accept json
 // @Produce json
-// @Success 200 {object} dto.QueueListResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/queues [get]
+// @Success 200 {object} models.QueueListResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse "Failed to list queues"
+// @Router /queues [get]
+// @Security BearerAuth
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues := b.ManagerApi.ListQueues()
-	if queues == nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(dtos.ErrorResponse{
-			Error: "failed to list exchanges",
+	queues, err := b.ManagerApi.ListQueues()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: "Failed to list queues: " + err.Error(),
 		})
 	}
-	return c.Status(fiber.StatusOK).JSON(dtos.QueueListResponse{
+	return c.Status(fiber.StatusOK).JSON(models.QueueListResponse{
 		Queues: queues,
 	})
 }
@@ -39,20 +38,22 @@ func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
 // @Accept json
 // @Produce json
 // @Param queue body models.CreateQueueRequest true "Queue to create"
-// @Success 200 {object} fiber.Map
-// @Failure 400 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
-// @Router /api/queues [post]
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues [post]
+// @Security BearerAuth
 func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "invalid request body: " + err.Error(),
 		})
 	}
 	if request.QueueName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "queue name is required",
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "queue name is required",
 		})
 	}
 
@@ -65,13 +66,13 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 		nil,   // arguments
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
 		})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Queue created successfully",
+	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
+		Message: "Queue created successfully",
 	})
 }
 
@@ -82,43 +83,43 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Accept json
 // @Produce json
 // @Param queue path string true "Queue name"
-// @Success 200 {object} fiber.Map
-// @Failure 400 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
-// @Router /api/queues/{queue} [delete]
+// @Success 204 {object} nil
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues/{queue} [delete]
+// @Security BearerAuth
 func DeleteQueue(c *fiber.Ctx) error {
+	panic("not implemented")
 	// queueName := c.Params("queue")
 	// if queueName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": "queue name is required",
+	// 	return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+	// 		Error: "queue name is required",
 	// 	})
 	// }
 
 	// command := fmt.Sprintf("DELETE_QUEUE %s", queueName)
 	// response, err := utils.SendCommand(command)
 	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": err.Error(),
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: err.Error(),
 	// 	})
 	// }
 
 	// var commandResponse api.CommandResponse
 	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "failed to parse response",
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: "failed to parse response",
 	// 	})
 	// }
 
 	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": commandResponse.Message,
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+	// 		Error: commandResponse.Message,
 	// 	})
 	// } else {
-	// 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-	// 		"message": commandResponse.Message,
-	// 	})
+	// 	return c.Status(fiber.StatusNoContent).Send(nil)
 	// }
-	return nil // just to make it compile
 }
 
 // GetMessage godoc
@@ -128,31 +129,32 @@ func DeleteQueue(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param queue path string true "Queue name"
-// @Success 200 {object} fiber.Map
-// @Failure 400 {object} fiber.Map
-// @Failure 500 {object} fiber.Map
-// @Router /api/queues/{queue}/consume [post]
+// @Success 200 {object} models.SuccessResponse
+// @Failure 400 {object} models.ErrorResponse "Queue name is required"
+// @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
+// @Failure 404 {object} models.ErrorResponse "No messages in queue"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /queues/{queue}/consume [post]
+// @Security BearerAuth
 func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	queueName := c.Params("queue")
 	if queueName == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "queue name is required",
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Queue name is required",
 		})
 	}
-	fmt.Println("Consuming from queue:", queueName)
 	msg, ok, err := ch.Get(queueName, false)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
 		})
 	}
 	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"data": "",
+		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
+			Error: "No messages in queue",
 		})
 	}
-	fmt.Println("Message received: ", string(msg.Body))
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"data": string(msg.Body),
+	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
+		Message: string(msg.Body),
 	})
 }

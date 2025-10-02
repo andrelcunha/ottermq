@@ -33,7 +33,7 @@ export const useExchangesStore = defineStore('exchanges', {
     },
     async fetchBindings(exchange) {
         const {data} = await api.get(`/bindings/${encodeURIComponent(exchange)}`)
-        const map = data?.bindings ?? data?.data?.bindings ?? {}
+        const map = data?.bindings ?? {}
         const list = []
         Object.entries(map).forEach(([routing_key, queues]) => {
         (queues || []).forEach(q => list.push({routingKey: routing_key, queue: q}))
@@ -47,9 +47,7 @@ export const useExchangesStore = defineStore('exchanges', {
       await this.fetchBindings(exchange)
     },
     async deleteBinding(exchange, routingKey, queue) {
-      await api.delete(`/bindings`, {
-        exchange_name: exchange, routing_key: routingKey, queue_name: queue
-      })
+      await api.delete(`/bindings`, { data: { exchange_name: exchange, routing_key: routingKey, queue_name: queue } })
       await this.fetchBindings(exchange)
     },
     async publish(exchange, routingKey, message) {
@@ -57,8 +55,6 @@ export const useExchangesStore = defineStore('exchanges', {
         exchange_name: exchange, routing_key: routingKey, message
       })
     },
-    select(exchange) {
-      this.selected = exchange
-    }
+    select(exchange) { this.selected = exchange },
   }
 })
