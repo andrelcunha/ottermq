@@ -1,10 +1,10 @@
 # Stage 1: Build Stage
-FROM golang:1.23-alpine AS builder
+FROM golang:alpine AS go-builder
 
 # Install build tools
 RUN apk add --no-cache make git gcc g++
 
-ENV CGO_ENABLED 1
+ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -28,23 +28,28 @@ RUN make docs
 RUN make build
 
 ####################################################################
-# Stage 2: Final Stage
+FROM node:alpine AS node-builder
+
+WORKDIR /ui
+
+# copy the UI source code from the host machine folder ottermq_ui to the root of the container
+COPY ottermq_ui ./
+RUN npm install
+RUN npm run build
+
+####################################################################
+# Stage 3: Final Stage
 FROM alpine:latest
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-# RUN apk add --no-cache bash
-
 # Copy the built binaries from the builder stage
-COPY --from=builder /app/bin/ottermq .
-COPY --from=builder /app/web/static ./web/static
-COPY --from=builder /app/web/templates ./web/templates
-
+COPY --from=go-builder /app/bin/ottermq .
+COPY --from=node-builder /ui/dist/spa ./ui/
 # Expose ports 3000 for the web admin and 5672 for the broker
 EXPOSE 3000
 EXPOSE 5672
 
 # Command to run both broker and web admin binaries
-CMD ["sh", "-c", "./ottermq"]
-# CMD ["tail", "-f", "/dev/null"]
+CMD ["./ottermq"]

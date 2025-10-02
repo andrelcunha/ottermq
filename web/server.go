@@ -7,7 +7,6 @@ import (
 	_ "github.com/andrelcunha/ottermq/web/docs"
 	"github.com/andrelcunha/ottermq/web/handlers/api"
 	"github.com/andrelcunha/ottermq/web/handlers/api_admin"
-	"github.com/andrelcunha/ottermq/web/handlers/webui"
 	"github.com/andrelcunha/ottermq/web/middleware"
 
 	"github.com/gofiber/swagger"
@@ -19,8 +18,6 @@ import (
 )
 
 type WebServer struct {
-	// brokerAddr        string
-	// heartbeatInterval time.Duration
 	config  *Config
 	Broker  *broker.Broker
 	Client  *amqp091.Connection
@@ -55,25 +52,18 @@ func NewWebServer(config *Config, broker *broker.Broker, conn *amqp091.Connectio
 }
 
 func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
-	// connectionSting := fmt.Sprintf("amqp://%s:%s@%s:%s/", ws.config.Username, ws.config.Password, ws.config.BrokerHost, ws.config.BrokerPort)
-	// conn, err := getBrokerClient(connectionSting)
 
 	// ws.Client = conn
 	app := ws.configServer(logFile)
 
 	app.Get("/docs/*", swagger.HandlerDefault)
 
-	// Serve static files
-	app.Static("/", "./web/static")
-
-	app.Get("/login", webui.LoginPage)
-	app.Post("/login", webui.Authenticate)
+	// Serve static files (ui -- Vue frontend)
+	app.Static("/", "./ui")
 
 	ws.AddApi(app)
 
 	ws.AddAdminApi(app)
-
-	ws.AddUI(app)
 
 	return app
 }
@@ -119,17 +109,6 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	apiGrp.Get("/connections", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListConnections(c, ws.Broker)
 	})
-}
-
-func (ws *WebServer) AddUI(app *fiber.App) {
-	// Web Interface Routes
-	webGrp := app.Group("/", middleware.AuthRequired)
-	webGrp.Get("/", webui.Dashboard)
-	webGrp.Get("/logout", webui.Logout)
-	webGrp.Get("/overview", webui.Dashboard)
-	webGrp.Get("/connections", webui.ListConnections)
-	webGrp.Get("/exchanges", webui.ListExchanges)
-	webGrp.Get("/queues", webui.ListQueues)
 }
 
 func (ws *WebServer) AddAdminApi(app *fiber.App) {
