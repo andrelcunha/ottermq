@@ -90,7 +90,7 @@ func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	}
 	// prevent creating exchanges with the name of default aliases
 	if _, ok := defaultAlias[dto.Name]; ok {
-		return fmt.Errorf("cannot create exchange with the name %s", dto.Name)
+		return fmt.Errorf("cannot create exchange with reserved alias name '%s'", dto.Name)
 	}
 	return vh.CreateExchange(dto.Name, typ)
 }
