@@ -10,12 +10,11 @@ func AuthRequired(c *fiber.Ctx) error {
 	// Bypass authentication for static files
 	currentPath := c.Path()
 
-	if strings.HasPrefix(currentPath, "/static/") ||
-		strings.HasPrefix(currentPath, "/css/") ||
-		strings.HasPrefix(currentPath, "/js/") ||
+	if strings.HasPrefix(currentPath, "/assets/") ||
+		strings.HasPrefix(currentPath, "/icons/") ||
 		strings.HasPrefix(currentPath, "/images/") ||
 		currentPath == "/favicon.ico" ||
-		currentPath == "/login" {
+		currentPath == "/index.html" {
 		return c.Next()
 	}
 
