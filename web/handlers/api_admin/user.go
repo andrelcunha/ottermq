@@ -63,7 +63,7 @@ func GetUsers(c *fiber.Ctx) error {
 	}
 	out := make([]models.UserSummary, 0, len(list))
 	for _, u := range list {
-		userdto, err := u.ToUserDTO()
+		userdto, err := u.ToUserListDTO()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 		}
@@ -107,7 +107,7 @@ func Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 
-	userdto, err := persistedUser.ToUserDTO()
+	userdto, err := persistedUser.ToUserListDTO()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}

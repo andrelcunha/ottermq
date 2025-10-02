@@ -79,11 +79,11 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 }
 
 func (ws *WebServer) AddApi(app *fiber.App) {
-	// API routes
-	apiGrp := app.Group("/api")
-	apiGrp.Post("/login", api_admin.Login)
+	// Public API routes
+	app.Post("/api/login", api_admin.Login)
 
 	// Protected API routes
+	apiGrp := app.Group("/api")
 	apiGrp.Get("/queues", middleware.JwtMiddleware(ws.config.JwtKey), func(c *fiber.Ctx) error {
 		return api.ListQueues(c, ws.Broker)
 	})

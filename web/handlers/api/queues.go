@@ -20,10 +20,10 @@ import (
 // @Router /queues [get]
 // @Security BearerAuth
 func ListQueues(c *fiber.Ctx, b *broker.Broker) error {
-	queues := b.ManagerApi.ListQueues()
-	if queues == nil {
+	queues, err := b.ManagerApi.ListQueues()
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-			Error: "Failed to list queues",
+			Error: "Failed to list queues: " + err.Error(),
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.QueueListResponse{

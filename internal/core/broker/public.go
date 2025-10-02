@@ -13,7 +13,7 @@ type ManagerApi interface {
 	CreateExchange(dto models.ExchangeDTO) error
 	GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error)
 	GetTotalExchanges() int
-	ListQueues() []models.QueueDTO
+	ListQueues() ([]models.QueueDTO, error)
 	GetTotalQueues() int
 	ListConnections() []models.ConnectionInfoDTO
 	ListBindings(vhostName, exchangeName string) map[string][]string
@@ -89,14 +89,17 @@ func (a DefaultManagerApi) GetTotalExchanges() int {
 	return total
 }
 
-func (a DefaultManagerApi) ListQueues() []models.QueueDTO {
+func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 	b := a.broker
 	queues := make([]models.QueueDTO, 0, a.GetTotalQueues())
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for vhostName := range b.VHosts {
-		vhost := b.VHosts[vhostName]
-		for _, queue := range b.VHosts[vhost.Name].Queues {
+		vhost, ok := b.VHosts[vhostName]
+		if !ok {
+			return nil, fmt.Errorf("vhost %s not found", vhostName)
+		}
+		for _, queue := range vhost.Queues {
 			queues = append(queues, models.QueueDTO{
 				VHostName: vhost.Name,
 				VHostId:   vhost.Id,
@@ -105,7 +108,7 @@ func (a DefaultManagerApi) ListQueues() []models.QueueDTO {
 			})
 		}
 	}
-	return queues
+	return queues, nil
 }
 
 func (a DefaultManagerApi) GetTotalQueues() int {

@@ -92,7 +92,7 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), err
 }
 
-func (u User) ToUserDTO() (UserListDTO, error) {
+func (u User) ToUserListDTO() (UserListDTO, error) {
 	role, err := GetRoleByID(u.RoleID)
 	if err != nil {
 		return UserListDTO{}, err
