@@ -59,7 +59,7 @@ func main() {
 		Username:             USERNAME,
 		Password:             PASSWORD,
 		HeartbeatIntervalMax: HEARTBEAT,
-		ChannelMax:           5,
+		ChannelMax:           2048,
 		FrameMax:             131072,
 		Ssl:                  false,
 		Version:              VERSION,

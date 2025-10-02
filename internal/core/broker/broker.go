@@ -78,7 +78,7 @@ OO   OO tt    tt      eee  rr rr  MMM  MMM QQ   QQ
 OO   OO tttt  tttt  ee   e rrr  r MM MM MM QQ   QQ
 OO   OO tt    tt    eeeee  rr     MM    MM QQ  QQ 
  OOOO0   tttt  tttt  eeeee rr     MM    MM  QQQQ Q
-                                          
+
 `)
 }
 func (b *Broker) setConfigurations() map[string]any {

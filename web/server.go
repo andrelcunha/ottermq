@@ -64,7 +64,8 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 	app.Get("/docs/*", swagger.HandlerDefault)
 
 	// Serve static files
-	app.Static("/", "./web/static")
+	// app.Static("/", "./web/static")
+	app.Static("/", "./ui")
 
 	app.Get("/login", webui.LoginPage)
 	app.Post("/login", webui.Authenticate)
@@ -73,7 +74,7 @@ func (ws *WebServer) SetupApp(logFile *os.File) *fiber.App {
 
 	ws.AddAdminApi(app)
 
-	ws.AddUI(app)
+	// ws.AddUI(app)
 
 	return app
 }
@@ -121,16 +122,16 @@ func (ws *WebServer) AddApi(app *fiber.App) {
 	})
 }
 
-func (ws *WebServer) AddUI(app *fiber.App) {
-	// Web Interface Routes
-	webGrp := app.Group("/", middleware.AuthRequired)
-	webGrp.Get("/", webui.Dashboard)
-	webGrp.Get("/logout", webui.Logout)
-	webGrp.Get("/overview", webui.Dashboard)
-	webGrp.Get("/connections", webui.ListConnections)
-	webGrp.Get("/exchanges", webui.ListExchanges)
-	webGrp.Get("/queues", webui.ListQueues)
-}
+// func (ws *WebServer) AddUI(app *fiber.App) {
+// 	// Web Interface Routes
+// 	webGrp := app.Group("/", middleware.AuthRequired)
+// 	webGrp.Get("/", webui.Dashboard)
+// 	webGrp.Get("/logout", webui.Logout)
+// 	webGrp.Get("/overview", webui.Dashboard)
+// 	webGrp.Get("/connections", webui.ListConnections)
+// 	webGrp.Get("/exchanges", webui.ListExchanges)
+// 	webGrp.Get("/queues", webui.ListQueues)
+// }
 
 func (ws *WebServer) AddAdminApi(app *fiber.App) {
 	// Admin API routes
