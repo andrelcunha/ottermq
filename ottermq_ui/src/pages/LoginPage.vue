@@ -32,8 +32,8 @@ const username = ref('guest')
 const password = ref('guest')
 
 async function submit () {
-  await auth.login(username.value, password.value)
-  const redirect = route.query.redirect || '/queues'
-  router.replace(redirect)
+    await auth.login(username.value, password.value)
+    const redirect = route.query.redirect || '/overview'
+    router.replace(redirect)
 }
 </script>

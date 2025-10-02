@@ -33,7 +33,7 @@ lastMessage: null,
     },
     async consume(queue) {
         const {data} = await api.post(`/queues/${encodeURIComponent(queue)}/consume`)
-        this.lastMessage = data?.data ?? null
+        this.lastMessage = data?.message ?? null
         await this.fetch()
         return this.lastMessage
     },

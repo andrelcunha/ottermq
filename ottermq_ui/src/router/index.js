@@ -17,7 +17,7 @@ import { useAuthStore } from 'src/stores/auth'
  * with the Router instance.
  */
 
-export default defineRouter(function (/* { store, ssrContext } */) {
+export default defineRouter(function ({ store/*, ssrContext*/ } ) {
   const createHistory = process.env.SERVER
     ? createMemoryHistory
     : process.env.VUE_ROUTER_MODE === 'history'
@@ -33,10 +33,15 @@ export default defineRouter(function (/* { store, ssrContext } */) {
     // quasar.conf.js -> build -> publicPath
     history: createHistory(process.env.VUE_ROUTER_BASE),
   })
-  Router.beforeEach((to) => {
-    const auth = useAuthStore()
-    if (to.meta.requeiresAuth && !auth.isAuthed) {
-      return { path: '/login', query: { redirect: to.fullPath } }
+  Router.beforeEach((to, from, next) => {
+    const auth = useAuthStore(store)
+
+    if (to.meta.requiresAuth && !auth.isAuthed) {
+      next( { path: '/login', query: { redirect: to.fullPath } })
+    } else if (to.path === '/login' && auth.isAuthed) {
+      next( { path: '/overview' } )
+    } else {
+      next()
     }
   })
 

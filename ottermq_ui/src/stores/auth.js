@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth', {
             this.loading = true;
             this.error = null;
             try {
-                const { data } = await api.post('/admin/login', { username, password });
+                const { data } = await api.post('/login', { username, password });
                 const token = data?.token;
                 if (!token) throw new Error('Token missing');
                 this.token = token;
