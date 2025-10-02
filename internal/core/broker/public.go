@@ -40,21 +40,21 @@ type DefaultManagerApi struct {
 func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	b := a.broker
 	names := a.GetExchangeUniqueNames()
+	for name := range names {
+		if alias, ok := defaultAlias[name]; ok {
+			delete(names, name)
+			names[alias] = true
+		}
+	}
 	exchanges := make([]models.ExchangeDTO, 0, len(names))
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, vh := range b.VHosts {
 		for exchangeName := range names {
 			if exchange, ok := vh.Exchanges[exchangeName]; ok {
-				var name string
-				if alias, ok := defaultAlias[exchange.Name]; ok {
-					name = alias
-				} else {
-					name = exchange.Name
-				}
 				exchanges = append(exchanges, models.ExchangeDTO{
 					VHostName: vh.Name,
-					Name:      name,
+					Name:      exchange.Name,
 					Type:      string(exchange.Typ),
 				})
 			}
@@ -115,15 +115,11 @@ func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 	queues := make([]models.QueueDTO, 0, a.GetTotalQueues())
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for vhostName := range b.VHosts {
-		vhost, ok := b.VHosts[vhostName]
-		if !ok {
-			return nil, fmt.Errorf("vhost %s not found", vhostName)
-		}
-		for _, queue := range vhost.Queues {
+	for _, vh := range b.VHosts {
+		for _, queue := range vh.Queues {
 			queues = append(queues, models.QueueDTO{
-				VHostName: vhost.Name,
-				VHostId:   vhost.Id,
+				VHostName: vh.Name,
+				VHostId:   vh.Id,
 				Name:      queue.Name,
 				Messages:  queue.Len(),
 			})
