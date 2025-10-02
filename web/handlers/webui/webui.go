@@ -40,7 +40,7 @@ func Authenticate(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
-	userdto, err := persistedUser.MapUserToUserDTO()
+	userdto, err := persistedUser.ToUserDTO()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),

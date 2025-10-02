@@ -63,7 +63,7 @@ func GetUsers(c *fiber.Ctx) error {
 	}
 	out := make([]models.UserSummary, 0, len(list))
 	for _, u := range list {
-		userdto, err := u.MapUserToUserDTO()
+		userdto, err := u.ToUserDTO()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 		}
@@ -99,7 +99,7 @@ func Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(models.ErrorResponse{Error: "Invalid username or password"})
+		return c.Status(fiber.StatusUnauthorized).JSON(models.UnauthorizedErrorResponse{Error: "Invalid username or password"})
 	}
 	// get user
 	persistedUser, err := persistdb.GetUserByUsername(req.Username)
@@ -107,7 +107,7 @@ func Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}
 
-	userdto, err := persistedUser.MapUserToUserDTO()
+	userdto, err := persistedUser.ToUserDTO()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{Error: err.Error()})
 	}

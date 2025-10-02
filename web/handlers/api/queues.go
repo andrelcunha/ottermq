@@ -48,7 +48,7 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 	var request models.CreateQueueRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: "invalid request body",
+			Error: "invalid request body: " + err.Error(),
 		})
 	}
 	if request.QueueName == "" {
@@ -151,7 +151,7 @@ func GetMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 	}
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(models.ErrorResponse{
-			Error: "no messages in queue",
+			Error: "No messages in queue",
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(models.SuccessResponse{
