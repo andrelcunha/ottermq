@@ -1,7 +1,6 @@
 .bin
 server.log
 .vscode
-ottermq_ui
 .github
 docker-compose.yml
 Dockerfile
