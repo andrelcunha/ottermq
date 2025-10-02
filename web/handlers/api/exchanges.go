@@ -39,7 +39,7 @@ func ListExchanges(c *fiber.Ctx, b *broker.Broker) error {
 // @Produce json
 // @Param exchange body models.CreateExchangeRequest true "Exchange to create"
 // @Success 200 {object} models.SuccessResponse "Exchange created successfully"
-// @Failure 400 {object} models.ErrorResponse
+// @Failure 400 {object} models.ErrorResponse "Invalid or malformed request body"
 // @Failure 401 {object} models.UnauthorizedErrorResponse "Missing or invalid JWT token"
 // @Failure 500 {object} models.ErrorResponse
 // @Router /exchanges [post]
@@ -48,7 +48,7 @@ func CreateExchange(c *fiber.Ctx, b *broker.Broker) error {
 	var request models.CreateExchangeRequest
 	if err := c.BodyParser(&request); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-			Error: err.Error(),
+			Error: "Invalid or malformed request body: " + err.Error(),
 		})
 	}
 	exchangeDto := models.ExchangeDTO{

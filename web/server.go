@@ -130,7 +130,6 @@ func (ws *WebServer) AddUI(app *fiber.App) {
 	webGrp.Get("/connections", webui.ListConnections)
 	webGrp.Get("/exchanges", webui.ListExchanges)
 	webGrp.Get("/queues", webui.ListQueues)
-	// webGrp.Get("/settings", webui.Settings)
 }
 
 func (ws *WebServer) AddAdminApi(app *fiber.App) {
