@@ -61,5 +61,5 @@ type BindingDTO struct {
 	VHostName string              `json:"vhost"`
 	VHostId   string              `json:"vhost_id"`
 	Exchange  string              `json:"exchange"`
-	Bindings  map[string][]string `json:"bidings"`
+	Bindings  map[string][]string `json:"bindings"`
 }
