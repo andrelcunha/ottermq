@@ -1,6 +1,6 @@
 module github.com/andrelcunha/ottermq
 
-go 1.23.3
+go 1.25.1
 
 require (
 	github.com/gofiber/contrib/jwt v1.0.10
