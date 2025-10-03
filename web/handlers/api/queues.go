@@ -97,8 +97,8 @@ func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
 		})
 	}
 
-	// Use default vhost
-	err := b.ManagerApi.DeleteQueue(broker.DefaultVHost, queueName)
+	// Use default vhost TODO: allow specifying vhost in the request
+	err := b.ManagerApi.DeleteQueue("/", queueName)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
 			Error: err.Error(),

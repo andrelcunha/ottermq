@@ -75,19 +75,20 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			return nil, fmt.Errorf("queue %s does not exist", queueName)
 		}
 		messageCount := uint32(queue.Len())
-		consumerCount := uint32(0)
-		if cc, ok := interface{}(queue).(interface{ ConsumerCount() int }); ok {
-			consumerCount = uint32(cc.ConsumerCount())
-		}
+		// consumerCount := uint32(0)
+		// if cc, ok := interface{}(queue).(interface{ ConsumerCount() int }); ok {
+		// 	consumerCount = uint32(cc.ConsumerCount())
+		// }
+		// TODO: Implement the following flags: if-unused, if-empty
 
-		// Honor if-empty flag
-		if content.IfEmpty && messageCount > 0 {
-			return nil, fmt.Errorf("queue %s not empty", queueName)
-		}
-		// Honor if-unused flag
-		if content.IfUnused && consumerCount > 0 {
-			return nil, fmt.Errorf("queue %s is in use", queueName)
-		}
+		// // Honor if-empty flag
+		// if content.IfEmpty && messageCount > 0 {
+		// 	return nil, fmt.Errorf("queue %s not empty", queueName)
+		// }
+		// // Honor if-unused flag
+		// if content.IfUnused && consumerCount > 0 {
+		// 	return nil, fmt.Errorf("queue %s is in use", queueName)
+		// }
 
 		err := vh.DeleteQueue(queueName)
 		if err != nil {
