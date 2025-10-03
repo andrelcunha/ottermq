@@ -69,10 +69,24 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		log.Printf("[DEBUG] Content: %+v\n", content)
 		queueName := content.QueueName
 
-		// Get message count before deletion
-		messageCount := uint32(0)
-		if queue, exists := vh.Queues[queueName]; exists {
-			messageCount = uint32(queue.Len())
+		// Get queue object and message count before deletion
+		queue, exists := vh.Queues[queueName]
+		if !exists {
+			return nil, fmt.Errorf("queue %s does not exist", queueName)
+		}
+		messageCount := uint32(queue.Len())
+		consumerCount := uint32(0)
+		if cc, ok := interface{}(queue).(interface{ ConsumerCount() int }); ok {
+			consumerCount = uint32(cc.ConsumerCount())
+		}
+
+		// Honor if-empty flag
+		if content.IfEmpty && messageCount > 0 {
+			return nil, fmt.Errorf("queue %s not empty", queueName)
+		}
+		// Honor if-unused flag
+		if content.IfUnused && consumerCount > 0 {
+			return nil, fmt.Errorf("queue %s is in use", queueName)
 		}
 
 		err := vh.DeleteQueue(queueName)
@@ -80,8 +94,11 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			return nil, err
 		}
 
-		frame := b.framer.CreateQueueDeleteOkFrame(request, messageCount)
-		b.framer.SendFrame(conn, frame)
+		// Honor no-wait flag
+		if !content.NoWait {
+			frame := b.framer.CreateQueueDeleteOkFrame(request, messageCount)
+			b.framer.SendFrame(conn, frame)
+		}
 		return nil, nil
 
 	case uint16(amqp.QUEUE_UNBIND):
