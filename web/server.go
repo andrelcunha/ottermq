@@ -13,7 +13,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/template/html/v2"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -123,13 +122,11 @@ func (ws *WebServer) AddAdminApi(app *fiber.App) {
 }
 
 func (ws *WebServer) configServer(logFile *os.File) *fiber.App {
-	engine := html.New("./web/templates", ".html")
 
 	config := fiber.Config{
 
 		Prefork:               false,
 		AppName:               "ottermq-webadmin",
-		Views:                 engine,
 		ViewsLayout:           "layout",
 		DisableStartupMessage: true,
 	}
