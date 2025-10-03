@@ -70,6 +70,52 @@ OtterMq uses:
 - Port **5672** for the AMQP broker
 
 - Port **3000** for the management UI
+
+## ⚙️ Configuration
+OtterMQ can be configured using environment variables or a `.env` file. Environment variables take precedence over `.env` file settings, which in turn take precedence over default values.
+
+### Configuration Options
+Copy `.env.example` to `.env` and customize as needed:
+
+```sh
+cp .env.example .env
+```
+
+Available configuration options:
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `OTTERMQ_BROKER_PORT` | `5672` | AMQP broker port |
+| `OTTERMQ_BROKER_HOST` | `` | Broker bind address (empty = all interfaces) |
+| `OTTERMQ_USERNAME` | `guest` | Default username for authentication |
+| `OTTERMQ_PASSWORD` | `guest` | Default password for authentication |
+| `OTTERMQ_HEARTBEAT_INTERVAL` | `60` | Heartbeat interval in seconds |
+| `OTTERMQ_CHANNEL_MAX` | `2048` | Maximum number of channels |
+| `OTTERMQ_FRAME_MAX` | `131072` | Maximum frame size in bytes |
+| `OTTERMQ_SSL` | `false` | Enable SSL/TLS |
+| `OTTERMQ_QUEUE_BUFFER_SIZE` | `100000` | Queue message buffer size |
+| `OTTERMQ_WEB_PORT` | `3000` | Web management UI port |
+| `OTTERMQ_JWT_SECRET` | `secret` | JWT secret key for authentication |
+
+### Example Configuration
+Create a `.env` file in the project root:
+
+```env
+OTTERMQ_BROKER_PORT=5672
+OTTERMQ_WEB_PORT=8080
+OTTERMQ_USERNAME=admin
+OTTERMQ_PASSWORD=secure_password
+OTTERMQ_QUEUE_BUFFER_SIZE=200000
+OTTERMQ_JWT_SECRET=my-secret-key
+```
+
+Or use environment variables directly:
+```sh
+export OTTERMQ_BROKER_PORT=15672
+export OTTERMQ_WEB_PORT=8080
+ottermq
+```
+
 ## 🐳 Docker
 You can run OtterMq using Docker:
 ```sh

@@ -43,7 +43,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
 	}
-	b.VHosts["/"] = vhost.NewVhost("/")
+	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize)
 	b.framer = &amqp.DefaultFramer{}
 	b.ManagerApi = &DefaultManagerApi{b}
 	return b

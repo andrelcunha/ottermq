@@ -22,6 +22,7 @@ type VHost struct {
 	ConsumerUnackMsgs map[string]map[string]amqp.Message `json:"consumer_unacked_messages"`
 	mu                sync.Mutex                         `json:"-"`
 	MsgCtrlr          MessageController
+	QueueBufferSize   int `json:"-"`
 }
 
 type Consumer struct {
@@ -30,7 +31,7 @@ type Consumer struct {
 	SessionID string `json:"session_id"`
 }
 
-func NewVhost(vhostName string) *VHost {
+func NewVhost(vhostName string, queueBufferSize int) *VHost {
 	id := uuid.New().String()
 	vh := &VHost{
 		Name:              vhostName,
@@ -41,6 +42,7 @@ func NewVhost(vhostName string) *VHost {
 		Consumers:         make(map[string]*Consumer),
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]amqp.Message),
+		QueueBufferSize:   queueBufferSize,
 	}
 	vh.MsgCtrlr = &DefaultMessageController{vh}
 	vh.createMandatoryStructure()

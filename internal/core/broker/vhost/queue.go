@@ -22,7 +22,7 @@ type Queue struct {
 	mu         sync.Mutex        `json:"-"`
 }
 
-func NewQueue(name string) *Queue {
+func NewQueue(name string, bufferSize int) *Queue {
 	return &Queue{
 		Name:       name,
 		Durable:    false,
@@ -30,7 +30,7 @@ func NewQueue(name string) *Queue {
 		AutoDelete: false,
 		MessageTTL: 0,
 		Arguments:  make(QueueArgs),
-		messages:   make(chan amqp.Message, 100000), // Adjustable buffer size
+		messages:   make(chan amqp.Message, bufferSize),
 		count:      0,
 	}
 }
@@ -42,7 +42,7 @@ func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 		log.Printf("[DEBUG] Queue %s already exists", name)
 		return queue, nil
 	}
-	queue := NewQueue(name)
+	queue := NewQueue(name, vh.QueueBufferSize)
 	vh.Queues[name] = queue
 	log.Printf("[DEBUG] Created queue %s", name)
 	// vh.saveBrokerState() // TODO: persist state
