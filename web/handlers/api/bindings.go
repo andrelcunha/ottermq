@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/url"
+
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 
@@ -62,7 +64,13 @@ func BindQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Security BearerAuth
 func ListBindings(c *fiber.Ctx, b *broker.Broker) error {
 
-	exchangeName := c.Params("exchange")
+	encodedExchangeName := c.Params("exchange")
+	exchangeName, err := url.PathUnescape(encodedExchangeName)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "Invalid exchange name",
+		})
+	}
 	if exchangeName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
 			Error: "Exchange name is required",
