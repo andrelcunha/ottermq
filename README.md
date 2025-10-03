@@ -98,11 +98,11 @@ If you make changes to the API and need to regenerate the documentation, run:
 ```sh
 make docs
 ```
-This will update the Swagger spec and refresh the documentation served at ´/docs´.
+This will update the Swagger spec and refresh the documentation served at `/docs`.
 This will update the Swagger spec and refresh the documentation served at `/docs`.
 
 ## ⚖️ License
-OtterMq is released under the MIT License. See [License](https://github.com/dunstontc/vscode-go-syntax/blob/master/LICENSE) for more information.
+OtterMq is released under the MIT License. See [License](https://github.com/andrelcunha/ottermq/blob/master/LICENSE) for more information.
 
 ## 💬 Contact
 For questions, suggestions, or issues, please open an issue in the [GitHub repository](https://github.com/andrelcunha/ottermq.git).
