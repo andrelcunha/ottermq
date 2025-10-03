@@ -123,12 +123,20 @@ func (b *Broker) registerConnection(conn net.Conn, connInfo *amqp.ConnectionInfo
 }
 
 func (b *Broker) cleanupConnection(conn net.Conn) {
-	if connInfo, ok := b.Connections[conn]; ok {
-		connInfo.Client.Ctx.Done()
-		vhName := connInfo.VHostName
-		vh := b.GetVHost(vhName)
+	b.mu.Lock()
+	connInfo, ok := b.Connections[conn]
+	if !ok {
+		b.mu.Unlock()
+		return
+	}
+	vhName := connInfo.VHostName
+	delete(b.Connections, conn)
+	b.mu.Unlock()
+	
+	connInfo.Client.Ctx.Done()
+	vh := b.GetVHost(vhName)
+	if vh != nil {
 		vh.CleanupConnection(conn)
-		delete(b.Connections, conn)
 	}
 }
 

@@ -71,9 +71,6 @@ func (vh *VHost) CleanupConnection(conn net.Conn) error {
 }
 
 func (vh *VHost) handleConsumerDisconnection(sessionID string) {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-
 	consumerID, ok := vh.ConsumerSessions[sessionID]
 	if !ok {
 		log.Printf("[DEBUG] Session %s not found\n", sessionID)
