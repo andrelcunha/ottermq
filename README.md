@@ -27,12 +27,10 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 
 ## ⚙️ Installation
 ### Broker Setup
-
 ```sh
 git clone https://github.com/andrelcunha/ottermq.git
 cd ottermq
 make build && make install
-```sh
 ```
 
 ## UI Setup (Vue + Quasar)
@@ -57,7 +55,7 @@ quasar dev
 quasar build
 ```
 2. Link the built UI to the broker:
-```
+```sh
 cd ..
 ln -s ./ottermq_ui/dist/spa ./ui
 ```
