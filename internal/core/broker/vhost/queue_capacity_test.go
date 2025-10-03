@@ -8,8 +8,8 @@ import (
 )
 
 func TestQueueCapacityExceeds1000(t *testing.T) {
-	// Create a test queue
-	queue := NewQueue("testQueue")
+	// Create a test queue with a buffer size of 100000
+	queue := NewQueue("testQueue", 100000)
 	
 	// Try to push more than 1000 messages
 	t.Logf("Starting to push 2000 messages to queue...")

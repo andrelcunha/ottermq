@@ -25,11 +25,12 @@ type WebServer struct {
 }
 
 type Config struct {
-	BrokerHost string
-	BrokerPort string
-	Username   string
-	Password   string
-	JwtKey     string
+	BrokerHost    string
+	BrokerPort    string
+	Username      string
+	Password      string
+	JwtKey        string
+	WebServerPort string
 }
 
 func (ws *WebServer) Close() {

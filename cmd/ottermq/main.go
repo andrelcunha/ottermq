@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -17,15 +18,6 @@ import (
 
 var (
 	VERSION = ""
-)
-
-const (
-	PORT      = "5672"
-	HOST      = ""
-	HEARTBEAT = 60
-	USERNAME  = "guest"
-	PASSWORD  = "guest"
-	VHOST     = "/"
 )
 
 // @title OtterMQ API
@@ -53,20 +45,11 @@ func main() {
 		}
 	}
 
-	config := &config.Config{
-		Port:                 PORT,
-		Host:                 HOST,
-		Username:             USERNAME,
-		Password:             PASSWORD,
-		HeartbeatIntervalMax: HEARTBEAT,
-		ChannelMax:           2048,
-		FrameMax:             131072,
-		Ssl:                  false,
-		Version:              VERSION,
-	}
+	// Load configuration from .env file, environment variables, or defaults
+	cfg := config.LoadConfig(VERSION)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	b := broker.NewBroker(config, ctx, cancel)
+	b := broker.NewBroker(cfg, ctx, cancel)
 
 	// Verify if the database file exists
 	dbPath := filepath.Join(dataDir, "ottermq.db")
@@ -76,12 +59,12 @@ func main() {
 		persistdb.InitDB()
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
-		user := persistdb.UserCreateDTO{Username: config.Username, Password: config.Password, RoleID: 1}
+		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
 		persistdb.AddUser(user)
 		persistdb.CloseDB()
 	}
 	persistdb.OpenDB()
-	user, err := persistdb.GetUserByUsername(config.Username)
+	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		log.Fatalf("Failed to get user: %v", err)
 	}
@@ -101,12 +84,12 @@ func main() {
 
 	// Initialize the web admin server
 	webConfig := &web.Config{
-		BrokerHost: HOST,
-		BrokerPort: PORT,
-		// HeartbeatInterval: 60,
-		Username: USERNAME,
-		Password: PASSWORD,
-		JwtKey:   "secret",
+		BrokerHost:    cfg.Host,
+		BrokerPort:    cfg.Port,
+		Username:      cfg.Username,
+		Password:      cfg.Password,
+		JwtKey:        cfg.JwtSecret,
+		WebServerPort: cfg.WebServerPort,
 	}
 	conn, err := web.GetBrokerClient(webConfig)
 	if err != nil {
@@ -128,7 +111,9 @@ func main() {
 
 	// Start the web admin server in a goroutine
 	go func() {
-		err := app.Listen(":3000")
+		addr := fmt.Sprintf(":%s", cfg.WebServerPort)
+		log.Printf("Starting web server on %s", addr)
+		err := app.Listen(addr)
 		if err != nil {
 			log.Fatalf("Error: %v", err)
 		}
