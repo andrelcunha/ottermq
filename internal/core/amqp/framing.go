@@ -24,6 +24,7 @@ type Framer interface {
 	// Queue Methods
 	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte
 	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
+	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
 
 	// Exchange Methods
 	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
@@ -62,6 +63,10 @@ func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, q
 
 func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {
 	return createQueueBindOkFrame(request)
+}
+
+func (d *DefaultFramer) CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
+	return createQueueDeleteOkFrame(request, messageCount)
 }
 
 func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
