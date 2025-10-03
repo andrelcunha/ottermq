@@ -14,7 +14,7 @@ OtterMq already supports basic interoperability with RabbitMQ clients, including
 
 
 ## 🐾 About the Name
-The name "OtterMq" comes from my son's nickname and is a way to honor him. He brings joy and inspiration to my life, and this project is a reflection of that. And, off corse, it is also a pun on **RabbitMQ**.
+The name "OtterMq" comes from my son's nickname and is a way to honor him. He brings joy and inspiration to my life, and this project is a reflection of that. And, of course, it is also a pun on **RabbitMQ**.
 
 ## ✨ Features
 - AMQP-style Message Queuing
@@ -40,7 +40,7 @@ cd ottermq_ui
 npm install
 ```
 
-🚀 Usage
+## 🚀 Usage
 ### Development Mode (UI runs separately)
 ```sh
 #Run the broker:
@@ -91,7 +91,6 @@ Basic compatibility with RabbitMQ clients is already functional, and more protoc
 
 ## 📚 API Documentation
 OtterMq provides a built-in Swagger UI for exploring and testing the API.
-OtterMq provides a built-in Swagger UI for exploring and testing the API.
 
 Access it at: `http://<server-address>/docs`
 
@@ -100,6 +99,7 @@ If you make changes to the API and need to regenerate the documentation, run:
 make docs
 ```
 This will update the Swagger spec and refresh the documentation served at ´/docs´.
+This will update the Swagger spec and refresh the documentation served at `/docs`.
 
 ## ⚖️ License
 OtterMq is released under the MIT License. See [License](https://github.com/dunstontc/vscode-go-syntax/blob/master/LICENSE) for more information.
