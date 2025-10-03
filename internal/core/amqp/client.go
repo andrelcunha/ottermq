@@ -2,9 +2,10 @@ package amqp
 
 import (
 	"context"
-	"github.com/rs/zerolog/log"
 	"net"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type AmqpClient struct {
@@ -93,7 +94,7 @@ func (c *AmqpClient) sendHeartbeats() {
 				return
 			}
 		case <-c.Ctx.Done():
-			log.Info().Msg("Heartbeat stopped due to context cancel")
+			log.Debug().Msg("Heartbeat stopped due to context cancel")
 			return
 		}
 	}
