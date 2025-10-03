@@ -24,6 +24,7 @@ type ManagerApi interface {
 	GetExchange(vhostName, exchangeName string) (*vhost.Exchange, error)
 	GetExchangeUniqueNames() map[string]bool
 	ListQueues() ([]models.QueueDTO, error)
+	DeleteQueue(vhostName, queueName string) error
 	GetTotalQueues() int
 	ListConnections() []models.ConnectionInfoDTO
 	ListBindings(vhostName, exchangeName string) map[string][]string
@@ -125,6 +126,15 @@ func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 		}
 	}
 	return queues, nil
+}
+
+func (a DefaultManagerApi) DeleteQueue(vhostName, queueName string) error {
+	b := a.broker
+	vh := b.GetVHost(vhostName)
+	if vh == nil {
+		return fmt.Errorf("vhost %s not found", vhostName)
+	}
+	return vh.DeleteQueue(queueName)
 }
 
 func (a DefaultManagerApi) GetTotalQueues() int {

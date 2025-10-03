@@ -60,7 +60,29 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		return nil, nil
 
 	case uint16(amqp.QUEUE_DELETE):
-		return nil, fmt.Errorf("not implemented")
+		log.Printf("[DEBUG] Received queue delete request: %+v\n", request)
+		content, ok := request.Content.(*amqp.QueueDeleteMessage)
+		if !ok {
+			log.Printf("[ERROR] Invalid content type for QueueDeleteMessage")
+			return nil, fmt.Errorf("invalid content type for QueueDeleteMessage")
+		}
+		log.Printf("[DEBUG] Content: %+v\n", content)
+		queueName := content.QueueName
+
+		// Get message count before deletion
+		messageCount := uint32(0)
+		if queue, exists := vh.Queues[queueName]; exists {
+			messageCount = uint32(queue.Len())
+		}
+
+		err := vh.DeleteQueue(queueName)
+		if err != nil {
+			return nil, err
+		}
+
+		frame := b.framer.CreateQueueDeleteOkFrame(request, messageCount)
+		b.framer.SendFrame(conn, frame)
+		return nil, nil
 
 	case uint16(amqp.QUEUE_UNBIND):
 		return nil, fmt.Errorf("not implemented")
