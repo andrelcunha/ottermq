@@ -107,12 +107,11 @@ func (q *Queue) Len() int {
 func (vh *VHost) DeleteQueue(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	if _, ok := vh.Queues[name]; !ok {
+	queue, exists := vh.Queues[name]
+	if !exists {
 		return fmt.Errorf("queue %s not found", name)
 	}
-	if queue, ok := vh.Queues[name]; ok {
-		close(queue.messages)
-	}
+	close(queue.messages)
 	delete(vh.Queues, name)
 	log.Printf("[DEBUG] Deleted queue %s", name)
 	// vh.publishQueueUpdate()
