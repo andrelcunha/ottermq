@@ -43,10 +43,10 @@ npm install
 ## 🚀 Usage
 ### Development Mode (UI runs separately)
 ```sh
-#Run the broker:
+# Run the broker:
 ottermq
 
-#Run the UI
+# Run the UI
 cd ottermq_ui
 quasar dev
 ```
@@ -98,7 +98,6 @@ If you make changes to the API and need to regenerate the documentation, run:
 ```sh
 make docs
 ```
-This will update the Swagger spec and refresh the documentation served at `/docs`.
 This will update the Swagger spec and refresh the documentation served at `/docs`.
 
 ## ⚖️ License
