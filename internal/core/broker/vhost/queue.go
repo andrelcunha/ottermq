@@ -29,7 +29,7 @@ func NewQueue(name string) *Queue {
 		AutoDelete: false,
 		MessageTTL: 0,
 		Arguments:  make(QueueArgs),
-		messages:   make(chan amqp.Message, 1000), // Adjustable buffer size
+		messages:   make(chan amqp.Message, 100000), // Adjustable buffer size
 		count:      0,
 	}
 }
