@@ -3,13 +3,13 @@ package broker
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/rs/zerolog/log"
 	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
 
@@ -44,10 +44,10 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 	defer func() {
 		defer b.ActiveConns.Done()
 		if len(b.Connections) == 0 {
-			log.Println("[DEBUG] No connections to clean")
+			log.Debug().Msg("No connections to clean")
 			return
 		}
-		log.Println("[DEBUG] Cleaning connection")
+		log.Debug().Msg("Cleaning connection")
 		b.cleanupConnection(conn)
 	}()
 
@@ -57,12 +57,12 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 		frame, err := b.framer.ReadFrame(conn)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				log.Printf("[DEBUG] Connection timeout: %v", err)
+				log.Debug().Err(err).Msg("Connection timeout")
 			}
 			if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
-				log.Printf("[DEBUG] Connection closed by client: %v", conn.RemoteAddr())
+				log.Debug().Str("client", conn.RemoteAddr().String()).Msg("Connection closed by client")
 			} else {
-				log.Printf("Error reading frame: %v", err)
+				log.Error().Err(err).Msg("Error reading frame")
 			}
 			client.Cancel()
 			return
@@ -75,7 +75,7 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 		//Process frame
 		newInterface, err := b.framer.ParseFrame(frame)
 		if err != nil {
-			log.Printf("[ERROR] Failed parsing frame: %v", err)
+			log.Error().Err(err).Msg("Failed parsing frame")
 			client.Cancel()
 			return
 		}
@@ -85,30 +85,30 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 
 		newState, ok := newInterface.(*amqp.ChannelState)
 		if !ok {
-			log.Printf(" [ERROR] Failed to cast request to ChannelState")
+			log.Error().Msg("Failed to cast request to ChannelState")
 			client.Cancel()
 			return
 		}
 
-		log.Printf("[TRACE] New State: %+v\n", newState)
+		log.Trace().Interface("state", newState).Msg("New State")
 
 		if newState.MethodFrame != nil {
 			request := newState.MethodFrame
 			if channelNum != request.Channel {
 				channelNum = newState.MethodFrame.Channel
-				log.Printf("[DEBUG] Switching to channel: %d\n", request.Channel)
+				log.Debug().Uint16("channel", request.Channel).Msg("Switching to channel")
 			}
 		} else {
 			if newState.HeaderFrame != nil {
-				log.Printf("[DEBUG] HeaderFrame: %+v\n", newState.HeaderFrame)
+				log.Debug().Interface("header", newState.HeaderFrame).Msg("HeaderFrame")
 			} else if newState.Body != nil {
-				log.Printf("[DEBUG] Body: %+v\n", newState.Body)
+				log.Debug().Interface("body", newState.Body).Msg("Body")
 			}
 			if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
 				newState.MethodFrame = previousState.MethodFrame
-				log.Printf("[DEBUG] Recovered method frame: %+v", previousState.MethodFrame)
+				log.Debug().Interface("method_frame", previousState.MethodFrame).Msg("Recovered method frame")
 			} else {
-				log.Printf("[DEBUG] Channel %d not found", channelNum)
+				log.Debug().Uint16("channel", channelNum).Msg("Channel not found")
 				continue
 			}
 		}
@@ -188,7 +188,7 @@ func (b *Broker) connectionHandler(request *amqp.RequestMethodMessage, conn net.
 		b.connectionCloseOk(conn)
 		return nil, nil
 	default:
-		log.Printf("[DEBUG] Unknown connection method: %d", request.MethodID)
+		log.Debug().Uint16("method_id", request.MethodID).Msg("Unknown connection method")
 		return nil, fmt.Errorf("unknown connection method: %d", request.MethodID)
 	}
 }

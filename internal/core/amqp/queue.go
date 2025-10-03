@@ -3,7 +3,7 @@ package amqp
 import (
 	"bytes"
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
@@ -120,17 +120,17 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] Queue fomated: %+v \n", msg)
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
 	return request, nil
 }
 
 func parseQueueMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(QUEUE_DECLARE):
-		log.Printf("[DEBUG] Received QUEUE_DECLARE frame \n")
+		log.Debug().Msg("Received QUEUE_DECLARE frame")
 		return parseQueueDeclareFrame(payload)
 	case uint16(QUEUE_DELETE):
-		log.Printf("[DEBUG] Received QUEUE_DELETE frame \n")
+		log.Debug().Msg("Received QUEUE_DELETE frame")
 		return parseQueueDeleteFrame(payload)
 	case uint16(QUEUE_BIND):
 		log.Printf("[DEBUG] Received QUEUE_BIND frame \n")
@@ -180,7 +180,7 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] Queue fomated: %+v \n", msg)
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
 	return request, nil
 }
 
@@ -234,6 +234,6 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] Queue fomated: %+v \n", msg)
+	log.Debug().Interface("queue", msg).Msg("Queue formatted")
 	return request, nil
 }

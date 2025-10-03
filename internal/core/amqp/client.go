@@ -2,7 +2,7 @@ package amqp
 
 import (
 	"context"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net"
 	"time"
 )
@@ -89,11 +89,11 @@ func (c *AmqpClient) sendHeartbeats() {
 		case <-ticker.C:
 			err := sendHeartbeat(c.Conn)
 			if err != nil {
-				log.Printf("[ERROR] Heartbeat failed: %v", err)
+				log.Error().Err(err).Msg("Heartbeat failed")
 				return
 			}
 		case <-c.Ctx.Done():
-			log.Println("[INFO] Heartbeat stopped due to context cancel")
+			log.Info().Msg("Heartbeat stopped due to context cancel")
 			return
 		}
 	}
@@ -108,7 +108,7 @@ func (c *AmqpClient) monitorHeartbeatTimeout() {
 		case <-ticker.C:
 			maxInterval := time.Duration(c.Config.HeartbeatInterval<<1) * time.Second
 			if time.Since(c.LastHeartbeat) > maxInterval {
-				log.Printf("[WARN] Heartbeat timeout for %s", c.RemoteAddr)
+				log.Warn().Str("addr", c.RemoteAddr).Msg("Heartbeat timeout")
 				c.Cancel() // triggers cleanup
 				return
 			}

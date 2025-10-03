@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net"
 	"strconv"
 	"strings"
@@ -20,12 +20,12 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[DEBUG] Handshake - Received: %x", clientHeader)
+	log.Debug().Str("header", fmt.Sprintf("%x", clientHeader)).Msg("Handshake - Received")
 	protocol := (*configurations)["protocol"].(string)
 	protocolHeader, err := buildProtocolHeader(protocol)
 	if err != nil {
 		msg := "error parsing protocol"
-		log.Printf("[ERROR] %s", msg)
+		log.Error().Str("error", msg).Msg("Handshake error")
 		return nil, fmt.Errorf("%s", msg)
 	}
 	if !bytes.Equal(clientHeader, protocolHeader) {
@@ -35,7 +35,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 		}
 		return nil, fmt.Errorf("bad protocol: %x (%s -> %s)", clientHeader, conn.RemoteAddr().String(), conn.LocalAddr().String())
 	}
-	log.Printf("[DEBUG] Handshake - Accepting AMQP connection (%s -> %s)\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	log.Debug().Str("remote", conn.RemoteAddr().String()).Str("local", conn.LocalAddr().String()).Msg("Handshake - Accepting AMQP connection")
 
 	/** connection.start **/
 	// send connection.start frame

@@ -3,7 +3,7 @@ package amqp
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
@@ -74,7 +74,7 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 	bodySize := len(msg.Message.Body)
 	flag_list, flags, err := msg.Message.Properties.encodeBasicProperties()
 	if err != nil {
-		log.Printf("[ERROR] Error: %v\n", err)
+		log.Error().Err(err).Msg("Error")
 		return nil
 	}
 

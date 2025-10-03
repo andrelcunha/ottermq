@@ -3,7 +3,7 @@ package persistdb
 import (
 	"encoding/base64"
 	"encoding/json"
-	"log"
+	"github.com/rs/zerolog/log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -16,12 +16,12 @@ func AddUser(user UserCreateDTO) error {
 	defer CloseDB()
 	hashedPassword, err := hashPassword(user.Password)
 	if err != nil {
-		log.Printf("Failed to hash password: %v\n", err)
+		log.Error().Err(err).Msg("Failed to hash password")
 		return err
 	}
 	_, err = db.Exec("INSERT INTO users (username, password, role_id) VALUES (?, ?, ?)", user.Username, hashedPassword, user.RoleID)
 	if err != nil {
-		log.Printf("Failed to insert user: %v\n", err)
+		log.Error().Err(err).Msg("Failed to insert user")
 		return err
 	}
 	return nil
@@ -32,7 +32,7 @@ func GetUsers() ([]User, error) {
 	defer CloseDB()
 	rows, err := db.Query("SELECT id, username, role_id FROM users")
 	if err != nil {
-		log.Printf("Failed to query users: %v\n", err)
+		log.Error().Err(err).Msg("Failed to query users")
 		return nil, err
 	}
 	defer rows.Close()
@@ -42,7 +42,7 @@ func GetUsers() ([]User, error) {
 		var user User
 		err := rows.Scan(&user.ID, &user.Username, &user.RoleID)
 		if err != nil {
-			log.Printf("Failed to scan user: %v\n", err)
+			log.Error().Err(err).Msg("Failed to scan user")
 			return nil, err
 		}
 		users = append(users, user)
@@ -56,7 +56,7 @@ func GetUserByUsername(username string) (User, error) {
 	var user User
 	err := db.QueryRow("SELECT id, username, role_id FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.RoleID)
 	if err != nil {
-		log.Printf("Failed to query user: %v\n", err)
+		log.Error().Err(err).Msg("Failed to query user")
 		return User{}, err
 	}
 	return user, nil
@@ -66,7 +66,7 @@ func GenerateJWTToken(user UserListDTO) (string, error) {
 	// convert user to json
 	jsonUser, err := json.Marshal(user)
 	if err != nil {
-		log.Printf("Failed to marshal user: %v\n", err)
+		log.Error().Err(err).Msg("Failed to marshal user")
 	}
 	// convert jsonUser to base64
 	encoded := base64.StdEncoding.EncodeToString(jsonUser)

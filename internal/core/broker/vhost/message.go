@@ -2,7 +2,7 @@ package vhost
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/google/uuid"
@@ -47,7 +47,7 @@ func (vh *VHost) acknowledge(consumerID, msgID string) error {
 		return fmt.Errorf("message ID %s not found in unack messages for consumer %s", msgID, consumerID)
 	}
 	delete(vh.ConsumerUnackMsgs[consumerID], msgID)
-	log.Printf("[DEBUG] Acknoledged messege %s for consumer %s", msgID, consumerID)
+	log.Debug().Str("msg_id", msgID).Str("consumer_id", consumerID).Msg("Acknowledged message")
 
 	// vh.saveBrokerState() // TODO: Persist
 	return nil
@@ -68,7 +68,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 	exchange, ok := vh.Exchanges[exchangeName]
 	vh.mu.Unlock()
 	if !ok {
-		log.Printf("Exchange %s not found", exchangeName)
+		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
 		return "", fmt.Errorf("Exchange %s not found", exchangeName)
 	}
 	msgID := uuid.New().String()
@@ -79,8 +79,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 		Exchange:   exchangeName,
 		RoutingKey: routingKey,
 	}
-	log.Printf("[DEBUG] Publishing message: ID=%s, Exchange=%s, RoutingKey=%s, Body=%s, Properties=%+v",
-		msgID, msg.Exchange, msg.RoutingKey, string(msg.Body), msg.Properties)
+	log.Debug().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
 
 	// // Save message to file TODO: Persist
 	// err := vh.saveMessage(routingKey, msg)
@@ -98,7 +97,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 			}
 			return msgID, nil
 		}
-		log.Printf("[ERROR] Routing key %s not found for exchange %s", routingKey, exchangeName)
+		log.Error().Str("routing_key", routingKey).Str("exchange", exchangeName).Msg("Routing key not found for exchange")
 		return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 
 	case FANOUT:
@@ -116,12 +115,12 @@ func (vh *VHost) getMessage(queueName string) *amqp.Message {
 	defer vh.mu.Unlock()
 	queue, ok := vh.Queues[queueName]
 	if !ok {
-		log.Printf("[ERROR] Queue %s not found", queueName)
+		log.Error().Str("queue", queueName).Msg("Queue not found")
 		return nil
 	}
 	msg := queue.Pop()
 	if msg == nil {
-		log.Printf("[DEBUG] No messages in queue %s", queueName)
+		log.Debug().Str("queue", queueName).Msg("No messages in queue")
 		return nil
 	}
 	return msg

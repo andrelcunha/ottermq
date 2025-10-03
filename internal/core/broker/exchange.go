@@ -2,7 +2,7 @@ package broker
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -13,14 +13,14 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 	channel := request.Channel
 	switch request.MethodID {
 	case uint16(amqp.EXCHANGE_DECLARE):
-		log.Printf("[DEBUG] Received exchange declare request: %+v\n", request)
-		log.Printf("[DEBUG] Channel: %d\n", channel)
+		log.Debug().Interface("request", request).Msg("Received exchange declare request")
+		log.Debug().Uint16("channel", channel).Msg("Channel")
 		content, ok := request.Content.(*amqp.ExchangeDeclareMessage)
 		if !ok {
-			log.Printf("[ERROR] Invalid content type for ExchangeDeclareMessage")
+			log.Error().Msg("Invalid content type for ExchangeDeclareMessage")
 			return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 		}
-		log.Printf("[DEBUG] Content: %+v\n", content)
+		log.Debug().Interface("content", content).Msg("Content")
 		typ := content.ExchangeType
 		exchangeName := content.ExchangeName
 
@@ -36,14 +36,14 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		return true, nil
 
 	case uint16(amqp.EXCHANGE_DELETE):
-		log.Printf("[DEBUG] Received exchange.delete request: %+v\n", request)
-		log.Printf("[DEBUG] Channel: %d\n", channel)
+		log.Debug().Interface("request", request).Msg("Received exchange.delete request")
+		log.Debug().Uint16("channel", channel).Msg("Channel")
 		content, ok := request.Content.(*amqp.ExchangeDeleteMessage)
 		if !ok {
-			log.Printf("[ERROR] Invalid content type for ExchangeDeleteMessage")
+			log.Error().Msg("Invalid content type for ExchangeDeleteMessage")
 			return nil, fmt.Errorf("invalid content type for ExchangeDeleteMessage")
 		}
-		log.Printf("[DEBUG] Content: %+v\n", content)
+		log.Debug().Interface("content", content).Msg("Content")
 		exchangeName := content.ExchangeName
 
 		err := vh.DeleteExchange(exchangeName)

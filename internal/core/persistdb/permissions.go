@@ -1,6 +1,6 @@
 package persistdb
 
-import "log"
+import "github.com/rs/zerolog/log"
 
 var defaultPermissions = []Permission{
 	{Action: "create", Resource: "resource"},
@@ -16,7 +16,7 @@ func AddDefaultPermissions() {
 	for _, permission := range defaultPermissions {
 		_, err := db.Exec("INSERT INTO permissions (action, resource) VALUES (?, ?)", permission.Action, permission.Resource)
 		if err != nil {
-			log.Printf("Failed to insert permission: %v\n", err)
+			log.Error().Err(err).Msg("Failed to insert permission")
 		}
 	}
 }

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -21,6 +21,7 @@ type Config struct {
 	QueueBufferSize      int
 	WebServerPort        string
 	JwtSecret            string
+	LogLevel             string
 }
 
 // LoadConfig loads configuration from .env file, environment variables, or defaults
@@ -41,6 +42,7 @@ func LoadConfig(version string) *Config {
 		QueueBufferSize:      getEnvAsInt("OTTERMQ_QUEUE_BUFFER_SIZE", 100000),
 		WebServerPort:        getEnv("OTTERMQ_WEB_PORT", "3000"),
 		JwtSecret:            getEnv("OTTERMQ_JWT_SECRET", "secret"),
+		LogLevel:             getEnv("LOG_LEVEL", "info"),
 		Version:              version,
 	}
 }
@@ -59,7 +61,7 @@ func getEnvAsInt(key string, defaultValue int) int {
 	}
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		log.Printf("Warning: Invalid value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %d\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return value
@@ -72,7 +74,7 @@ func getEnvAsUint16(key string, defaultValue uint16) uint16 {
 	}
 	value, err := strconv.ParseUint(valueStr, 10, 16)
 	if err != nil {
-		log.Printf("Warning: Invalid value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %d\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return uint16(value)
@@ -85,7 +87,7 @@ func getEnvAsUint32(key string, defaultValue uint32) uint32 {
 	}
 	value, err := strconv.ParseUint(valueStr, 10, 32)
 	if err != nil {
-		log.Printf("Warning: Invalid value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %d\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return uint32(value)
@@ -98,7 +100,7 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 	}
 	value, err := strconv.ParseBool(valueStr)
 	if err != nil {
-		log.Printf("Warning: Invalid value for %s: %s, using default: %t", key, valueStr, defaultValue)
+		fmt.Printf("Warning: Invalid value for %s: %s, using default: %t\n", key, valueStr, defaultValue)
 		return defaultValue
 	}
 	return value

@@ -1,7 +1,7 @@
 package persistdb
 
 import (
-	"log"
+	"github.com/rs/zerolog/log"
 )
 
 var defaultRoles = []Role{
@@ -17,7 +17,7 @@ func AddDefaultRoles() {
 	for _, role := range defaultRoles {
 		_, err := db.Exec("INSERT INTO roles (name, description) VALUES (?, ?)", role.Name, role.Description)
 		if err != nil {
-			log.Printf("Failed to insert role: %v\n", err)
+			log.Error().Err(err).Msg("Failed to insert role")
 		}
 	}
 }
@@ -28,7 +28,7 @@ func GetRoleByID(id int) (Role, error) {
 	var role Role
 	err := db.QueryRow("SELECT id, name, description FROM roles WHERE id = ?", id).Scan(&role.ID, &role.Name, &role.Description)
 	if err != nil {
-		log.Printf("Failed to query role: %v\n", err)
+		log.Error().Err(err).Msg("Failed to query role")
 		return Role{}, err
 	}
 	return role, nil

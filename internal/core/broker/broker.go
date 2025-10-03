@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -12,6 +11,7 @@ import (
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/rs/zerolog/log"
 
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
@@ -51,8 +51,8 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 
 func (b *Broker) Start() error {
 	Logo()
-	log.Printf("OtterMQ version %s", b.config.Version)
-	log.Printf("Broker is starting...")
+	log.Info().Str("version", b.config.Version).Msg("OtterMQ")
+	log.Info().Msg("Broker is starting...")
 
 	configurations := b.setConfigurations()
 
@@ -60,11 +60,11 @@ func (b *Broker) Start() error {
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("Failed to start vhost: %v", err)
+		log.Fatal().Err(err).Msg("Failed to start listener")
 	}
 	b.listener = listener
 	defer listener.Close()
-	log.Printf("Started TCP listener on %s", addr)
+	log.Info().Str("addr", addr).Msg("Started TCP listener")
 
 	return b.acceptLoop(configurations)
 }
@@ -114,22 +114,22 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 		conn, err := b.listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) || b.rootCtx.Err() != nil {
-				log.Printf("[INFO] Listener closed or context canceled: %v", err)
+				log.Info().Err(err).Msg("Listener closed or context canceled")
 				return err
 			}
-			log.Printf("[DEBUG] Accept failed: %v", err)
+			log.Debug().Err(err).Msg("Accept failed")
 			continue
 		}
 		if ok := b.ShuttingDown.Load(); ok {
-			log.Println("[DEBUG] Broker is shutting down, ignoring new connection")
+			log.Debug().Msg("Broker is shutting down, ignoring new connection")
 			continue
 		}
-		log.Println("[DEBUG] New client waiting for connection: ", conn.RemoteAddr())
+		log.Debug().Str("client", conn.RemoteAddr().String()).Msg("New client waiting for connection")
 		connCtx, connCancel := context.WithCancel(b.rootCtx)
 		defer connCancel()
 		connInfo, err := b.framer.Handshake(&configurations, conn, connCtx)
 		if err != nil {
-			log.Printf("[INFO] Handshake failed: %v", err)
+			log.Info().Err(err).Msg("Handshake failed")
 			continue
 		}
 		b.registerConnection(conn, connInfo)
@@ -141,7 +141,7 @@ func (b *Broker) acceptLoop(configurations map[string]any) error {
 
 func (b *Broker) monitorConnectionLifecycle(conn net.Conn, client *amqp.AmqpClient) {
 	<-client.Ctx.Done()
-	log.Printf("[INFO] Connection %s closed", conn.RemoteAddr())
+	log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
 	b.cleanupConnection(conn)
 }
 
@@ -182,7 +182,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			if currentState.MethodFrame != newState.MethodFrame {
 				b.Connections[conn].Channels[channel].MethodFrame = newState.MethodFrame
-				log.Printf("[DEBUG] Current state after update method : %+v\n", b.getCurrentState(conn, channel))
+				log.Debug().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
 				return nil, nil
 			}
 			// if the class and method are not the same as the current state,
@@ -190,17 +190,17 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
 				b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
 				b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
-				log.Printf("[DEBUG] Current state after update header: %+v\n", b.getCurrentState(conn, channel))
+				log.Debug().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
 				return nil, nil
 			}
 			if currentState.Body == nil && newState.Body != nil {
 				b.Connections[conn].Channels[channel].Body = newState.Body
 			}
-			log.Printf("[DEBUG] Current state after all: %+v\n", currentState)
+			log.Debug().Interface("state", currentState).Msg("Current state after all")
 			if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-				log.Printf("[DEBUG] All fields must be filled -> current state: %+v\n", currentState)
+				log.Debug().Interface("state", currentState).Msg("All fields must be filled")
 				if len(currentState.Body) != int(currentState.BodySize) {
-					log.Printf("[DEBUG] Body size is not correct: %d != %d\n", len(currentState.Body), currentState.BodySize)
+					log.Debug().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
 					return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
 				}
 				publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishMessage)
@@ -210,7 +210,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 				props := currentState.HeaderFrame.Properties
 				_, err := vh.MsgCtrlr.Publish(exchanege, routingKey, body, props)
 				if err == nil {
-					log.Printf("[DEBUG] Published message to exchange=%s, routingKey=%s, body=%s", exchanege, routingKey, string(body))
+					log.Debug().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 					b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 				}
 				return nil, err
@@ -221,7 +221,7 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			queue := getMsg.Queue
 			msgCount, err := vh.MsgCtrlr.GetMessageCount(queue)
 			if err != nil {
-				log.Printf("[ERROR] Error getting message count: %v", err)
+				log.Error().Err(err).Msg("Error getting message count")
 				return nil, err
 			}
 			if msgCount == 0 {
@@ -235,10 +235,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 
 			frame := b.framer.CreateBasicGetOkFrame(request, msg.Exchange, msg.RoutingKey, uint32(msgCount))
 			err = b.framer.SendFrame(conn, frame)
-			log.Printf("[DEBUG] Sent message from queue %s: ID=%s", queue, msg.ID)
+			log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 
 			if err != nil {
-				log.Printf("[DEBUG] Error sending frame: %v\n", err)
+				log.Debug().Err(err).Msg("Error sending frame")
 				return nil, err
 			}
 
@@ -296,10 +296,10 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	log.Printf("[DEBUG] Getting current state for channel %d\n", channel)
+	log.Debug().Uint16("channel", channel).Msg("Getting current state for channel")
 	state, ok := b.Connections[conn].Channels[channel]
 	if !ok {
-		log.Printf("[DEBUG] No channel found\n")
+		log.Debug().Msg("No channel found")
 		return nil
 	}
 	return state

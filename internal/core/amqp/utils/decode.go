@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+	"github.com/rs/zerolog/log"
 	"time"
 )
 
@@ -236,7 +236,7 @@ func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	}
 
 	if uint32(buf.Len()) < strLen {
-		log.Printf("[DEBUG] Reached EOF.  buf.Len(): %d\n", buf.Len())
+		log.Debug().Int("buf_len", buf.Len()).Msg("Reached EOF")
 		return "", io.EOF
 	}
 
