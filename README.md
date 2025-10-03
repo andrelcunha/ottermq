@@ -33,7 +33,7 @@ cd ottermq
 make build && make install
 ```
 
-## UI Setup (Vue + Quasar)
+### UI Setup (Vue + Quasar)
 ```sh
 cd ottermq_ui
 npm install
