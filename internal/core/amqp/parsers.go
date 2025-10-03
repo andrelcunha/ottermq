@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
@@ -24,7 +24,7 @@ func parseFrame(frame []byte) (any, error) {
 
 	switch frameType {
 	case byte(TYPE_METHOD):
-		log.Printf("[TRACE] Received METHOD frame on channel %d\n", channel)
+		log.Trace().Uint16("channel", channel).Msg("Received METHOD frame")
 		request, err := parseMethodFrame(channel, payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse method frame: %v", err)
@@ -32,11 +32,11 @@ func parseFrame(frame []byte) (any, error) {
 		return request, nil
 
 	case byte(TYPE_HEADER):
-		log.Printf("[TRACE] Received HEADER frame on channel %d\n", channel)
+		log.Trace().Uint16("channel", channel).Msg("Received HEADER frame")
 		return parseHeaderFrame(channel, payloadSize, payload)
 
 	case byte(TYPE_BODY):
-		log.Printf("[TRACE] Received BODY frame on channel %d\n", channel)
+		log.Trace().Uint16("channel", channel).Msg("Received BODY frame")
 		return parseBodyFrame(channel, payloadSize, payload)
 
 	case byte(TYPE_HEARTBEAT):

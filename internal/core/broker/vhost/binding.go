@@ -2,7 +2,7 @@ package vhost
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 )
 
 // bindToDefaultExchange binds a queue to the default exchange using the queue name as the routing key.
@@ -28,7 +28,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	case DIRECT:
 		for _, q := range exchange.Bindings[routingKey] {
 			if q.Name == queueName {
-				log.Printf("[DEBUG] Queue %s already boud to exchange %s using routing key %s", queueName, exchangeName, routingKey)
+				log.Debug().Str("queue", queueName).Str("exchange", exchangeName).Str("routing_key", routingKey).Msg("Queue already bound to exchange")
 				return nil
 			}
 		}

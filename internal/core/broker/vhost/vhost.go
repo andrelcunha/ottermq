@@ -2,7 +2,7 @@ package vhost
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net"
 	"sync"
 
@@ -60,7 +60,7 @@ func (vh *VHost) createMandatoryStructure() {
 }
 
 func (vh *VHost) CleanupConnection(conn net.Conn) error {
-	log.Println("[DEBUG] Cleaning vhost connection")
+	log.Debug().Msg("Cleaning vhost connection")
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -75,13 +75,13 @@ func (vh *VHost) CleanupConnection(conn net.Conn) error {
 func (vh *VHost) handleConsumerDisconnection(sessionID string) {
 	consumerID, ok := vh.ConsumerSessions[sessionID]
 	if !ok {
-		log.Printf("[DEBUG] Session %s not found\n", sessionID)
+		log.Debug().Str("session_id", sessionID).Msg("Session not found")
 		return
 	}
 
 	consumer, ok := vh.Consumers[consumerID]
 	if !ok {
-		log.Printf("[DEBUG] Consumer %s not found\n", consumerID)
+		log.Debug().Str("consumer_id", consumerID).Msg("Consumer not found")
 		return
 	}
 
@@ -94,7 +94,7 @@ func (vh *VHost) handleConsumerDisconnection(sessionID string) {
 	delete(vh.ConsumerUnackMsgs, consumerID)
 	delete(vh.ConsumerSessions, sessionID)
 	delete(vh.Consumers, consumerID)
-	log.Printf("[DEBUG] Cleaned up consumer %s, session %s", consumerID, sessionID)
+	log.Debug().Str("consumer_id", consumerID).Str("session_id", sessionID).Msg("Cleaned up consumer")
 }
 
 func (vh *VHost) getSessionID(conn net.Conn) (string, bool) {

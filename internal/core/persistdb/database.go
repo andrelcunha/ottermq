@@ -2,7 +2,8 @@ package persistdb
 
 import (
 	"database/sql"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -20,7 +21,7 @@ func InitDB() {
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Failed to open database")
 	}
 	createTables()
 	db.Close()
@@ -37,7 +38,7 @@ func createTables() {
 	);`
 	_, err := db.Exec(createUserTable)
 	if err != nil {
-		log.Fatalf("Failed to create 'users' table: %v\n", err)
+		log.Fatal().Err(err).Msg("Failed to create 'users' table")
 	}
 
 	createRolesTable := `
@@ -48,7 +49,7 @@ func createTables() {
 	);`
 	_, err = db.Exec(createRolesTable)
 	if err != nil {
-		log.Fatalf("Faled to create 'roles' table: %v\n", err)
+		log.Fatal().Err(err).Msg("Failed to create 'roles' table")
 	}
 
 	createPermissionsTable := `
@@ -59,7 +60,7 @@ func createTables() {
 	);`
 	_, err = db.Exec(createPermissionsTable)
 	if err != nil {
-		log.Fatalf("Faled to create 'permissions' table: %v\n", err)
+		log.Fatal().Err(err).Msg("Failed to create 'permissions' table")
 	}
 
 	createRolePermissionsTable := `
@@ -72,7 +73,7 @@ func createTables() {
 	);`
 	_, err = db.Exec(createRolePermissionsTable)
 	if err != nil {
-		log.Fatalf("Faled to create 'role_permissions' table: %v\n", err)
+		log.Fatal().Err(err).Msg("Failed to create 'role_permissions' table")
 	}
 }
 
@@ -84,7 +85,7 @@ func OpenDB() error {
 	var err error
 	db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Println("Error opening database: ", err.Error())
+		log.Error().Err(err).Msg("Error opening database")
 	}
 	return err
 }

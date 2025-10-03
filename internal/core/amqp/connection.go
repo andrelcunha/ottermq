@@ -3,7 +3,7 @@ package amqp
 import (
 	"bytes"
 	"encoding/binary"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
@@ -65,11 +65,11 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 
 	serverPropsRaw, ok := (*configurations)["serverProperties"]
 	if !ok {
-		log.Fatalf("serverProperties not found in configurations")
+		log.Fatal().Msg("serverProperties not found in configurations")
 	}
 	serverProperties, ok := serverPropsRaw.(map[string]any)
 	if !ok {
-		log.Fatalf("serverProperties is not a map[string]any")
+		log.Fatal().Msg("serverProperties is not a map[string]any")
 	}
 	encodedProperties := utils.EncodeTable(serverProperties)
 
@@ -78,22 +78,22 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 	// Extract mechanisms
 	mechanismsRaw, ok := (*configurations)["mechanisms"]
 	if !ok {
-		log.Fatalf("mechanisms not found in configurations")
+		log.Fatal().Msg("mechanisms not found in configurations")
 	}
 	mechanismsSlice, ok := mechanismsRaw.([]string)
 	if !ok || len(mechanismsSlice) == 0 {
-		log.Fatalf("mechanisms is not a non-empty []string")
+		log.Fatal().Msg("mechanisms is not a non-empty []string")
 	}
 	payloadBuf.Write(utils.EncodeLongStr([]byte(mechanismsSlice[0])))
 
 	// Extract locales
 	localesRaw, ok := (*configurations)["locales"]
 	if !ok {
-		log.Fatalf("locales not found in configurations")
+		log.Fatal().Msg("locales not found in configurations")
 	}
 	localesSlice, ok := localesRaw.([]string)
 	if !ok || len(localesSlice) == 0 {
-		log.Fatalf("locales is not a non-empty []string")
+		log.Fatal().Msg("locales is not a non-empty []string")
 	}
 	payloadBuf.Write(utils.EncodeLongStr([]byte(localesSlice[0])))
 

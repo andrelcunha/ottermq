@@ -48,6 +48,9 @@ func TestLoadConfigWithDefaults(t *testing.T) {
 	if config.Version != "test-version" {
 		t.Errorf("Expected Version to be 'test-version', got '%s'", config.Version)
 	}
+	if config.LogLevel != "info" {
+		t.Errorf("Expected LogLevel to be 'info', got '%s'", config.LogLevel)
+	}
 }
 
 func TestLoadConfigWithEnvVars(t *testing.T) {
@@ -63,6 +66,7 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	os.Setenv("OTTERMQ_QUEUE_BUFFER_SIZE", "50000")
 	os.Setenv("OTTERMQ_WEB_PORT", "8080")
 	os.Setenv("OTTERMQ_JWT_SECRET", "my-secret-key")
+	os.Setenv("LOG_LEVEL", "debug")
 
 	defer func() {
 		os.Clearenv()
@@ -106,6 +110,9 @@ func TestLoadConfigWithEnvVars(t *testing.T) {
 	}
 	if config.Version != "env-version" {
 		t.Errorf("Expected Version to be 'env-version', got '%s'", config.Version)
+	}
+	if config.LogLevel != "debug" {
+		t.Errorf("Expected LogLevel to be 'debug', got '%s'", config.LogLevel)
 	}
 }
 

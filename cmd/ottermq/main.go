@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,7 +12,9 @@ import (
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/pkg/logger"
 	"github.com/andrelcunha/ottermq/web"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -29,24 +30,27 @@ var (
 // @in header
 // @name Authorization
 func main() {
+	// Load configuration from .env file, environment variables, or defaults
+	cfg := config.LoadConfig(VERSION)
+	
+	// Initialize logger with configured log level
+	logger.Init(cfg.LogLevel)
+
 	// Determine the directory of the running binary
 	executablePath, err := os.Executable()
 	if err != nil {
-		log.Fatalf("Failed to get executable path: %v", err)
+		log.Fatal().Err(err).Msg("Failed to get executable path")
 	}
 	executableDir := filepath.Dir(executablePath)
 	dataDir := filepath.Join(executableDir, "data")
 
 	// Ensure the data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		log.Println("Data directory not found. Creating a new one...")
+		log.Info().Msg("Data directory not found. Creating a new one...")
 		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatalf("Failed to create data directory: %v", err)
+			log.Fatal().Err(err).Msg("Failed to create data directory")
 		}
 	}
-
-	// Load configuration from .env file, environment variables, or defaults
-	cfg := config.LoadConfig(VERSION)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	b := broker.NewBroker(cfg, ctx, cancel)
@@ -55,7 +59,7 @@ func main() {
 	dbPath := filepath.Join(dataDir, "ottermq.db")
 	persistdb.SetDbPath(dbPath)
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Println("Database file not found. Creating a new one...")
+		log.Info().Msg("Database file not found. Creating a new one...")
 		persistdb.InitDB()
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
@@ -66,10 +70,10 @@ func main() {
 	persistdb.OpenDB()
 	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
-		log.Fatalf("Failed to get user: %v", err)
+		log.Fatal().Err(err).Msg("Failed to get user")
 	}
 	if user.RoleID != 1 {
-		log.Fatalf("User is not an admin")
+		log.Fatal().Msg("User is not an admin")
 	}
 	persistdb.CloseDB()
 	b.VHosts["/"].Users[user.Username] = &user
@@ -78,7 +82,7 @@ func main() {
 	go func() {
 		err := b.Start()
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatal().Err(err).Msg("Broker error")
 		}
 	}()
 
@@ -93,29 +97,29 @@ func main() {
 	}
 	conn, err := web.GetBrokerClient(webConfig)
 	if err != nil {
-		log.Fatalf("failed to connect to broker: %v", err)
+		log.Fatal().Err(err).Msg("Failed to connect to broker")
 	}
 	defer conn.Close()
 
 	webServer, err := web.NewWebServer(webConfig, b, conn)
 	if err != nil {
-		log.Fatalf("failed to connect to broker: %v", err)
+		log.Fatal().Err(err).Msg("Failed to create web server")
 	}
 	defer webServer.Close()
 	// open "server.log" for appending
 	logfile, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("failed to open log file: %v", err)
+		log.Fatal().Err(err).Msg("Failed to open log file")
 	}
 	app := webServer.SetupApp(logfile) // Using os.Stdout for logging
 
 	// Start the web admin server in a goroutine
 	go func() {
 		addr := fmt.Sprintf(":%s", cfg.WebServerPort)
-		log.Printf("Starting web server on %s", addr)
+		log.Info().Str("addr", addr).Msg("Starting web server")
 		err := app.Listen(addr)
 		if err != nil {
-			log.Fatalf("Error: %v", err)
+			log.Fatal().Err(err).Msg("Web server error")
 		}
 	}()
 
@@ -124,13 +128,13 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	<-stop
-	log.Println("Shutting down OtterMq...")
+	log.Info().Msg("Shutting down OtterMQ...")
 	cancel()
 	b.ShuttingDown.Store(true)
 
 	// Broadcast connection close to all channels
 	b.BroadcastConnectionClose()
-	log.Println("Waiting for active connections to close...")
+	log.Info().Msg("Waiting for active connections to close...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -143,15 +147,15 @@ func main() {
 
 	select {
 	case <-done:
-		log.Println("All connections closed gracefully.")
+		log.Info().Msg("All connections closed gracefully")
 	case <-shutdownCtx.Done():
-		log.Println("Timeout reached. Forcing shutdown.")
+		log.Warn().Msg("Timeout reached. Forcing shutdown")
 	}
 
 	b.Shutdown()
 	if err := app.ShutdownWithContext(shutdownCtx); err != nil {
-		log.Fatalf("Failed to shutdown web server: %v", err)
+		log.Fatal().Err(err).Msg("Failed to shutdown web server")
 	}
-	log.Println("Server gracefully stopped.")
+	log.Info().Msg("Server gracefully stopped")
 	os.Exit(0) // if came so far it means the server has stopped gracefully
 }

@@ -2,7 +2,7 @@ package vhost
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"sync"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -39,12 +39,12 @@ func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	if queue, ok := vh.Queues[name]; ok {
-		log.Printf("[DEBUG] Queue %s already exists", name)
+		log.Debug().Str("queue", name).Msg("Queue already exists")
 		return queue, nil
 	}
 	queue := NewQueue(name, vh.QueueBufferSize)
 	vh.Queues[name] = queue
-	log.Printf("[DEBUG] Created queue %s", name)
+	log.Debug().Str("queue", name).Msg("Created queue")
 	// vh.saveBrokerState() // TODO: persist state
 	// adminQueues := make(map[string]bool)
 	// queues := []string{ADMIN_QUEUES, ADMIN_EXCHANGES, ADMIN_BINDINGS, ADMIN_CONNECTIONS}
@@ -65,9 +65,9 @@ func (q *Queue) Push(msg amqp.Message) {
 	select {
 	case q.messages <- msg:
 		q.count++
-		log.Printf("[DEBUG] Pushed message to queue %s: ID=%s, Body=%s", q.Name, msg.ID, msg.Body)
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Bytes("body", msg.Body).Msg("Pushed message to queue")
 	default:
-		log.Printf("[DEBUG] Queue %s channel full, dropping message: ID=%s", q.Name, msg.ID)
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Queue channel full, dropping message")
 	}
 }
 
@@ -78,10 +78,10 @@ func (q *Queue) Pop() *amqp.Message {
 	select {
 	case msg := <-q.messages:
 		q.count--
-		log.Printf("[DEBUG] Popped message from queue %s: ID=%s, Body=%s", q.Name, msg.ID, string(msg.Body))
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Str("body", string(msg.Body)).Msg("Popped message from queue")
 		return &msg
 	default:
-		log.Printf("[DEBUG] Queue %s is empty", q.Name)
+		log.Debug().Str("queue", q.Name).Msg("Queue is empty")
 		return nil
 	}
 }
@@ -92,9 +92,9 @@ func (q *Queue) ReQueue(msg amqp.Message) {
 	select {
 	case q.messages <- msg:
 		q.count++
-		log.Printf("[DEBUG] Pushed message to queue %s: ID=%s, Body=%s", q.Name, msg.ID, msg.Body)
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Bytes("body", msg.Body).Msg("Pushed message to queue")
 	default:
-		log.Printf("[DEBUG] Queue %s channel full, dropping message: ID=%s", q.Name, msg.ID)
+		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Queue channel full, dropping message")
 	}
 }
 
@@ -113,7 +113,7 @@ func (vh *VHost) DeleteQueue(name string) error {
 	}
 	close(queue.messages)
 	delete(vh.Queues, name)
-	log.Printf("[DEBUG] Deleted queue %s", name)
+	log.Debug().Str("queue", name).Msg("Deleted queue")
 	// vh.publishQueueUpdate()
 	return nil
 }
