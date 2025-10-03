@@ -40,22 +40,21 @@ type DefaultManagerApi struct {
 func (a DefaultManagerApi) ListExchanges() []models.ExchangeDTO {
 	b := a.broker
 	names := a.GetExchangeUniqueNames()
-	for name := range names {
-		if alias, ok := defaultAlias[name]; ok {
-			delete(names, name)
-			names[alias] = true
-		}
-	}
 	exchanges := make([]models.ExchangeDTO, 0, len(names))
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, vh := range b.VHosts {
-		for exchangeName := range names {
-			if exchange, ok := vh.Exchanges[exchangeName]; ok {
+		for xn := range names {
+			if exchange, ok := vh.Exchanges[xn]; ok {
 				exchanges = append(exchanges, models.ExchangeDTO{
 					VHostName: vh.Name,
-					Name:      exchange.Name,
-					Type:      string(exchange.Typ),
+					Name: func(xname string) string {
+						if alias, ok := defaultAlias[xname]; ok {
+							return alias
+						}
+						return xname
+					}(xn),
+					Type: string(exchange.Typ),
 				})
 			}
 		}

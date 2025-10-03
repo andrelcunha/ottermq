@@ -16,6 +16,21 @@ export const useExchangesStore = defineStore('exchanges', {
       try {
         const {data} = await api.get('/exchanges')
         this.items = Array.isArray(data?.exchanges) ? data.exchanges : []
+        console.log('Fetched exchanges:', this.items)
+        // Sort by vhost -> type -> name (groups by vhost, then type, then name)
+        this.items.sort((a, b) => {
+          // First: vhost (case-insensitive)
+          const vhostCompare = a.vhost.localeCompare(b.vhost, undefined, { sensitivity: 'base' })
+          if (vhostCompare !== 0) return vhostCompare
+          
+          // Second: type (case-insensitive)
+          const typeCompare = a.type.localeCompare(b.type, undefined, { sensitivity: 'base' })
+          if (typeCompare !== 0) return typeCompare
+          
+          // Third: name (case-insensitive)
+          return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        })
+        console.log('Sorted exchanges:', this.items)
       } catch (err) {
         this.error = err?.response?.data?.error || err.message
         this.items = []

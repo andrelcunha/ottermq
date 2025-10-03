@@ -394,7 +394,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid or malformed request body",
                         "schema": {
                             "$ref": "#/definitions/models.ErrorResponse"
                         }
@@ -894,6 +894,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "description": "ip",
                     "type": "string"
                 },
                 "protocol": {
@@ -903,15 +904,13 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "state": {
+                    "description": "\"disconnected\" or \"running\"",
                     "type": "string"
                 },
                 "user_name": {
                     "type": "string"
                 },
                 "vhost": {
-                    "type": "string"
-                },
-                "vhost_id": {
                     "type": "string"
                 }
             }
