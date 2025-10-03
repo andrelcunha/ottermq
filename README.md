@@ -5,7 +5,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/andrelcunha/ottermq.svg)](https://github.com/andrelcunha/ottermq/issues)
 
 
-**OtterMq** is a high-performance message broker written in Go, inspired by RabbitMQ. It aims to provide a reliable, scalable, and easy-to-use messaging solution for distributed systems. OtterMq is being developed with the goal of full compliance with the **AMQP 0.9.1 protocol**, ensuring compatibility with existing tools and workflows. It also features a modern management UI built with **Vue + Quasar**.
+**OtterMQ** is a high-performance message broker written in Go, inspired by RabbitMQ. It aims to provide a reliable, scalable, and easy-to-use messaging solution for distributed systems. OtterMQ is being developed with the goal of full compliance with the **AMQP 0.9.1 protocol**, ensuring compatibility with existing tools and workflows. It also features a modern management UI built with **Vue + Quasar**.
 
 OtterMq already supports basic interoperability with RabbitMQ clients, including:
 - [.NET RabbitMQ.Client](https://github.com/rabbitmq/rabbitmq-dotnet-client)
@@ -14,7 +14,7 @@ OtterMq already supports basic interoperability with RabbitMQ clients, including
 
 
 ## 🐾 About the Name
-The name "OtterMq" comes from my son's nickname and is a way to honor him. He brings joy and inspiration to my life, and this project is a reflection of that. And, of course, it is also a pun on **RabbitMQ**.
+The name "OtterMQ" comes from my son's nickname and is a way to honor him. He brings joy and inspiration to my life, and this project is a reflection of that. And, of course, it is also a pun on **RabbitMQ**.
 
 ## ✨ Features
 - AMQP-style Message Queuing
@@ -32,6 +32,7 @@ The name "OtterMq" comes from my son's nickname and is a way to honor him. He br
 git clone https://github.com/andrelcunha/ottermq.git
 cd ottermq
 make build && make install
+```sh
 ```
 
 ## UI Setup (Vue + Quasar)
@@ -63,7 +64,7 @@ ln -s ./ottermq_ui/dist/spa ./ui
 Alternatively, copy the contents of dist/spa into a folder named ui at the project root (not recommended due to duplication).
 
 3. Run the broker:
-```
+```sh
 ottermq
 ```
 OtterMq uses:
