@@ -43,6 +43,23 @@ func createQueueBindOkFrame(request *RequestMethodMessage) []byte {
 	return frame
 }
 
+func createQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  request.Channel,
+		ClassID:  request.ClassID,
+		MethodID: uint16(QUEUE_DELETE_OK),
+		Content: ContentList{
+			KeyValuePairs: []KeyValue{
+				{
+					Key:   INT_LONG,
+					Value: messageCount,
+				},
+			},
+		},
+	}.FormatMethodFrame()
+	return frame
+}
+
 // Fields:
 // 0-1: reserved short int
 // 2: exchange name - length (short)

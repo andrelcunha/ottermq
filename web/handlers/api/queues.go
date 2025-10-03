@@ -89,37 +89,23 @@ func CreateQueue(c *fiber.Ctx, ch *amqp091.Channel) error {
 // @Failure 500 {object} models.ErrorResponse
 // @Router /queues/{queue} [delete]
 // @Security BearerAuth
-func DeleteQueue(c *fiber.Ctx) error {
-	panic("not implemented")
-	// queueName := c.Params("queue")
-	// if queueName == "" {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
-	// 		Error: "queue name is required",
-	// 	})
-	// }
+func DeleteQueue(c *fiber.Ctx, b *broker.Broker) error {
+	queueName := c.Params("queue")
+	if queueName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(models.ErrorResponse{
+			Error: "queue name is required",
+		})
+	}
 
-	// command := fmt.Sprintf("DELETE_QUEUE %s", queueName)
-	// response, err := utils.SendCommand(command)
-	// if err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: err.Error(),
-	// 	})
-	// }
+	// Use default vhost TODO: allow specifying vhost in the request
+	err := b.ManagerApi.DeleteQueue("/", queueName)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+			Error: err.Error(),
+		})
+	}
 
-	// var commandResponse api.CommandResponse
-	// if err := json.Unmarshal([]byte(response), &commandResponse); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: "failed to parse response",
-	// 	})
-	// }
-
-	// if commandResponse.Status == "ERROR" {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
-	// 		Error: commandResponse.Message,
-	// 	})
-	// } else {
-	// 	return c.Status(fiber.StatusNoContent).Send(nil)
-	// }
+	return c.Status(fiber.StatusNoContent).Send(nil)
 }
 
 // GetMessage godoc
