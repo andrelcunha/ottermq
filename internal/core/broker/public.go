@@ -92,7 +92,9 @@ func (a DefaultManagerApi) CreateExchange(dto models.ExchangeDTO) error {
 	if _, ok := defaultAlias[dto.Name]; ok {
 		return fmt.Errorf("cannot create exchange with reserved alias name '%s'", dto.Name)
 	}
-	return vh.CreateExchange(dto.Name, typ)
+	// For simplicity, we are not allowing to set properties via the API for now
+	// They will be set to default values
+	return vh.CreateExchange(dto.Name, typ, nil)
 }
 
 func (a DefaultManagerApi) GetExchangeUniqueNames() map[string]bool {
