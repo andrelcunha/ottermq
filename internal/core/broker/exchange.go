@@ -2,11 +2,11 @@ package broker
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/rs/zerolog/log"
 )
 
 func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
@@ -21,16 +21,19 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 			return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
 		}
 		log.Debug().Interface("content", content).Msg("Content")
-		typ := content.ExchangeType
 		exchangeName := content.ExchangeName
-
-		err := vh.CreateExchange(exchangeName, vhost.ExchangeType(typ))
+		exchangeType := vhost.ExchangeType(content.ExchangeType)
+		props := vhost.ExchangeProperties{
+			Durable:    content.Durable,
+			AutoDelete: content.AutoDelete,
+			Internal:   content.Internal,
+			NoWait:     content.NoWait,
+			Arguments:  content.Arguments,
+		}
+		err := vh.CreateExchange(exchangeName, exchangeType, &props)
 		if err != nil {
 			return nil, err
 		}
-		// frame := b.framer.CreateExchangeDeclareFrame(channel, request)
-
-		// b.framer.SendFrame(conn, frame)
 		frame := b.framer.CreateExchangeDeclareFrame(request)
 		b.framer.SendFrame(conn, frame)
 		return true, nil
