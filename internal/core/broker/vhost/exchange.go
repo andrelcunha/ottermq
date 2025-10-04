@@ -62,7 +62,13 @@ func ParseExchangeType(s string) (ExchangeType, error) {
 
 func (vh *VHost) createMandatoryExchanges() {
 	for _, mandatoryExchange := range mandatoryExchanges {
-		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type)
+		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type, &ExchangeProperties{
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		})
 	}
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -71,7 +77,7 @@ func (vh *VHost) createMandatoryExchanges() {
 	}
 }
 
-func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
+func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangeProperties) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	// Check if the exchange already exists
@@ -79,11 +85,29 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
 		return fmt.Errorf("exchange %s already exists", name)
 	}
 
+	if props == nil {
+		props = &ExchangeProperties{
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		}
+	}
+
+	// Handle durable property
+	if props.Durable {
+		// calls persist interface to save exchange
+	}
+
+	// Create the exchange
+
 	exchange := &Exchange{
 		Name:     name,
 		Typ:      typ,
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
+		Props:    props,
 	}
 	vh.Exchanges[name] = exchange
 	return nil
