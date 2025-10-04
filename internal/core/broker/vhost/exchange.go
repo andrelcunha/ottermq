@@ -9,6 +9,15 @@ type Exchange struct {
 	Queues   map[string]*Queue   `json:"queues"`
 	Typ      ExchangeType        `json:"type"`
 	Bindings map[string][]*Queue `json:"bindings"`
+	Props    *ExchangeProperties `json:"properties"`
+}
+
+type ExchangeProperties struct {
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Internal   bool           `json:"internal"`
+	NoWait     bool           `json:"no_wait"`
+	Arguments  map[string]any `json:"arguments"`
 }
 
 type ExchangeType string
