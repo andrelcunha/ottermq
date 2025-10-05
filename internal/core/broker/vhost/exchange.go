@@ -96,12 +96,6 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 			Arguments:  nil,
 		}
 	}
-
-	// Handle durable property
-	if props.Durable {
-
-	}
-
 	exchange := &Exchange{
 		Name:     name,
 		Typ:      typ,
@@ -110,6 +104,10 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 		Props:    props,
 	}
 	vh.Exchanges[name] = exchange
+	// Handle durable property
+	if props.Durable {
+		vh.persist.SaveExchange(vh.Name, exchange.ToPersistence())
+	}
 	return nil
 }
 
@@ -132,7 +130,7 @@ func (vh *VHost) DeleteExchange(name string) error {
 	return nil
 }
 
-func (e *Exchange) ToDb() *db.PersistedExchange {
+func (e *Exchange) ToPersistence() *db.PersistedExchange {
 	bindings := make([]db.PersistedBinding, 0)
 	for routingKey, queues := range e.Bindings {
 		for _, queue := range queues {
@@ -146,11 +144,11 @@ func (e *Exchange) ToDb() *db.PersistedExchange {
 	return &db.PersistedExchange{
 		Name:       e.Name,
 		Type:       string(e.Typ),
-		Properties: e.Props.ToDb(),
+		Properties: e.Props.ToPersistence(),
 		Bindings:   bindings,
 	}
 }
-func (ep *ExchangeProperties) ToDb() db.ExchangePropertiesDb {
+func (ep *ExchangeProperties) ToPersistence() db.ExchangePropertiesDb {
 	return db.ExchangePropertiesDb{
 		Durable:    ep.Durable,
 		AutoDelete: ep.AutoDelete,
