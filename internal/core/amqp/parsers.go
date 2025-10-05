@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
+	"github.com/rs/zerolog/log"
 )
 
 func parseFrame(frame []byte) (any, error) {
@@ -202,8 +202,6 @@ func parseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*Channe
 	}
 	log.Printf("[DEBUG] payload size: %d\n", payloadSize)
 
-	// headerPayload := payload[2:]
-
 	log.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
 
 	state := &ChannelState{
@@ -212,8 +210,6 @@ func parseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*Channe
 	return state, nil
 
 }
-
-// REGION Queue_Methods
 
 // REGION Exchange_Methods
 func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
@@ -246,11 +242,11 @@ func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 
 	buf := bytes.NewReader(payload)
-	reserverd1, err := utils.DecodeShortInt(buf)
+	reserved1, err := utils.DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
-	if reserverd1 != 0 {
+	if reserved1 != 0 {
 		return nil, fmt.Errorf("reserved1 must be 0")
 	}
 	exchangeName, err := utils.DecodeShortStr(buf)
@@ -266,8 +262,9 @@ func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
 	flags := utils.DecodeExchangeDeclareFlags(octet)
-	autoDelete := flags["autoDelete"]
+	passive := flags["passive"]
 	durable := flags["durable"]
+	autoDelete := flags["autoDelete"]
 	internal := flags["internal"]
 	noWait := flags["noWait"]
 
@@ -286,6 +283,7 @@ func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	msg := &ExchangeDeclareMessage{
 		ExchangeName: exchangeName,
 		ExchangeType: exchangeType,
+		Passive:      passive,
 		Durable:      durable,
 		AutoDelete:   autoDelete,
 		Internal:     internal,

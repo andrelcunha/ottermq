@@ -5,8 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"github.com/rs/zerolog/log"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // decodeTable decodes an AMQP field table from a byte slice
@@ -177,8 +178,8 @@ func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"passive", "durable", "autoDelete", "internal", "noWait", "flag6", "flag7", "flag8"}
 
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+	for i := range 8 {
+		flags[flagNames[i]] = (octet & (1 << uint(i))) != 0
 	}
 
 	return flags
