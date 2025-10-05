@@ -92,8 +92,8 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "ifUnused", "exclusive", "noWait"}, true)
-	ifUnused := flags["ifUnused"]
+	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "autoDelete", "exclusive", "noWait"}, true)
+	autoDelete := flags["autoDelete"]
 	durable := flags["durable"]
 	exclusive := flags["exclusive"]
 	noWait := flags["noWait"]
@@ -111,12 +111,12 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 		}
 	}
 	msg := &QueueDeclareMessage{
-		QueueName: queueName,
-		Durable:   durable,
-		IfUnused:  ifUnused,
-		Exclusive: exclusive,
-		NoWait:    noWait,
-		Arguments: arguments,
+		QueueName:  queueName,
+		Durable:    durable,
+		AutoDelete: autoDelete,
+		Exclusive:  exclusive,
+		NoWait:     noWait,
+		Arguments:  arguments,
 	}
 	request := &RequestMethodMessage{
 		Content: msg,

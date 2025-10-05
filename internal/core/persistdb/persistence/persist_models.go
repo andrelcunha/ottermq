@@ -8,7 +8,7 @@ type ExchangePropertiesDb struct {
 	Arguments  map[string]any `json:"arguments"`
 }
 
-type QueuePropertiesDb struct {
+type QProps struct {
 	Passive    bool           `json:"passive"`
 	Durable    bool           `json:"durable"`
 	Exclusive  bool           `json:"exclusive"`
@@ -42,7 +42,7 @@ type PersistedMessage struct {
 
 type PersistedQueue struct {
 	Name       string             `json:"name"`
-	Properties QueuePropertiesDb  `json:"properties"`
+	Properties QProps             `json:"properties"`
 	Messages   []PersistedMessage `json:"messages"`
 }
 

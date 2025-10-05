@@ -55,7 +55,7 @@ func TestSaveLoadExchange(t *testing.T) {
 func TestSaveLoadQueue(t *testing.T) {
 	db := NewDefaultPersistence()
 	vhostName := "vhost/test"
-	props := QueuePropertiesDb{
+	props := QProps{
 		Passive:    false,
 		Durable:    true,
 		Exclusive:  false,

@@ -2,50 +2,72 @@ package vhost
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 )
 
 type QueueArgs map[string]any
 
 type Queue struct {
-	Name       string            `json:"name"`
-	Durable    bool              `json:"durable"`
-	Exclusive  bool              `json:"exclusive"`
-	AutoDelete bool              `json:"auto_delete"`
-	MessageTTL int               `json:"message_ttl"`
-	Arguments  QueueArgs         `json:"arguments"`
-	messages   chan amqp.Message `json:"-"`
-	count      int               `json:"-"`
-	mu         sync.Mutex        `json:"-"`
+	Name     string            `json:"name"`
+	Props    *QueueProperties  `json:"properties"`
+	messages chan amqp.Message `json:"-"`
+	count    int               `json:"-"`
+	mu       sync.Mutex        `json:"-"`
+}
+
+type QueueProperties struct {
+	Passive    bool      `json:"passive"`
+	Durable    bool      `json:"durable"`
+	AutoDelete bool      `json:"auto_delete"`
+	Exclusive  bool      `json:"exclusive"`
+	NoWait     bool      `json:"no_wait"`
+	Arguments  QueueArgs `json:"arguments"`
 }
 
 func NewQueue(name string, bufferSize int) *Queue {
 	return &Queue{
-		Name:       name,
-		Durable:    false,
-		Exclusive:  false,
-		AutoDelete: false,
-		MessageTTL: 0,
-		Arguments:  make(QueueArgs),
-		messages:   make(chan amqp.Message, bufferSize),
-		count:      0,
+		Name:     name,
+		Props:    &QueueProperties{},
+		messages: make(chan amqp.Message, bufferSize),
+		count:    0,
 	}
 }
 
-func (vh *VHost) CreateQueue(name string) (*Queue, error) {
+func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	if queue, ok := vh.Queues[name]; ok {
 		log.Debug().Str("queue", name).Msg("Queue already exists")
 		return queue, nil
 	}
-	queue := NewQueue(name, vh.QueueBufferSize)
+	if props == nil {
+		props = &QueueProperties{
+			Passive:    false,
+			Durable:    false,
+			AutoDelete: false,
+			Exclusive:  false,
+			NoWait:     false,
+			Arguments:  make(map[string]any),
+		}
+	}
+	queue := &Queue{
+		Name:     name,
+		Props:    props,
+		messages: make(chan amqp.Message, vh.QueueBufferSize),
+		count:    0,
+	}
+
 	vh.Queues[name] = queue
+	if props.Durable {
+		vh.persist.SaveQueue(vh.Name, queue.ToPersistence())
+	}
+
 	log.Debug().Str("queue", name).Msg("Created queue")
-	// vh.saveBrokerState() // TODO: persist state
 	// adminQueues := make(map[string]bool)
 	// queues := []string{ADMIN_QUEUES, ADMIN_EXCHANGES, ADMIN_BINDINGS, ADMIN_CONNECTIONS}
 	// for _, queueName := range queues {
@@ -56,6 +78,26 @@ func (vh *VHost) CreateQueue(name string) (*Queue, error) {
 	// 	vh.publishQueueUpdate()
 	// }
 	return queue, nil
+}
+
+func (q *Queue) ToPersistence() *persistence.PersistedQueue {
+	messages := make([]persistence.PersistedMessage, 0)
+	return &persistence.PersistedQueue{
+		Name:       q.Name,
+		Properties: q.Props.ToPersistence(),
+		Messages:   messages,
+	}
+}
+
+func (qp *QueueProperties) ToPersistence() persistence.QProps {
+	return persistence.QProps{
+		Passive:    qp.Passive,
+		Durable:    qp.Durable,
+		AutoDelete: qp.AutoDelete,
+		Exclusive:  qp.Exclusive,
+		NoWait:     qp.NoWait,
+		Arguments:  qp.Arguments,
+	}
 }
 
 func (q *Queue) Push(msg amqp.Message) {
