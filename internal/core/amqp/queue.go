@@ -92,7 +92,6 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	// flags := utils.DecodeQueueDeclareFlags(octet)
 	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "ifUnused", "exclusive", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	durable := flags["durable"]
@@ -170,7 +169,6 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	// flags := utils.DecodeQueueDeclareFlags(octet)
 	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]

@@ -59,7 +59,7 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 
 			table[string(fieldName)] = intValue
 
-		case 'F':
+		case 'F': // Field Table
 			var strLength uint32
 			if err := binary.Read(buf, binary.BigEndian, &strLength); err != nil {
 				return nil, err
@@ -196,66 +196,6 @@ func min(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// Deprecated: use DecodeFlags instead
-func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"passive", "durable", "autoDelete", "internal", "noWait", "flag6", "flag7", "flag8"}
-
-	for i := range 8 {
-		flags[flagNames[i]] = (octet & (1 << uint(i))) != 0
-	}
-
-	return flags
-}
-
-// Deprecated: use DecodeFlags instead
-func DecodeExchangeDeleteFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-// Deprecated: use DecodeFlags instead
-func DecodeQueueDeclareFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"passive", "durable", "ifUnused", "exclusive", "noWait", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-// Deprecated: use DecodeFlags instead
-func DecodeQueueDeleteFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-// Deprecated: use DecodeFlags instead
-func DecodeQueueBindFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"noWait", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
 }
 
 func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
