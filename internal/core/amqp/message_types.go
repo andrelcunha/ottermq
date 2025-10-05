@@ -27,6 +27,7 @@ type ConnectionCloseOkMessage struct {
 type ExchangeDeclareMessage struct {
 	ExchangeName string
 	ExchangeType string
+	Passive      bool
 	Durable      bool
 	AutoDelete   bool
 	Internal     bool
