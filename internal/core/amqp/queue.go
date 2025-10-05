@@ -3,6 +3,7 @@ package amqp
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
@@ -91,13 +92,14 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueDeclareFlags(octet)
+	// flags := utils.DecodeQueueDeclareFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "ifUnused", "exclusive", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	durable := flags["durable"]
 	exclusive := flags["exclusive"]
 	noWait := flags["noWait"]
 
-	var arguments map[string]interface{}
+	var arguments map[string]any
 	if buf.Len() > 4 {
 
 		argumentsStr, err := utils.DecodeLongStr(buf)
@@ -168,7 +170,8 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueDeclareFlags(octet)
+	// flags := utils.DecodeQueueDeclareFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]
 
@@ -214,7 +217,8 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueBindFlags(octet)
+	// flags := utils.DecodeQueueBindFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"noWait"}, true)
 	noWait := flags["noWait"]
 	arguments := make(map[string]any)
 	if buf.Len() > 4 {

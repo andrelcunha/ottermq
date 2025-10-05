@@ -261,14 +261,15 @@ func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeExchangeDeclareFlags(octet)
+	// flags := utils.DecodeExchangeDeclareFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "autoDelete", "internal", "noWait"}, true)
 	passive := flags["passive"]
 	durable := flags["durable"]
 	autoDelete := flags["autoDelete"]
 	internal := flags["internal"]
 	noWait := flags["noWait"]
 
-	var arguments map[string]interface{}
+	var arguments map[string]any
 	if buf.Len() > 4 {
 
 		argumentsStr, err := utils.DecodeLongStr(buf)
@@ -324,7 +325,8 @@ func parseExchangeDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeExchangeDeclareFlags(octet)
+	// flags := utils.DecodeExchangeDeclareFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]
 

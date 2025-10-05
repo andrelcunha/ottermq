@@ -174,6 +174,31 @@ func DecodeBoolean(buf *bytes.Reader) (bool, error) {
 	return value != 0, nil
 }
 
+// DecodeFlags decodes an octet into a map of flag names to boolean values.
+func DecodeFlags(octet byte, flagNames []string, lsbFirst bool) map[string]bool {
+	if len(flagNames) > 8 {
+		log.Warn().Msg("More than 8 flag names provided; extra names will be ignored")
+	}
+	flagNames = flagNames[:min(len(flagNames), 8)]
+	flags := make(map[string]bool)
+	for i := range flagNames {
+		bit := i
+		if !lsbFirst {
+			bit = 7 - i
+		}
+		flags[flagNames[i]] = (octet & (1 << uint(bit))) != 0
+	}
+	return flags
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Deprecated: use DecodeFlags instead
 func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"passive", "durable", "autoDelete", "internal", "noWait", "flag6", "flag7", "flag8"}
@@ -185,6 +210,7 @@ func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
 	return flags
 }
 
+// Deprecated: use DecodeFlags instead
 func DecodeExchangeDeleteFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
@@ -196,6 +222,7 @@ func DecodeExchangeDeleteFlags(octet byte) map[string]bool {
 	return flags
 }
 
+// Deprecated: use DecodeFlags instead
 func DecodeQueueDeclareFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"passive", "durable", "ifUnused", "exclusive", "noWait", "flag6", "flag7", "flag8"}
@@ -207,6 +234,7 @@ func DecodeQueueDeclareFlags(octet byte) map[string]bool {
 	return flags
 }
 
+// Deprecated: use DecodeFlags instead
 func DecodeQueueDeleteFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
@@ -218,6 +246,7 @@ func DecodeQueueDeleteFlags(octet byte) map[string]bool {
 	return flags
 }
 
+// Deprecated: use DecodeFlags instead
 func DecodeQueueBindFlags(octet byte) map[string]bool {
 	flags := make(map[string]bool)
 	flagNames := []string{"noWait", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
