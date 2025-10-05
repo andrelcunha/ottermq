@@ -2,6 +2,8 @@ package vhost
 
 import (
 	"fmt"
+
+	db "github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 )
 
 type Exchange struct {
@@ -97,10 +99,8 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 
 	// Handle durable property
 	if props.Durable {
-		// calls persist interface to save exchange
-	}
 
-	// Create the exchange
+	}
 
 	exchange := &Exchange{
 		Name:     name,
@@ -130,4 +130,32 @@ func (vh *VHost) DeleteExchange(name string) error {
 	}
 	delete(vh.Exchanges, name)
 	return nil
+}
+
+func (e *Exchange) ToDb() *db.PersistedExchange {
+	bindings := make([]db.PersistedBinding, 0)
+	for routingKey, queues := range e.Bindings {
+		for _, queue := range queues {
+			bindings = append(bindings, db.PersistedBinding{
+				QueueName:  queue.Name,
+				RoutingKey: routingKey,
+				Arguments:  nil, // TODO: Add support for binding arguments
+			})
+		}
+	}
+	return &db.PersistedExchange{
+		Name:       e.Name,
+		Type:       string(e.Typ),
+		Properties: e.Props.ToDb(),
+		Bindings:   bindings,
+	}
+}
+func (ep *ExchangeProperties) ToDb() db.ExchangePropertiesDb {
+	return db.ExchangePropertiesDb{
+		Durable:    ep.Durable,
+		AutoDelete: ep.AutoDelete,
+		Internal:   ep.Internal,
+		NoWait:     ep.NoWait,
+		Arguments:  ep.Arguments,
+	}
 }
