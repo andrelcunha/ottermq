@@ -81,6 +81,7 @@ func (vh *VHost) createMandatoryExchanges() {
 	}
 }
 
+// CreateExchange creates a new exchange with the given name, type, and properties.
 func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangeProperties) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -168,13 +169,14 @@ func (vh *VHost) checkAutoDeleteExchangeUnlocked(name string) (bool, error) {
 	return false, nil
 }
 
-// Public: acquires lock
+// CheckAutoDeleteExchange checks if an exchange is auto-delete and has no bindings, and deletes it if so.
 func (vh *VHost) CheckAutoDeleteExchange(name string) (bool, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	return vh.checkAutoDeleteExchangeUnlocked(name)
 }
 
+// ToPersistence convert Exchange to persistence format
 func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
 	bindings := make([]persistence.PersistedBinding, 0)
 	for routingKey, queues := range e.Bindings {
@@ -193,6 +195,8 @@ func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
 		Bindings:   bindings,
 	}
 }
+
+// ToPersistence convert ExchangeProperties to persistence format
 func (ep *ExchangeProperties) ToPersistence() persistence.ExchangePropertiesDb {
 	return persistence.ExchangePropertiesDb{
 		Durable:    ep.Durable,

@@ -100,9 +100,6 @@ func (vh *VHost) DeleteQueue(name string) error {
 			}
 			if len(exchange.Bindings[rk]) == 0 {
 				delete(exchange.Bindings, rk)
-				// delete persisted binding
-				// vh.persist.DeleteBinding(vh.Name, exchange.Name, name, rk)
-
 				// Check if the exchange can be auto-deleted
 				if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
 					log.Printf("Failed to check auto-delete exchange: %v", err)
