@@ -3,14 +3,15 @@ package vhost
 import (
 	"fmt"
 
-	db "github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/rs/zerolog/log"
 )
 
 type Exchange struct {
 	Name     string              `json:"name"`
-	Queues   map[string]*Queue   `json:"queues"`
+	Queues   map[string]*Queue   `json:"queues"` // Queues bound directly to this exchange (e.g., for fanout)
 	Typ      ExchangeType        `json:"type"`
-	Bindings map[string][]*Queue `json:"bindings"`
+	Bindings map[string][]*Queue `json:"bindings"` // RoutingKey to Queues bindings
 	Props    *ExchangeProperties `json:"properties"`
 }
 
@@ -111,45 +112,81 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 	return nil
 }
 
-func (vh *VHost) DeleteExchange(name string) error {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
+// Internal helper: assumes vh.mu is already locked
+func (vh *VHost) deleteExchangeUnlocked(name string) error {
 	// If the exchange is the default exchange, return an error
 	for _, mandatoryExchange := range mandatoryExchanges {
 		if name == mandatoryExchange.Name {
 			return fmt.Errorf("cannot delete default exchange")
 		}
 	}
-
 	// Check if the exchange exists
 	_, ok := vh.Exchanges[name]
 	if !ok {
 		return fmt.Errorf("exchange %s not found", name)
 	}
+
 	delete(vh.Exchanges, name)
+	// Handle durable property
+	if err := vh.persist.DeleteExchange(vh.Name, name); err != nil {
+		return fmt.Errorf("failed to delete exchange from persistence: %v", err)
+	}
+	log.Debug().Str("exchange", name).Msg("Deleted exchange")
 	return nil
 }
 
-func (e *Exchange) ToPersistence() *db.PersistedExchange {
-	bindings := make([]db.PersistedBinding, 0)
+func (vh *VHost) DeleteExchange(name string) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.deleteExchangeUnlocked(name)
+}
+
+// checkAutoDeleteExchange checks if an exchange is auto-delete and has no bindings, and deletes it if so.
+// It returns true if the exchange was deleted, false otherwise.
+// Internal helper: assumes vh.mu is already locked
+func (vh *VHost) checkAutoDeleteExchangeUnlocked(name string) (bool, error) {
+	exchange, ok := vh.Exchanges[name]
+	if !ok {
+		return false, fmt.Errorf("exchange %s not found", name)
+	}
+
+	if exchange.Props.AutoDelete && len(exchange.Bindings) == 0 {
+		log.Debug().Str("exchange", name).Msg("Auto-deleting exchange")
+		if err := vh.deleteExchangeUnlocked(name); err != nil {
+			return false, fmt.Errorf("failed to auto-delete exchange %s: %v", name, err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+// Public: acquires lock
+func (vh *VHost) CheckAutoDeleteExchange(name string) (bool, error) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	return vh.checkAutoDeleteExchangeUnlocked(name)
+}
+
+func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
+	bindings := make([]persistence.PersistedBinding, 0)
 	for routingKey, queues := range e.Bindings {
 		for _, queue := range queues {
-			bindings = append(bindings, db.PersistedBinding{
+			bindings = append(bindings, persistence.PersistedBinding{
 				QueueName:  queue.Name,
 				RoutingKey: routingKey,
 				Arguments:  nil, // TODO: Add support for binding arguments
 			})
 		}
 	}
-	return &db.PersistedExchange{
+	return &persistence.PersistedExchange{
 		Name:       e.Name,
 		Type:       string(e.Typ),
 		Properties: e.Props.ToPersistence(),
 		Bindings:   bindings,
 	}
 }
-func (ep *ExchangeProperties) ToPersistence() db.ExchangePropertiesDb {
-	return db.ExchangePropertiesDb{
+func (ep *ExchangeProperties) ToPersistence() persistence.ExchangePropertiesDb {
+	return persistence.ExchangePropertiesDb{
 		Durable:    ep.Durable,
 		AutoDelete: ep.AutoDelete,
 		Internal:   ep.Internal,

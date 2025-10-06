@@ -80,6 +80,50 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	return queue, nil
 }
 
+func (vh *VHost) DeleteQueue(name string) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	queue, exists := vh.Queues[name]
+	if !exists {
+		return fmt.Errorf("queue %s not found", name)
+	}
+	close(queue.messages)
+	delete(vh.Queues, name)
+	// verify if there are any bindings to this queue and remove them
+	for _, exchange := range vh.Exchanges {
+		for rk, queues := range exchange.Bindings {
+			for i, q := range queues {
+				if q.Name == name {
+					exchange.Bindings[rk] = append(queues[:i], queues[i+1:]...)
+					break
+				}
+			}
+			if len(exchange.Bindings[rk]) == 0 {
+				delete(exchange.Bindings, rk)
+				// delete persisted binding
+				// vh.persist.DeleteBinding(vh.Name, exchange.Name, name, rk)
+
+				// Check if the exchange can be auto-deleted
+				if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
+					log.Printf("Failed to check auto-delete exchange: %v", err)
+				} else if deleted {
+					log.Printf("Exchange %s was auto-deleted", exchange.Name)
+				}
+			}
+		}
+	}
+	log.Debug().Str("queue", name).Msg("Deleted queue")
+	// Call persistence layer to delete the queue
+	if queue.Props.Durable {
+		if err := vh.persist.DeleteQueue(vh.Name, name); err != nil {
+			log.Error().Err(err).Str("queue", name).Msg("Failed to delete queue from persistence")
+			return err
+		}
+	}
+	// vh.publishQueueUpdate()
+	return nil
+}
+
 func (q *Queue) ToPersistence() *persistence.PersistedQueue {
 	messages := make([]persistence.PersistedMessage, 0)
 	return &persistence.PersistedQueue{
@@ -144,20 +188,6 @@ func (q *Queue) Len() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.count
-}
-
-func (vh *VHost) DeleteQueue(name string) error {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	queue, exists := vh.Queues[name]
-	if !exists {
-		return fmt.Errorf("queue %s not found", name)
-	}
-	close(queue.messages)
-	delete(vh.Queues, name)
-	log.Debug().Str("queue", name).Msg("Deleted queue")
-	// vh.publishQueueUpdate()
-	return nil
 }
 
 // func (vh *VHost) subscribe(consumerID, queueName string) {
