@@ -16,6 +16,7 @@ type Exchange struct {
 }
 
 type ExchangeProperties struct {
+	Passive    bool           `json:"passive"`
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Internal   bool           `json:"internal"`
@@ -87,9 +88,16 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 	if _, ok := vh.Exchanges[name]; ok {
 		return fmt.Errorf("exchange %s already exists", name)
 	}
+	// Deal with passive property
+	if props != nil && props.Passive {
+		if _, ok := vh.Exchanges[name]; !ok {
+			return fmt.Errorf("exchange %s does not exist", name)
+		}
+	}
 
 	if props == nil {
 		props = &ExchangeProperties{
+			Passive:    false,
 			Durable:    false,
 			AutoDelete: false,
 			Internal:   false,
