@@ -84,3 +84,75 @@ func TestSaveLoadQueue(t *testing.T) {
 	safeName := safeVHostName(vhostName)
 	os.RemoveAll("data/vhosts/" + safeName)
 }
+
+func TestDeleteExchange(t *testing.T) {
+	db := NewDefaultPersistence()
+	vhostName := "/"
+	props := ExchangePropertiesDb{
+		Durable:    true,
+		AutoDelete: false,
+		Internal:   false,
+		NoWait:     false,
+		Arguments:  nil,
+	}
+	exchange := &PersistedExchange{
+		Name:       "delete-exchange",
+		Type:       "direct",
+		Properties: props,
+		Bindings:   []PersistedBinding{},
+	}
+	// Save exchange first
+	err := db.SaveExchange(vhostName, exchange)
+	if err != nil {
+		t.Fatalf("SaveExchange failed: %v", err)
+	}
+	// Delete exchange
+	err = db.DeleteExchange(vhostName, exchange.Name)
+	if err != nil {
+		t.Fatalf("DeleteExchange failed: %v", err)
+	}
+	// Try to load deleted exchange
+	_, err = db.LoadExchange(vhostName, exchange.Name)
+	if err == nil {
+		t.Errorf("Expected error when loading deleted exchange, got nil")
+	}
+	// Cleanup
+	safeName := safeVHostName(vhostName)
+	os.RemoveAll("data/vhosts/" + safeName)
+}
+
+func TestDeleteQueue(t *testing.T) {
+	db := NewDefaultPersistence()
+	vhostName := "vhost/test"
+	props := QProps{
+		Passive:    false,
+		Durable:    true,
+		Exclusive:  false,
+		AutoDelete: false,
+		NoWait:     false,
+		Arguments:  nil,
+	}
+	msg := PersistedMessage{ID: "m1", Body: []byte("hello"), Properties: MessageProperties{DeliveryMode: 2}}
+	queue := &PersistedQueue{
+		Name:       "delete-queue",
+		Properties: props,
+		Messages:   []PersistedMessage{msg},
+	}
+	err := db.SaveQueue(vhostName, queue)
+	if err != nil {
+		t.Fatalf("SaveQueue failed: %v", err)
+	}
+	// Delete queue
+	err = db.DeleteQueue(vhostName, queue.Name)
+	if err != nil {
+		t.Fatalf("DeleteQueue failed: %v", err)
+	}
+	// Try to load deleted queue
+	_, err = db.LoadQueue(vhostName, queue.Name)
+	if err == nil {
+		t.Errorf("Expected error when loading deleted queue, got nil")
+	}
+	// Cleanup
+	safeName := safeVHostName(vhostName)
+	os.RemoveAll("data/vhosts/" + safeName)
+}

@@ -276,26 +276,6 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	return nil, nil
 }
 
-// func (b *Broker) updateCurrentState(conn net.Conn, channel uint16, newState *amqp.ChannelState) {
-// 	fmt.Println("Updating current state on channel ", channel)
-// 	currentState := b.getCurrentState(conn, channel)
-// 	b.mu.Lock()
-// 	defer b.mu.Unlock()
-// 	if newState.MethodFrame != nil {
-// 		currentState.MethodFrame = newState.MethodFrame
-// 	}
-// 	if newState.HeaderFrame != nil {
-// 		currentState.HeaderFrame = newState.HeaderFrame
-// 	}
-// 	if newState.Body != nil {
-// 		currentState.Body = append(currentState.Body, newState.Body...)
-// 	}
-// 	if newState.BodySize != 0 {
-// 		currentState.BodySize = newState.BodySize
-// 	}
-// 	b.Connections[conn].Channels[channel] = currentState
-// }
-
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()

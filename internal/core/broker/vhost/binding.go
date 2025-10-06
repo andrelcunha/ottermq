@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,7 +47,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	return nil
 }
 
-func (vh *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {
+func (vh *VHost) DeleteBinding(exchangeName, queueName, routingKey string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -77,15 +78,16 @@ func (vh *VHost) DeletBinding(exchangeName, queueName, routingKey string) error 
 
 	// Remove the queue from the bindings
 	exchange.Bindings[routingKey] = append(queues[:index], queues[index+1:]...)
+
 	if len(exchange.Bindings[routingKey]) == 0 {
 		delete(exchange.Bindings, routingKey)
+		// Check if the exchange can be auto-deleted
+		if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
+			log.Printf("Failed to check auto-delete exchange: %v", err)
+			return err
+		} else if deleted {
+			log.Printf("Exchange %s was auto-deleted", exchange.Name)
+		}
 	}
-
-	// // Persist the state
-	// err := vh.saveBrokerState()
-	// if err != nil {
-	// 	log.Printf("Failed to save broker state: %v", err)
-	// }
-
 	return nil
 }

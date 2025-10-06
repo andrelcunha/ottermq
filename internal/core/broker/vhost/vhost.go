@@ -50,12 +50,6 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 	}
 	vh.MsgCtrlr = &DefaultMessageController{vh}
 	vh.createMandatoryStructure()
-	// Admin expecific
-	// vh.CreateQueue(ADMIN_QUEUES)
-	// vh.CreateQueue(ADMIN_EXCHANGES)
-	// vh.CreateQueue(ADMIN_BINDINGS)
-	// vh.CreateQueue(ADMIN_CONNECTIONS)
-	// vh.bindAdminQueues()
 	return vh
 }
 
@@ -73,7 +67,6 @@ func (vh *VHost) CleanupConnection(conn net.Conn) error {
 		return nil
 	}
 	return fmt.Errorf("session not found")
-	// publishConnectionUpdate(nil) // Trigger update afte cleanup
 }
 
 func (vh *VHost) handleConsumerDisconnection(sessionID string) {
@@ -102,8 +95,6 @@ func (vh *VHost) handleConsumerDisconnection(sessionID string) {
 }
 
 func (vh *VHost) getSessionID(conn net.Conn) (string, bool) {
-	// vh.mu.Lock()
-	// defer vh.mu.Unlock()
 	for sessionID, consumerID := range vh.ConsumerSessions {
 		if conn.RemoteAddr().String() == consumerID {
 			return sessionID, true

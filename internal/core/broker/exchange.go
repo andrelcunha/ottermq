@@ -24,6 +24,7 @@ func (b *Broker) exchangeHandler(request *amqp.RequestMethodMessage, vh *vhost.V
 		exchangeName := content.ExchangeName
 		exchangeType := vhost.ExchangeType(content.ExchangeType)
 		props := vhost.ExchangeProperties{
+			Passive:    content.Passive,
 			Durable:    content.Durable,
 			AutoDelete: content.AutoDelete,
 			Internal:   content.Internal,
