@@ -159,7 +159,7 @@ func (vh *VHost) checkAutoDeleteExchangeUnlocked(name string) (bool, error) {
 		return false, fmt.Errorf("exchange %s not found", name)
 	}
 
-	if exchange.Props.AutoDelete && len(exchange.Bindings) == 0 {
+	if exchange.Props.AutoDelete && len(exchange.Bindings) == 0 && len(exchange.Queues) == 0 {
 		log.Debug().Str("exchange", name).Msg("Auto-deleting exchange")
 		if err := vh.deleteExchangeUnlocked(name); err != nil {
 			return false, fmt.Errorf("failed to auto-delete exchange %s: %v", name, err)

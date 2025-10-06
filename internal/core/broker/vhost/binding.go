@@ -47,7 +47,7 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 	return nil
 }
 
-func (vh *VHost) DeletBinding(exchangeName, queueName, routingKey string) error {
+func (vh *VHost) DeleteBinding(exchangeName, queueName, routingKey string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
