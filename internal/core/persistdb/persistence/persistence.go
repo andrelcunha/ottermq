@@ -11,8 +11,10 @@ import (
 type Persistence interface {
 	SaveExchange(vhostName string, exchange *PersistedExchange) error
 	LoadExchange(vhostName, exchangeName string) (*PersistedExchange, error)
+	DeleteExchange(vhostName, exchangeName string) error
 	SaveQueue(vhostName string, queue *PersistedQueue) error
 	LoadQueue(vhostName, queueName string) (*PersistedQueue, error)
+	DeleteQueue(vhostName, queueName string) error
 }
 
 // create a default implementation for PersistDB
@@ -58,6 +60,16 @@ func (db *DefaultPersistence) LoadExchange(vhostName, exchangeName string) (*Per
 	return &exchange, nil
 }
 
+// DeleteExchange removes a single exchange JSON file
+func (db *DefaultPersistence) DeleteExchange(vhostName, exchangeName string) error {
+	safeName := safeVHostName(vhostName)
+	file := filepath.Join("data", "vhosts", safeName, "exchanges", exchangeName+".json")
+	if err := os.Remove(file); err != nil {
+		return err
+	}
+	return nil
+}
+
 // SaveQueue persists a single queue to a JSON file
 func (db *DefaultPersistence) SaveQueue(vhostName string, queue *PersistedQueue) error {
 	safeName := safeVHostName(vhostName)
@@ -86,4 +98,14 @@ func (db *DefaultPersistence) LoadQueue(vhostName, queueName string) (*Persisted
 		return nil, err
 	}
 	return &queue, nil
+}
+
+// DeleteQueue removes a single queue JSON file
+func (db *DefaultPersistence) DeleteQueue(vhostName, queueName string) error {
+	safeName := safeVHostName(vhostName)
+	file := filepath.Join("data", "vhosts", safeName, "queues", queueName+".json")
+	if err := os.Remove(file); err != nil {
+		return err
+	}
+	return nil
 }
