@@ -10,39 +10,39 @@ import (
 func TestParseFrame_MethodFrame(t *testing.T) {
 	// Create a valid METHOD frame for Channel.Open
 	frame := make([]byte, 0)
-	
+
 	// Frame header
-	frame = append(frame, byte(TYPE_METHOD))              // frame type
-	frame = append(frame, 0x00, 0x01)                     // channel 1
-	frame = append(frame, 0x00, 0x00, 0x00, 0x08)         // payload size (8 bytes)
-	
+	frame = append(frame, byte(TYPE_METHOD))      // frame type
+	frame = append(frame, 0x00, 0x01)             // channel 1
+	frame = append(frame, 0x00, 0x00, 0x00, 0x08) // payload size (8 bytes)
+
 	// Payload: class ID (CHANNEL=20) + method ID (CHANNEL_OPEN=10) + reserved (4 bytes)
-	frame = append(frame, 0x00, 0x14)                     // class ID (20 = CHANNEL)
-	frame = append(frame, 0x00, 0x0A)                     // method ID (10 = CHANNEL_OPEN)
-	frame = append(frame, 0x00, 0x00, 0x00, 0x00)         // reserved short string (empty)
-	
+	frame = append(frame, 0x00, 0x14)             // class ID (20 = CHANNEL)
+	frame = append(frame, 0x00, 0x0A)             // method ID (10 = CHANNEL_OPEN)
+	frame = append(frame, 0x00, 0x00, 0x00, 0x00) // reserved short string (empty)
+
 	result, err := parseFrame(frame)
 	if err != nil {
 		t.Fatalf("parseFrame failed: %v", err)
 	}
-	
+
 	state, ok := result.(*ChannelState)
 	if !ok {
 		t.Fatalf("Expected *ChannelState, got %T", result)
 	}
-	
+
 	if state.MethodFrame == nil {
 		t.Fatal("MethodFrame is nil")
 	}
-	
+
 	if state.MethodFrame.Channel != 1 {
 		t.Errorf("Expected channel 1, got %d", state.MethodFrame.Channel)
 	}
-	
+
 	if state.MethodFrame.ClassID != uint16(CHANNEL) {
 		t.Errorf("Expected class ID %d, got %d", uint16(CHANNEL), state.MethodFrame.ClassID)
 	}
-	
+
 	if state.MethodFrame.MethodID != uint16(CHANNEL_OPEN) {
 		t.Errorf("Expected method ID %d, got %d", uint16(CHANNEL_OPEN), state.MethodFrame.MethodID)
 	}
@@ -52,17 +52,17 @@ func TestParseFrame_MethodFrame(t *testing.T) {
 func TestParseFrame_HeartbeatFrame(t *testing.T) {
 	// Create a valid HEARTBEAT frame
 	frame := make([]byte, 0)
-	
+
 	// Frame header
-	frame = append(frame, byte(TYPE_HEARTBEAT))           // frame type
-	frame = append(frame, 0x00, 0x00)                     // channel 0
-	frame = append(frame, 0x00, 0x00, 0x00, 0x00)         // payload size (0 bytes)
-	
+	frame = append(frame, byte(TYPE_HEARTBEAT))   // frame type
+	frame = append(frame, 0x00, 0x00)             // channel 0
+	frame = append(frame, 0x00, 0x00, 0x00, 0x00) // payload size (0 bytes)
+
 	result, err := parseFrame(frame)
 	if err != nil {
 		t.Fatalf("parseFrame failed: %v", err)
 	}
-	
+
 	_, ok := result.(*Heartbeat)
 	if !ok {
 		t.Fatalf("Expected *Heartbeat, got %T", result)
@@ -73,12 +73,12 @@ func TestParseFrame_HeartbeatFrame(t *testing.T) {
 func TestParseFrame_TooShort(t *testing.T) {
 	// Create a frame that's too short (less than 7 bytes header)
 	frame := []byte{0x01, 0x00, 0x01}
-	
+
 	_, err := parseFrame(frame)
 	if err == nil {
 		t.Fatal("Expected error for frame that's too short, got nil")
 	}
-	
+
 	expectedErr := "frame too short"
 	if err.Error() != expectedErr {
 		t.Errorf("Expected error '%s', got '%s'", expectedErr, err.Error())
@@ -89,17 +89,17 @@ func TestParseFrame_TooShort(t *testing.T) {
 func TestParseFrame_InvalidPayloadSize(t *testing.T) {
 	// Create a frame with invalid payload size
 	frame := make([]byte, 0)
-	frame = append(frame, byte(TYPE_METHOD))              // frame type
-	frame = append(frame, 0x00, 0x01)                     // channel 1
-	frame = append(frame, 0x00, 0x00, 0x00, 0xFF)         // payload size (255 bytes)
+	frame = append(frame, byte(TYPE_METHOD))      // frame type
+	frame = append(frame, 0x00, 0x01)             // channel 1
+	frame = append(frame, 0x00, 0x00, 0x00, 0xFF) // payload size (255 bytes)
 	// But only provide 10 bytes total (header is 7)
 	frame = append(frame, 0x00, 0x00, 0x00)
-	
+
 	_, err := parseFrame(frame)
 	if err == nil {
 		t.Fatal("Expected error for invalid payload size, got nil")
 	}
-	
+
 	expectedErr := "frame too short"
 	if err.Error() != expectedErr {
 		t.Errorf("Expected error '%s', got '%s'", expectedErr, err.Error())
@@ -110,10 +110,10 @@ func TestParseFrame_InvalidPayloadSize(t *testing.T) {
 func TestParseFrame_UnknownFrameType(t *testing.T) {
 	// Create a frame with unknown frame type (99)
 	frame := make([]byte, 0)
-	frame = append(frame, 99)                              // unknown frame type
-	frame = append(frame, 0x00, 0x00)                      // channel 0
-	frame = append(frame, 0x00, 0x00, 0x00, 0x00)          // payload size (0 bytes)
-	
+	frame = append(frame, 99)                     // unknown frame type
+	frame = append(frame, 0x00, 0x00)             // channel 0
+	frame = append(frame, 0x00, 0x00, 0x00, 0x00) // payload size (0 bytes)
+
 	_, err := parseFrame(frame)
 	if err == nil {
 		t.Fatal("Expected error for unknown frame type, got nil")
@@ -126,51 +126,51 @@ func TestFormatMethodFrame(t *testing.T) {
 	channelNum := uint16(1)
 	class := TypeClass(CHANNEL)
 	method := TypeMethod(CHANNEL_CLOSE)
-	
+
 	// Create method payload for Channel.Close
 	// reply-code (short), reply-text (shortstr), class-id (short), method-id (short)
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(200))  // reply code
-	payload.WriteByte(0)                                    // empty shortstr (length 0)
-	binary.Write(&payload, binary.BigEndian, uint16(0))    // class id
-	binary.Write(&payload, binary.BigEndian, uint16(0))    // method id
-	
+	binary.Write(&payload, binary.BigEndian, uint16(200)) // reply code
+	payload.WriteByte(0)                                  // empty shortstr (length 0)
+	binary.Write(&payload, binary.BigEndian, uint16(0))   // class id
+	binary.Write(&payload, binary.BigEndian, uint16(0))   // method id
+
 	frame := formatMethodFrame(channelNum, class, method, payload.Bytes())
-	
+
 	// Verify frame structure
 	if len(frame) < 8 {
 		t.Fatalf("Frame too short: %d bytes", len(frame))
 	}
-	
+
 	// Check frame type
 	if frame[0] != byte(TYPE_METHOD) {
 		t.Errorf("Expected frame type %d, got %d", byte(TYPE_METHOD), frame[0])
 	}
-	
+
 	// Check channel number
 	channel := binary.BigEndian.Uint16(frame[1:3])
 	if channel != channelNum {
 		t.Errorf("Expected channel %d, got %d", channelNum, channel)
 	}
-	
+
 	// Check payload size
 	payloadSize := binary.BigEndian.Uint32(frame[3:7])
 	expectedPayloadSize := uint32(4 + len(payload.Bytes())) // 4 bytes for class+method IDs
 	if payloadSize != expectedPayloadSize {
 		t.Errorf("Expected payload size %d, got %d", expectedPayloadSize, payloadSize)
 	}
-	
+
 	// Check frame-end octet
 	if frame[len(frame)-1] != 0xCE {
 		t.Errorf("Expected frame-end 0xCE, got 0x%02X", frame[len(frame)-1])
 	}
-	
+
 	// Check class and method IDs in payload
 	classID := binary.BigEndian.Uint16(frame[7:9])
 	if classID != uint16(class) {
 		t.Errorf("Expected class ID %d, got %d", uint16(class), classID)
 	}
-	
+
 	methodID := binary.BigEndian.Uint16(frame[9:11])
 	if methodID != uint16(method) {
 		t.Errorf("Expected method ID %d, got %d", uint16(method), methodID)
@@ -182,25 +182,25 @@ func TestFormatHeader(t *testing.T) {
 	frameType := uint8(TYPE_METHOD)
 	channel := uint16(5)
 	payloadSize := uint32(100)
-	
+
 	header := formatHeader(frameType, channel, payloadSize)
-	
+
 	// Verify header length
 	if len(header) != 7 {
 		t.Fatalf("Expected header length 7, got %d", len(header))
 	}
-	
+
 	// Verify frame type
 	if header[0] != frameType {
 		t.Errorf("Expected frame type %d, got %d", frameType, header[0])
 	}
-	
+
 	// Verify channel
 	ch := binary.BigEndian.Uint16(header[1:3])
 	if ch != channel {
 		t.Errorf("Expected channel %d, got %d", channel, ch)
 	}
-	
+
 	// Verify payload size
 	ps := binary.BigEndian.Uint32(header[3:7])
 	if ps != payloadSize {
@@ -222,7 +222,7 @@ func TestGetSmalestShortInt(t *testing.T) {
 		{"Both zero", 0, 0, 32767}, // When both are 0, they're treated as MaxInt16 (32767)
 		{"Equal values", 50, 50, 50},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := getSmalestShortInt(tt.a, tt.b)
@@ -247,7 +247,7 @@ func TestGetSmalestLongInt(t *testing.T) {
 		{"Both zero", 0, 0, 2147483647}, // When both are 0, they're treated as MaxInt32 (2147483647)
 		{"Equal values", 500, 500, 500},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := getSmalestLongInt(tt.a, tt.b)
@@ -261,30 +261,30 @@ func TestGetSmalestLongInt(t *testing.T) {
 // TestCreateHeartbeatFrame tests heartbeat frame creation
 func TestCreateHeartbeatFrame(t *testing.T) {
 	frame := createHeartbeatFrame()
-	
+
 	// Verify frame length (7 byte header + 1 byte frame-end = 8 bytes)
 	expectedLength := 8
 	if len(frame) != expectedLength {
 		t.Fatalf("Expected frame length %d, got %d", expectedLength, len(frame))
 	}
-	
+
 	// Verify frame type
 	if frame[0] != byte(TYPE_HEARTBEAT) {
 		t.Errorf("Expected frame type %d, got %d", byte(TYPE_HEARTBEAT), frame[0])
 	}
-	
+
 	// Verify channel (should be 0 for heartbeat)
 	channel := binary.BigEndian.Uint16(frame[1:3])
 	if channel != 0 {
 		t.Errorf("Expected channel 0, got %d", channel)
 	}
-	
+
 	// Verify payload size (should be 0 for heartbeat)
 	payloadSize := binary.BigEndian.Uint32(frame[3:7])
 	if payloadSize != 0 {
 		t.Errorf("Expected payload size 0, got %d", payloadSize)
 	}
-	
+
 	// Verify frame-end
 	if frame[7] != 0xCE {
 		t.Errorf("Expected frame-end 0xCE, got 0x%02X", frame[7])
@@ -296,34 +296,34 @@ func TestParseFrame_BodyFrame(t *testing.T) {
 	// Create a valid BODY frame
 	bodyContent := []byte("Hello, AMQP!")
 	frame := make([]byte, 0)
-	
+
 	// Frame header
-	frame = append(frame, byte(TYPE_BODY))                             // frame type
-	frame = append(frame, 0x00, 0x01)                                  // channel 1
-	
+	frame = append(frame, byte(TYPE_BODY)) // frame type
+	frame = append(frame, 0x00, 0x01)      // channel 1
+
 	// Payload size (length of body content)
 	payloadSize := uint32(len(bodyContent))
 	var sizeBuf [4]byte
 	binary.BigEndian.PutUint32(sizeBuf[:], payloadSize)
 	frame = append(frame, sizeBuf[:]...)
-	
+
 	// Payload (body content)
 	frame = append(frame, bodyContent...)
-	
+
 	result, err := parseFrame(frame)
 	if err != nil {
 		t.Fatalf("parseFrame failed: %v", err)
 	}
-	
+
 	state, ok := result.(*ChannelState)
 	if !ok {
 		t.Fatalf("Expected *ChannelState, got %T", result)
 	}
-	
+
 	if state.Body == nil {
 		t.Fatal("Body is nil")
 	}
-	
+
 	if !bytes.Equal(state.Body, bodyContent) {
 		t.Errorf("Expected body %q, got %q", bodyContent, state.Body)
 	}
@@ -333,12 +333,12 @@ func TestParseFrame_BodyFrame(t *testing.T) {
 func TestParseMethodFrame_TooShort(t *testing.T) {
 	// Create a method frame with payload that's too short (less than 4 bytes for class+method)
 	frame := make([]byte, 0)
-	
-	frame = append(frame, byte(TYPE_METHOD))              // frame type
-	frame = append(frame, 0x00, 0x01)                     // channel 1
-	frame = append(frame, 0x00, 0x00, 0x00, 0x02)         // payload size (2 bytes - too short)
-	frame = append(frame, 0x00, 0x14)                     // only class ID, missing method ID
-	
+
+	frame = append(frame, byte(TYPE_METHOD))      // frame type
+	frame = append(frame, 0x00, 0x01)             // channel 1
+	frame = append(frame, 0x00, 0x00, 0x00, 0x02) // payload size (2 bytes - too short)
+	frame = append(frame, 0x00, 0x14)             // only class ID, missing method ID
+
 	_, err := parseFrame(frame)
 	if err == nil {
 		t.Fatal("Expected error for method frame with short payload, got nil")
@@ -348,18 +348,18 @@ func TestParseMethodFrame_TooShort(t *testing.T) {
 // TestDefaultFramer_ParseFrame tests the DefaultFramer's ParseFrame method
 func TestDefaultFramer_ParseFrame(t *testing.T) {
 	framer := &DefaultFramer{}
-	
+
 	// Create a simple heartbeat frame
 	frame := make([]byte, 0)
-	frame = append(frame, byte(TYPE_HEARTBEAT))           // frame type
-	frame = append(frame, 0x00, 0x00)                     // channel 0
-	frame = append(frame, 0x00, 0x00, 0x00, 0x00)         // payload size (0 bytes)
-	
+	frame = append(frame, byte(TYPE_HEARTBEAT))   // frame type
+	frame = append(frame, 0x00, 0x00)             // channel 0
+	frame = append(frame, 0x00, 0x00, 0x00, 0x00) // payload size (0 bytes)
+
 	result, err := framer.ParseFrame(frame)
 	if err != nil {
 		t.Fatalf("ParseFrame failed: %v", err)
 	}
-	
+
 	_, ok := result.(*Heartbeat)
 	if !ok {
 		t.Fatalf("Expected *Heartbeat, got %T", result)
@@ -378,7 +378,7 @@ func TestFrameTypeConstants(t *testing.T) {
 		{"BODY frame type", TYPE_BODY, 3},
 		{"HEARTBEAT frame type", TYPE_HEARTBEAT, 8},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if uint8(tt.constant) != tt.expected {
@@ -479,7 +479,7 @@ func TestFormatMethodPayload(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			payload := formatMethodPayload(tt.content)

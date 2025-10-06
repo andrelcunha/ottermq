@@ -6,10 +6,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"github.com/rs/zerolog/log"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
@@ -266,7 +267,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 	}
 
 	// check if the frame-end is correct (0xCE)
-	if frameEnd[0] != 0xCE {
+	if frameEnd[0] != FRAME_END {
 		// return nil, ErrInvalidFrameEnd
 		return nil, fmt.Errorf("invalid frame end octet")
 	}
@@ -278,13 +279,4 @@ func sendFrame(conn net.Conn, frame []byte) error {
 	log.Printf("[TRACE] Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
-}
-
-func createHeartbeatFrame() []byte {
-	frame := make([]byte, 8)
-	frame[0] = byte(TYPE_HEARTBEAT)
-	binary.BigEndian.PutUint16(frame[1:3], 0)
-	binary.BigEndian.PutUint32(frame[3:7], 0)
-	frame[7] = 0xCE
-	return frame
 }

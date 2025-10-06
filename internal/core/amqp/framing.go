@@ -224,8 +224,6 @@ func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, me
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
 	binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
 
-	// payloadBuf.WriteByte(binary.BigEndian.AppendUint16()[])
-
 	payloadBuf.Write(methodPayload)
 
 	// Calculate the size of the payload
@@ -237,7 +235,7 @@ func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, me
 
 	frame := append(headerBuf, payloadBuf.Bytes()...)
 
-	frame = append(frame, 0xCE) // frame-end
+	frame = append(frame, FRAME_END) // frame-end
 
 	return frame
 }

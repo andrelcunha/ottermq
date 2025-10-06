@@ -150,3 +150,12 @@ func fineTune(tune *ConnectionTune) *ConnectionTune {
 
 	return tune
 }
+
+func createHeartbeatFrame() []byte {
+	frame := make([]byte, 8)
+	frame[0] = byte(TYPE_HEARTBEAT)
+	binary.BigEndian.PutUint16(frame[1:3], 0)
+	binary.BigEndian.PutUint32(frame[3:7], 0)
+	frame[7] = FRAME_END
+	return frame
+}
