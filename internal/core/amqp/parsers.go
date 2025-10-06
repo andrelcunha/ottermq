@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 	"github.com/rs/zerolog/log"
 )
 
@@ -226,122 +225,6 @@ func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
 	}
 }
 
-// Fields:
-// 0-1: reserved short int
-// 2: exchange name - length (short)
-// 3: type - (string)
-// 4: passive - (bit)
-// 5: durable - (bit)
-// 6: reserved 2
-// 7: reserved 3
-// 8: no-wait - (bit)
-// 9: arguments - (table)
-func parseExchangeDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 6 {
-		return nil, fmt.Errorf("payload too short")
-	}
-
-	buf := bytes.NewReader(payload)
-	reserved1, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserved1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
-	}
-	exchangeName, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
-	}
-	exchangeType, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange type: %v", err)
-	}
-	octet, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read octet: %v", err)
-	}
-	// flags := utils.DecodeExchangeDeclareFlags(octet)
-	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "autoDelete", "internal", "noWait"}, true)
-	passive := flags["passive"]
-	durable := flags["durable"]
-	autoDelete := flags["autoDelete"]
-	internal := flags["internal"]
-	noWait := flags["noWait"]
-
-	var arguments map[string]any
-	if buf.Len() > 4 {
-
-		argumentsStr, err := utils.DecodeLongStr(buf)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode arguments: %v", err)
-		}
-		arguments, err = utils.DecodeTable([]byte(argumentsStr))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read arguments: %v", err)
-		}
-	}
-	msg := &ExchangeDeclareMessage{
-		ExchangeName: exchangeName,
-		ExchangeType: exchangeType,
-		Passive:      passive,
-		Durable:      durable,
-		AutoDelete:   autoDelete,
-		Internal:     internal,
-		NoWait:       noWait,
-		Arguments:    arguments,
-	}
-	request := &RequestMethodMessage{
-		Content: msg,
-	}
-	log.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
-	return request, nil
-}
-
-// Fields:
-// 0-1: reserved short int
-// 2: exchange name - length (short)
-// 3: if-unused - (bit)
-// 4: no-wait - (bit)
-func parseExchangeDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 6 {
-		return nil, fmt.Errorf("payload too short")
-	}
-	log.Printf("[DEBUG] Received EXCHANGE_DELETE frame %x \n", payload)
-
-	buf := bytes.NewReader(payload)
-	reserverd1, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserverd1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
-	}
-	exchangeName, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
-	}
-	octet, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read octet: %v", err)
-	}
-	// flags := utils.DecodeExchangeDeclareFlags(octet)
-	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
-	ifUnused := flags["ifUnused"]
-	noWait := flags["noWait"]
-
-	msg := &ExchangeDeleteMessage{
-		ExchangeName: exchangeName,
-		IfUnused:     ifUnused,
-		NoWait:       noWait,
-	}
-	request := &RequestMethodMessage{
-		Content: msg,
-	}
-	log.Printf("[DEBUG] Exchange fomated: %+v \n", msg)
-	return request, nil
-}
-
 // REGION Connection_Methods
 
 func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
@@ -439,7 +322,7 @@ func parseConnectionOpenFrame(payload []byte) (interface{}, error) {
 		return nil, fmt.Errorf("payload too short")
 	}
 	buf := bytes.NewReader(payload)
-	virtualHost, err := utils.DecodeShortStr(buf)
+	virtualHost, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode virtual host: %v", err)
 	}
@@ -461,16 +344,16 @@ func parseConnectionTuneFrame(payload []byte) (*ConnectionTune, error) {
 		return nil, fmt.Errorf("payload too short")
 	}
 	buf := bytes.NewReader(payload)
-	channelMax, err := utils.DecodeShortInt(buf)
+	channelMax, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode channel max: %v", err)
 	}
 
-	frameMax, err := utils.DecodeLongInt(buf)
+	frameMax, err := DecodeLongInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode frame max: %v", err)
 	}
-	heartbeat, err := utils.DecodeShortInt(buf)
+	heartbeat, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode heartbeat: %v", err)
 	}
@@ -486,16 +369,16 @@ func parseConnectionTuneOkFrame(payload []byte) (interface{}, error) {
 		return nil, fmt.Errorf("payload too short")
 	}
 	buf := bytes.NewReader(payload)
-	channelMax, err := utils.DecodeShortInt(buf)
+	channelMax, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode channel max: %v", err)
 	}
 
-	frameMax, err := utils.DecodeLongInt(buf)
+	frameMax, err := DecodeLongInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode frame max: %v", err)
 	}
-	heartbeat, err := utils.DecodeShortInt(buf)
+	heartbeat, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode heartbeat: %v", err)
 	}
@@ -527,25 +410,25 @@ func parseConnectionStartFrame(payload []byte) (*ConnectionStartFrame, error) {
 	// log.Printf("[DEBUG] Version Minor: %d\n", versionMinor)
 
 	/***Server Properties*/
-	serverPropertiesStr, err := utils.DecodeLongStr(buf)
+	serverPropertiesStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client properties: %v", err)
 	}
-	serverProperties, err := utils.DecodeTable([]byte(serverPropertiesStr))
+	serverProperties, err := DecodeTable([]byte(serverPropertiesStr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client properties: %v", err)
 	}
 	// log.Printf("[DEBUG] Server Properties: %+v\n", serverProperties)
 
 	/***Mechanisms*/
-	mechanismsStr, err := utils.DecodeLongStr(buf)
+	mechanismsStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode mechanism: %v", err)
 	}
 	// log.Printf("[DEBUG] Mechanisms Srt: %s\n", mechanismsStr)
 
 	/***Locales*/
-	localesStr, err := utils.DecodeLongStr(buf)
+	localesStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode locale: %v", err)
 	}
@@ -567,17 +450,17 @@ func parseConnectionStartOkFrame(payload []byte) (*ConnectionStartOk, error) {
 
 	buf := bytes.NewReader(payload)
 
-	clientPropertiesStr, err := utils.DecodeLongStr(buf)
+	clientPropertiesStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client properties: %v", err)
 	}
 
-	clientProperties, err := utils.DecodeTable([]byte(clientPropertiesStr))
+	clientProperties, err := DecodeTable([]byte(clientPropertiesStr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client properties: %v", err)
 	}
 
-	mechanism, err := utils.DecodeShortStr(buf)
+	mechanism, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode mechanism: %v", err)
 	}
@@ -586,12 +469,12 @@ func parseConnectionStartOkFrame(payload []byte) (*ConnectionStartOk, error) {
 		return nil, fmt.Errorf("unsupported mechanism: %s", mechanism)
 	}
 
-	security, err := utils.DecodeSecurityPlain(buf)
+	security, err := DecodeSecurityPlain(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode security: %v", err)
 	}
 
-	locale, err := utils.DecodeShortStr(buf)
+	locale, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode locale: %v", err)
 	}
@@ -657,19 +540,19 @@ func parseChannelCloseFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 
 	buf := bytes.NewReader(payload)
-	replyCode, err := utils.DecodeShortInt(buf)
+	replyCode, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding reply code: %v", err)
 	}
-	replyText, err := utils.DecodeShortStr(buf)
+	replyText, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding reply text: %v", err)
 	}
-	classID, err := utils.DecodeShortInt(buf)
+	classID, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding class id: %v", err)
 	}
-	methodID, err := utils.DecodeShortInt(buf)
+	methodID, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding method id: %v", err)
 	}
@@ -698,154 +581,3 @@ func parseChannelCloseOkFrame(payload []byte) (*RequestMethodMessage, error) {
 }
 
 // REGION Basic_headers
-
-// ClassID: short
-// Weight: short
-// Body Size: long long
-// Properties flags: short
-// Properties: long (table)
-
-func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
-
-	buf := bytes.NewReader(headerPayload)
-	classID, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode class ID: %v", err)
-	}
-	log.Printf("[DEBUG] Class ID: %d\n", classID)
-
-	weight, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode weight: %v", err)
-	}
-	if weight != 0 {
-		return nil, fmt.Errorf("weight must be 0")
-	}
-	log.Printf("[DEBUG] Weight: %d\n", weight)
-
-	bodySize, err := utils.DecodeLongLongInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode body size: %v", err)
-	}
-	log.Printf("[DEBUG] Body Size: %d\n", bodySize)
-
-	shortFlags, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode flags: %v", err)
-	}
-	flags := decodeBasicHeaderFlags(shortFlags)
-	properties, err := createContentPropertiesTable(flags, buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode properties: %v", err)
-	}
-	log.Printf("[DEBUG] properties: %v\n", properties)
-	header := &HeaderFrame{
-		ClassID:    classID,
-		BodySize:   bodySize,
-		Properties: properties,
-	}
-	return header, nil
-}
-
-// REGION Basic_Methods
-
-func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
-	switch methodID {
-	// case uint16(BASIC_ACK):
-	// 	log.Printf("[DEBUG] Received BASIC_ACK frame \n")
-	// 	return parseBasicAckFrame(payload)
-
-	// case uint16(BASIC_REJECT):
-	// 	log.Printf("[DEBUG] Received BASIC_REJECT frame \n")
-	// 	return parseBasicRejectFrame(payload)
-
-	case uint16(BASIC_PUBLISH):
-		log.Printf("[DEBUG] Received BASIC_PUBLISH frame \n")
-		return parseBasicPublishFrame(payload)
-
-	// case uint16(BASIC_RETURN):
-	// 	log.Printf("[DEBUG] Received BASIC_RETURN frame \n")
-	// 	return parseBasicReturnFrame(payload)
-
-	// case uint16(BASIC_DELIVER):
-	// 	log.Printf("[DEBUG] Received BASIC_DELIVER frame \n")
-	// 	return parseBasicDeliverFrame(payload)
-
-	case uint16(BASIC_GET):
-		log.Printf("[DEBUG] Received BASIC_GET frame \n")
-		return parseBasicGetFrame(payload)
-
-	default:
-		return nil, fmt.Errorf("unknown method ID: %d", methodID)
-	}
-}
-
-func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 10 {
-		return nil, fmt.Errorf("payload too short")
-	}
-
-	buf := bytes.NewReader(payload)
-	reserved1, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserved1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
-	}
-	exchange, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange: %v", err)
-	}
-	routingKey, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode routing key: %v", err)
-	}
-	octet, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read octet: %v", err)
-	}
-	flags := decodeBasicPublishFlags(octet)
-	mandatory := flags["mandatory"]
-	immediate := flags["immediate"]
-	msg := &BasicPublishMessage{
-		Exchange:   exchange,
-		RoutingKey: routingKey,
-		Mandatory:  mandatory,
-		Immediate:  immediate,
-	}
-	request := &RequestMethodMessage{
-		Content: msg,
-	}
-	log.Printf("[DEBUG] BasicPublish fomated: %+v \n", msg)
-	return request, nil
-}
-
-func parseBasicGetFrame(payload []byte) (*RequestMethodMessage, error) {
-	buf := bytes.NewReader(payload)
-	reserved1, err := utils.DecodeShortInt(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserved1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
-	}
-	queue, err := utils.DecodeShortStr(buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode exchange: %v", err)
-	}
-	octet, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read octet: %v", err)
-	}
-	flags := decodeBasicGetFlags(octet)
-	noAck := flags["noAck"]
-	msg := &BasicGetMessage{
-		Reserved1: reserved1,
-		Queue:     queue,
-		NoAck:     noAck,
-	}
-	return &RequestMethodMessage{
-		Content: msg,
-	}, nil
-}

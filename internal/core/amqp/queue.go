@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
-
-	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
 
 func createQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
@@ -77,14 +75,14 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 
 	buf := bytes.NewReader(payload)
-	reserverd1, err := utils.DecodeShortInt(buf)
+	reserverd1, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
 	if reserverd1 != 0 {
 		return nil, fmt.Errorf("reserved1 must be 0")
 	}
-	queueName, err := utils.DecodeShortStr(buf)
+	queueName, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
@@ -92,20 +90,20 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "autoDelete", "exclusive", "noWait"}, true)
-	autoDelete := flags["autoDelete"]
+	flags := DecodeFlags(octet, []string{"passive", "durable", "exclusive", "autoDelete", "noWait"}, true)
 	durable := flags["durable"]
 	exclusive := flags["exclusive"]
+	autoDelete := flags["autoDelete"]
 	noWait := flags["noWait"]
 
 	var arguments map[string]any
 	if buf.Len() > 4 {
 
-		argumentsStr, err := utils.DecodeLongStr(buf)
+		argumentsStr, err := DecodeLongStr(buf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode arguments: %v", err)
 		}
-		arguments, err = utils.DecodeTable([]byte(argumentsStr))
+		arguments, err = DecodeTable([]byte(argumentsStr))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read arguments: %v", err)
 		}
@@ -113,8 +111,8 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	msg := &QueueDeclareMessage{
 		QueueName:  queueName,
 		Durable:    durable,
-		AutoDelete: autoDelete,
 		Exclusive:  exclusive,
+		AutoDelete: autoDelete,
 		NoWait:     noWait,
 		Arguments:  arguments,
 	}
@@ -154,14 +152,14 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	log.Printf("[DEBUG] Received QUEUE_DELETE frame %x \n", payload)
 
 	buf := bytes.NewReader(payload)
-	reserverd1, err := utils.DecodeShortInt(buf)
+	reserverd1, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
 	if reserverd1 != 0 {
 		return nil, fmt.Errorf("reserved1 must be 0")
 	}
-	exchangeName, err := utils.DecodeShortStr(buf)
+	exchangeName, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
@@ -169,7 +167,7 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
+	flags := DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]
 
@@ -191,23 +189,23 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 	log.Printf("[DEBUG] Received QUEUE_BIND frame %x \n", payload)
 	buf := bytes.NewReader(payload)
-	reserverd1, err := utils.DecodeShortInt(buf)
+	reserverd1, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
 	if reserverd1 != 0 {
 		return nil, fmt.Errorf("reserved1 must be 0")
 	}
-	queue, err := utils.DecodeShortStr(buf)
+	queue, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode queue name: %v", err)
 	}
-	exchange, err := utils.DecodeShortStr(buf)
+	exchange, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode exchange name: %v", err)
 	}
 	log.Printf("[DEBUG] Exchange name: %s\n", exchange)
-	routingKey, err := utils.DecodeShortStr(buf)
+	routingKey, err := DecodeShortStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode routing key: %v", err)
 	}
@@ -215,13 +213,12 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	// flags := utils.DecodeQueueBindFlags(octet)
-	flags := utils.DecodeFlags(octet, []string{"noWait"}, true)
+	flags := DecodeFlags(octet, []string{"noWait"}, true)
 	noWait := flags["noWait"]
 	arguments := make(map[string]any)
 	if buf.Len() > 4 {
-		argumentsStr, _ := utils.DecodeLongStr(buf)
-		arguments, err = utils.DecodeTable([]byte(argumentsStr))
+		argumentsStr, _ := DecodeLongStr(buf)
+		arguments, err = DecodeTable([]byte(argumentsStr))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read arguments: %v", err)
 		}

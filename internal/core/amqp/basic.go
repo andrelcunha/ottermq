@@ -3,7 +3,10 @@ package amqp
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type BasicPublishMessage struct {
@@ -292,4 +295,155 @@ func decodeBasicHeaderFlags(short uint16) []string {
 		}
 	}
 	return flags
+}
+
+// ClassID: short
+// Weight: short
+// Body Size: long long
+// Properties flags: short
+// Properties: long (table)
+
+func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
+
+	buf := bytes.NewReader(headerPayload)
+	classID, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode class ID: %v", err)
+	}
+	log.Printf("[DEBUG] Class ID: %d\n", classID)
+
+	weight, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode weight: %v", err)
+	}
+	if weight != 0 {
+		return nil, fmt.Errorf("weight must be 0")
+	}
+	log.Printf("[DEBUG] Weight: %d\n", weight)
+
+	bodySize, err := DecodeLongLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode body size: %v", err)
+	}
+	log.Printf("[DEBUG] Body Size: %d\n", bodySize)
+
+	shortFlags, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode flags: %v", err)
+	}
+	flags := decodeBasicHeaderFlags(shortFlags)
+	properties, err := createContentPropertiesTable(flags, buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode properties: %v", err)
+	}
+	log.Printf("[DEBUG] properties: %v\n", properties)
+	header := &HeaderFrame{
+		ClassID:    classID,
+		BodySize:   bodySize,
+		Properties: properties,
+	}
+	return header, nil
+}
+
+// REGION Basic_Methods
+
+func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
+	switch methodID {
+	// case uint16(BASIC_ACK):
+	// 	log.Printf("[DEBUG] Received BASIC_ACK frame \n")
+	// 	return parseBasicAckFrame(payload)
+
+	// case uint16(BASIC_REJECT):
+	// 	log.Printf("[DEBUG] Received BASIC_REJECT frame \n")
+	// 	return parseBasicRejectFrame(payload)
+
+	case uint16(BASIC_PUBLISH):
+		log.Printf("[DEBUG] Received BASIC_PUBLISH frame \n")
+		return parseBasicPublishFrame(payload)
+
+	// case uint16(BASIC_RETURN):
+	// 	log.Printf("[DEBUG] Received BASIC_RETURN frame \n")
+	// 	return parseBasicReturnFrame(payload)
+
+	// case uint16(BASIC_DELIVER):
+	// 	log.Printf("[DEBUG] Received BASIC_DELIVER frame \n")
+	// 	return parseBasicDeliverFrame(payload)
+
+	case uint16(BASIC_GET):
+		log.Printf("[DEBUG] Received BASIC_GET frame \n")
+		return parseBasicGetFrame(payload)
+
+	default:
+		return nil, fmt.Errorf("unknown method ID: %d", methodID)
+	}
+}
+
+func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
+	if len(payload) < 10 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	buf := bytes.NewReader(payload)
+	reserved1, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	if reserved1 != 0 {
+		return nil, fmt.Errorf("reserved1 must be 0")
+	}
+	exchange, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange: %v", err)
+	}
+	routingKey, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode routing key: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"mandatory", "immediate"}, true)
+	mandatory := flags["mandatory"]
+	immediate := flags["immediate"]
+	msg := &BasicPublishMessage{
+		Exchange:   exchange,
+		RoutingKey: routingKey,
+		Mandatory:  mandatory,
+		Immediate:  immediate,
+	}
+	request := &RequestMethodMessage{
+		Content: msg,
+	}
+	log.Printf("[DEBUG] BasicPublish fomated: %+v \n", msg)
+	return request, nil
+}
+
+func parseBasicGetFrame(payload []byte) (*RequestMethodMessage, error) {
+	buf := bytes.NewReader(payload)
+	reserved1, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+	if reserved1 != 0 {
+		return nil, fmt.Errorf("reserved1 must be 0")
+	}
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode exchange: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"noAck"}, true)
+	noAck := flags["noAck"]
+	msg := &BasicGetMessage{
+		Reserved1: reserved1,
+		Queue:     queue,
+		NoAck:     noAck,
+	}
+	return &RequestMethodMessage{
+		Content: msg,
+	}, nil
 }

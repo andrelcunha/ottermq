@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-
-	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
 )
 
 type Framer interface {
@@ -106,25 +104,25 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 	for _, flag := range flags {
 		switch flag {
 		case "contentType": // shortstr
-			contentType, err := utils.DecodeShortStr(buf)
+			contentType, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode content type: %v", err)
 			}
 			props.ContentType = contentType
 
 		case "contentEncoding": // shortstr
-			contentEncoding, err := utils.DecodeShortStr(buf)
+			contentEncoding, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode content encoding: %v", err)
 			}
 			props.ContentEncoding = contentEncoding
 
 		case "headers": // longstr (table)
-			headersStr, err := utils.DecodeLongStr(buf)
+			headersStr, err := DecodeLongStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode headers: %v", err)
 			}
-			headers, err := utils.DecodeTable([]byte(headersStr))
+			headers, err := DecodeTable([]byte(headersStr))
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode headers: %v", err)
 			}
@@ -151,63 +149,63 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			props.Priority = priority
 
 		case "correlationID": // shortstr
-			correlationID, err := utils.DecodeShortStr(buf)
+			correlationID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode correlation ID: %v", err)
 			}
 			props.CorrelationID = correlationID
 
 		case "replyTo": // shortstr
-			replyTo, err := utils.DecodeShortStr(buf)
+			replyTo, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode reply to: %v", err)
 			}
 			props.ReplyTo = replyTo
 
 		case "expiration": // shortstr
-			expiration, err := utils.DecodeShortStr(buf)
+			expiration, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode expiration: %v", err)
 			}
 			props.Expiration = expiration
 
 		case "messageID": // shortstr
-			messageID, err := utils.DecodeShortStr(buf)
+			messageID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode message ID: %v", err)
 			}
 			props.MessageID = messageID
 
 		case "timestamp": // 64 bit timestamp
-			timestamp, err := utils.DecodeTimestamp(buf)
+			timestamp, err := DecodeTimestamp(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode timestamp: %v", err)
 			}
 			props.Timestamp = timestamp
 
 		case "type": // shortstr
-			type_, err := utils.DecodeShortStr(buf)
+			type_, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode type: %v", err)
 			}
 			props.Type = type_
 
 		case "userID": // shortstr
-			userID, err := utils.DecodeShortStr(buf)
+			userID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode user ID: %v", err)
 			}
 			props.UserID = userID
 
 		case "appID": // shortstr
-			appID, err := utils.DecodeShortStr(buf)
+			appID, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode app ID: %v", err)
 			}
 			props.AppID = appID
 
 		case "reserved": // shortstr
-			reserved, err := utils.DecodeShortStr(buf)
+			reserved, err := DecodeShortStr(buf)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode reserved: %v", err)
 			}

@@ -3,9 +3,8 @@ package amqp
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/rs/zerolog/log"
 
-	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -155,14 +154,14 @@ func formatMethodPayload(content ContentList) []byte {
 				payloadBuf.WriteByte(0)
 			}
 		case STRING_SHORT:
-			payloadBuf.Write(utils.EncodeShortStr(kv.Value.(string)))
+			payloadBuf.Write(EncodeShortStr(kv.Value.(string)))
 		case STRING_LONG:
-			payloadBuf.Write(utils.EncodeLongStr(kv.Value.([]byte)))
+			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
 		case TIMESTAMP:
 			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64))
 		case TABLE:
-			encodedTable := utils.EncodeTable(kv.Value.(map[string]any))
-			payloadBuf.Write(utils.EncodeLongStr(encodedTable))
+			encodedTable := EncodeTable(kv.Value.(map[string]any))
+			payloadBuf.Write(EncodeLongStr(encodedTable))
 		}
 	}
 	return payloadBuf.Bytes()
