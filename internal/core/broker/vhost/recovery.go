@@ -44,7 +44,11 @@ func (vh *VHost) RecoverQueue(persistedQ *persistence.PersistedQueue) {
 			ID:   msgData.ID,
 			Body: msgData.Body,
 		}
-		q.messages <- *msg
-		q.count++
+		select {
+		case q.messages <- *msg:
+			q.count++
+		default:
+			// Optionally handle the case where the channel is full
+		}
 	}
 }

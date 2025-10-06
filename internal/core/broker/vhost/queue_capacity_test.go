@@ -17,7 +17,7 @@ func TestQueueCapacityExceeds1000(t *testing.T) {
 	for i := range 2000 {
 		msg := amqp.Message{
 			ID:   fmt.Sprintf("msg-%d", i),
-			Body: fmt.Appendf(nil, "Test message %d", i),
+			Body: []byte(fmt.Sprintf("Test message %d", i)),
 		}
 
 		// Push the message

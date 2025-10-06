@@ -179,14 +179,15 @@ func DecodeFlags(octet byte, flagNames []string, lsbFirst bool) map[string]bool 
 	if len(flagNames) > 8 {
 		log.Warn().Msg("More than 8 flag names provided; extra names will be ignored")
 	}
-	flagNames = flagNames[:min(len(flagNames), 8)]
+	copiedFlagNames := make([]string, min(len(flagNames), 8))
+	copy(copiedFlagNames, flagNames)
 	flags := make(map[string]bool)
-	for i := range flagNames {
+	for i := range copiedFlagNames {
 		bit := i
 		if !lsbFirst {
 			bit = 7 - i
 		}
-		flags[flagNames[i]] = (octet & (1 << uint(bit))) != 0
+		flags[copiedFlagNames[i]] = (octet & (1 << uint(bit))) != 0
 	}
 	return flags
 }
