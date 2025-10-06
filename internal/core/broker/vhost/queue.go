@@ -88,18 +88,31 @@ func (vh *VHost) DeleteQueue(name string) error {
 		return fmt.Errorf("queue %s not found", name)
 	}
 	close(queue.messages)
-	delete(vh.Queues, name)
 	// verify if there are any bindings to this queue and remove them
 	for _, exchange := range vh.Exchanges {
-		for rk, queues := range exchange.Bindings {
-			for i, q := range queues {
-				if q.Name == name {
-					exchange.Bindings[rk] = append(queues[:i], queues[i+1:]...)
-					break
+		// Routing keys to bindings
+		switch exchange.Typ {
+		case DIRECT:
+			for rk, queues := range exchange.Bindings {
+				for i, q := range queues {
+					if q.Name == name {
+						exchange.Bindings[rk] = append(queues[:i], queues[i+1:]...)
+						break
+					}
+				}
+				if len(exchange.Bindings[rk]) == 0 {
+					delete(exchange.Bindings, rk)
+					// Check if the exchange can be auto-deleted
+					if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
+						log.Printf("Failed to check auto-delete exchange: %v", err)
+					} else if deleted {
+						log.Printf("Exchange %s was auto-deleted", exchange.Name)
+					}
 				}
 			}
-			if len(exchange.Bindings[rk]) == 0 {
-				delete(exchange.Bindings, rk)
+		case FANOUT:
+			if _, ok := exchange.Queues[name]; ok {
+				delete(exchange.Queues, name)
 				// Check if the exchange can be auto-deleted
 				if deleted, err := vh.checkAutoDeleteExchangeUnlocked(exchange.Name); err != nil {
 					log.Printf("Failed to check auto-delete exchange: %v", err)
