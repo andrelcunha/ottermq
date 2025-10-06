@@ -175,28 +175,6 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	return buf.Bytes(), flags, nil
 }
 
-func decodeBasicGetFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"noAck", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func decodeBasicPublishFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"mandatory", "immediate", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
 func encodeShortStr(buf *bytes.Buffer, value string) error {
 	if err := buf.WriteByte(byte(len(value))); err != nil {
 		return err
