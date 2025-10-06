@@ -5,8 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"github.com/rs/zerolog/log"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // decodeTable decodes an AMQP field table from a byte slice
@@ -58,7 +59,7 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 
 			table[string(fieldName)] = intValue
 
-		case 'F':
+		case 'F': // Field Table
 			var strLength uint32
 			if err := binary.Read(buf, binary.BigEndian, &strLength); err != nil {
 				return nil, err
@@ -173,59 +174,29 @@ func DecodeBoolean(buf *bytes.Reader) (bool, error) {
 	return value != 0, nil
 }
 
-func DecodeExchangeDeclareFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"passive", "durable", "autoDelete", "internal", "noWait", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+// DecodeFlags decodes an octet into a map of flag names to boolean values.
+func DecodeFlags(octet byte, flagNames []string, lsbFirst bool) map[string]bool {
+	if len(flagNames) > 8 {
+		log.Warn().Msg("More than 8 flag names provided; extra names will be ignored")
 	}
-
+	copiedFlagNames := make([]string, min(len(flagNames), 8))
+	copy(copiedFlagNames, flagNames)
+	flags := make(map[string]bool)
+	for i := range copiedFlagNames {
+		bit := i
+		if !lsbFirst {
+			bit = 7 - i
+		}
+		flags[copiedFlagNames[i]] = (octet & (1 << uint(bit))) != 0
+	}
 	return flags
 }
 
-func DecodeExchangeDeleteFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
-
-	return flags
-}
-
-func DecodeQueueDeclareFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"passive", "durable", "ifUnused", "exclusive", "noWait", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func DecodeQueueDeleteFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"ifUnused", "noWait", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
-}
-
-func DecodeQueueBindFlags(octet byte) map[string]bool {
-	flags := make(map[string]bool)
-	flagNames := []string{"noWait", "flag2", "flag3", "flag4", "flag5", "flag6", "flag7", "flag8"}
-
-	for i := 0; i < 8; i++ {
-		flags[flagNames[i]] = (octet & (1 << uint(7-i))) != 0
-	}
-
-	return flags
+	return b
 }
 
 func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {

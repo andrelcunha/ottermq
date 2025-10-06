@@ -21,7 +21,14 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		log.Debug().Interface("content", content).Msg("Content")
 		queueName := content.QueueName
 
-		queue, err := vh.CreateQueue(queueName)
+		queue, err := vh.CreateQueue(queueName, &vhost.QueueProperties{
+			Passive:    content.Passive,
+			Durable:    content.Durable,
+			AutoDelete: content.AutoDelete,
+			Exclusive:  content.Exclusive,
+			NoWait:     content.NoWait,
+			Arguments:  content.Arguments,
+		})
 		if err != nil {
 			return nil, err
 		}

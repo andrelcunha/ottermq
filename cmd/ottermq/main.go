@@ -32,17 +32,17 @@ var (
 func main() {
 	// Load configuration from .env file, environment variables, or defaults
 	cfg := config.LoadConfig(VERSION)
-	
+
 	// Initialize logger with configured log level
 	logger.Init(cfg.LogLevel)
 
 	// Determine the directory of the running binary
-	executablePath, err := os.Executable()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to get executable path")
-	}
-	executableDir := filepath.Dir(executablePath)
-	dataDir := filepath.Join(executableDir, "data")
+	// executablePath, err := os.Executable()
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("Failed to get executable path")
+	// }
+	// executableDir := filepath.Dir(executablePath)
+	dataDir := filepath.Join("data")
 
 	// Ensure the data directory exists
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {

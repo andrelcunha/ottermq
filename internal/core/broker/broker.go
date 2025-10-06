@@ -11,6 +11,7 @@ import (
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 	"github.com/rs/zerolog/log"
 
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
@@ -33,6 +34,7 @@ type Broker struct {
 	ActiveConns  sync.WaitGroup
 	rootCtx      context.Context
 	rootCancel   context.CancelFunc
+	persist      persistence.Persistence
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
@@ -42,8 +44,9 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 		config:      config,
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
+		persist:     persistence.NewDefaultPersistence(),
 	}
-	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize)
+	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
 	b.framer = &amqp.DefaultFramer{}
 	b.ManagerApi = &DefaultManagerApi{b}
 	return b

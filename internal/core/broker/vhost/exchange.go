@@ -2,6 +2,8 @@ package vhost
 
 import (
 	"fmt"
+
+	db "github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 )
 
 type Exchange struct {
@@ -9,6 +11,15 @@ type Exchange struct {
 	Queues   map[string]*Queue   `json:"queues"`
 	Typ      ExchangeType        `json:"type"`
 	Bindings map[string][]*Queue `json:"bindings"`
+	Props    *ExchangeProperties `json:"properties"`
+}
+
+type ExchangeProperties struct {
+	Durable    bool           `json:"durable"`
+	AutoDelete bool           `json:"auto_delete"`
+	Internal   bool           `json:"internal"`
+	NoWait     bool           `json:"no_wait"`
+	Arguments  map[string]any `json:"arguments"`
 }
 
 type ExchangeType string
@@ -53,7 +64,13 @@ func ParseExchangeType(s string) (ExchangeType, error) {
 
 func (vh *VHost) createMandatoryExchanges() {
 	for _, mandatoryExchange := range mandatoryExchanges {
-		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type)
+		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type, &ExchangeProperties{
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		})
 	}
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -62,7 +79,7 @@ func (vh *VHost) createMandatoryExchanges() {
 	}
 }
 
-func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
+func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangeProperties) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	// Check if the exchange already exists
@@ -70,13 +87,27 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType) error {
 		return fmt.Errorf("exchange %s already exists", name)
 	}
 
+	if props == nil {
+		props = &ExchangeProperties{
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		}
+	}
 	exchange := &Exchange{
 		Name:     name,
 		Typ:      typ,
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
+		Props:    props,
 	}
 	vh.Exchanges[name] = exchange
+	// Handle durable property
+	if props.Durable {
+		vh.persist.SaveExchange(vh.Name, exchange.ToPersistence())
+	}
 	return nil
 }
 
@@ -97,4 +128,32 @@ func (vh *VHost) DeleteExchange(name string) error {
 	}
 	delete(vh.Exchanges, name)
 	return nil
+}
+
+func (e *Exchange) ToPersistence() *db.PersistedExchange {
+	bindings := make([]db.PersistedBinding, 0)
+	for routingKey, queues := range e.Bindings {
+		for _, queue := range queues {
+			bindings = append(bindings, db.PersistedBinding{
+				QueueName:  queue.Name,
+				RoutingKey: routingKey,
+				Arguments:  nil, // TODO: Add support for binding arguments
+			})
+		}
+	}
+	return &db.PersistedExchange{
+		Name:       e.Name,
+		Type:       string(e.Typ),
+		Properties: e.Props.ToPersistence(),
+		Bindings:   bindings,
+	}
+}
+func (ep *ExchangeProperties) ToPersistence() db.ExchangePropertiesDb {
+	return db.ExchangePropertiesDb{
+		Durable:    ep.Durable,
+		AutoDelete: ep.AutoDelete,
+		Internal:   ep.Internal,
+		NoWait:     ep.NoWait,
+		Arguments:  ep.Arguments,
+	}
 }

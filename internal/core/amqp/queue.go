@@ -3,6 +3,7 @@ package amqp
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp/utils"
@@ -91,13 +92,13 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueDeclareFlags(octet)
-	ifUnused := flags["ifUnused"]
+	flags := utils.DecodeFlags(octet, []string{"passive", "durable", "autoDelete", "exclusive", "noWait"}, true)
+	autoDelete := flags["autoDelete"]
 	durable := flags["durable"]
 	exclusive := flags["exclusive"]
 	noWait := flags["noWait"]
 
-	var arguments map[string]interface{}
+	var arguments map[string]any
 	if buf.Len() > 4 {
 
 		argumentsStr, err := utils.DecodeLongStr(buf)
@@ -110,12 +111,12 @@ func parseQueueDeclareFrame(payload []byte) (*RequestMethodMessage, error) {
 		}
 	}
 	msg := &QueueDeclareMessage{
-		QueueName: queueName,
-		Durable:   durable,
-		IfUnused:  ifUnused,
-		Exclusive: exclusive,
-		NoWait:    noWait,
-		Arguments: arguments,
+		QueueName:  queueName,
+		Durable:    durable,
+		AutoDelete: autoDelete,
+		Exclusive:  exclusive,
+		NoWait:     noWait,
+		Arguments:  arguments,
 	}
 	request := &RequestMethodMessage{
 		Content: msg,
@@ -168,7 +169,7 @@ func parseQueueDeleteFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueDeclareFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"ifUnused", "noWait"}, true)
 	ifUnused := flags["ifUnused"]
 	noWait := flags["noWait"]
 
@@ -214,7 +215,8 @@ func parseQueueBindFrame(payload []byte) (*RequestMethodMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read octet: %v", err)
 	}
-	flags := utils.DecodeQueueBindFlags(octet)
+	// flags := utils.DecodeQueueBindFlags(octet)
+	flags := utils.DecodeFlags(octet, []string{"noWait"}, true)
 	noWait := flags["noWait"]
 	arguments := make(map[string]any)
 	if buf.Len() > 4 {

@@ -2,12 +2,14 @@ package vhost
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"net"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 	"github.com/google/uuid"
 )
 
@@ -23,6 +25,7 @@ type VHost struct {
 	mu                sync.Mutex                         `json:"-"`
 	MsgCtrlr          MessageController
 	QueueBufferSize   int `json:"-"`
+	persist           persistence.Persistence
 }
 
 type Consumer struct {
@@ -31,7 +34,7 @@ type Consumer struct {
 	SessionID string `json:"session_id"`
 }
 
-func NewVhost(vhostName string, queueBufferSize int) *VHost {
+func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
 	id := uuid.New().String()
 	vh := &VHost{
 		Name:              vhostName,
@@ -43,6 +46,7 @@ func NewVhost(vhostName string, queueBufferSize int) *VHost {
 		ConsumerSessions:  make(map[string]string),
 		ConsumerUnackMsgs: make(map[string]map[string]amqp.Message),
 		QueueBufferSize:   queueBufferSize,
+		persist:           persist,
 	}
 	vh.MsgCtrlr = &DefaultMessageController{vh}
 	vh.createMandatoryStructure()
