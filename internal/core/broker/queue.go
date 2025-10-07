@@ -39,9 +39,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			return nil, err
 		}
 		messageCount := uint32(queue.Len())
-		counsumerCount := uint32(0)
+		consumerCount := uint32(0)
 
-		frame := b.framer.CreateQueueDeclareFrame(request, queueName, messageCount, counsumerCount)
+		frame := b.framer.CreateQueueDeclareFrame(request, queueName, messageCount, consumerCount)
 		b.framer.SendFrame(conn, frame)
 		return nil, nil
 
