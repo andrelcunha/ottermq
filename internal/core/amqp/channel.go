@@ -1,34 +1,5 @@
 package amqp
 
-func CloseChannelFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
-	replyCodeKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: replyCode,
-	}
-	replyTextKv := KeyValue{
-		Key:   STRING_SHORT,
-		Value: replyText,
-	}
-	classIDKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: classID,
-	}
-	methodIDKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: methodID,
-	}
-	content := ContentList{
-		KeyValuePairs: []KeyValue{replyCodeKv, replyTextKv, classIDKv, methodIDKv},
-	}
-	frame := ResponseMethodMessage{
-		Channel:  channel,
-		ClassID:  uint16(CHANNEL),
-		MethodID: uint16(CHANNEL_CLOSE),
-		Content:  content,
-	}.FormatMethodFrame()
-	return frame
-}
-
 func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
