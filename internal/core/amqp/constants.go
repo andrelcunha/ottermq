@@ -113,3 +113,51 @@ const (
 	ROLLBACK    TxMethod = 30
 	ROLLBACK_OK TxMethod = 31
 )
+
+// AMQP Reply Codes as defined in AMQP 0-9-1 specification
+type ReplyCode uint16
+
+const (
+	REPLY_SUCCESS          ReplyCode = 200 // reply-success
+	CONTENT_TOO_LARGE      ReplyCode = 311 // content-too-large
+	NO_ROUTE               ReplyCode = 312 // no-route
+	NO_CONSUMERS           ReplyCode = 313 // no-consumers
+	CONNECTION_FORCED      ReplyCode = 320 // connection-forced
+	INVALID_PATH           ReplyCode = 402 // invalid-path
+	ACCESS_REFUSED         ReplyCode = 403 // access-refused
+	NOT_FOUND              ReplyCode = 404 // not-found
+	RESOURCE_LOCKED        ReplyCode = 405 // resource-locked
+	PRECONDITION_FAILED    ReplyCode = 406 // precondition-failed
+	FRAME_ERROR            ReplyCode = 501 // frame-error
+	SYNTAX_ERROR           ReplyCode = 502 // syntax-error
+	COMMAND_INVALID        ReplyCode = 503 // command-invalid
+	CHANNEL_ERROR          ReplyCode = 504 // channel-error
+	UNEXPECTED_FRAME       ReplyCode = 505 // unexpected-frame
+	RESOURCE_ERROR         ReplyCode = 506 // resource-error
+	NOT_ALLOWED            ReplyCode = 530 // not-allowed
+	NOT_IMPLEMENTED        ReplyCode = 540 // not-implemented
+	INTERNAL_ERROR         ReplyCode = 541 // internal-error
+)
+
+// ReplyText returns the default reply text for a given reply code
+var ReplyText = map[ReplyCode]string{
+	REPLY_SUCCESS:       "Success",
+	CONTENT_TOO_LARGE:   "Content too large",
+	NO_ROUTE:            "No route",
+	NO_CONSUMERS:        "No consumers",
+	CONNECTION_FORCED:   "Connection forced",
+	INVALID_PATH:        "Invalid path",
+	ACCESS_REFUSED:      "Access refused",
+	NOT_FOUND:           "Not found",
+	RESOURCE_LOCKED:     "Resource locked",
+	PRECONDITION_FAILED: "Precondition failed",
+	FRAME_ERROR:         "Frame error",
+	SYNTAX_ERROR:        "Syntax error",
+	COMMAND_INVALID:     "Command invalid",
+	CHANNEL_ERROR:       "Channel error",
+	UNEXPECTED_FRAME:    "Unexpected frame",
+	RESOURCE_ERROR:      "Resource error",
+	NOT_ALLOWED:         "Not allowed",
+	NOT_IMPLEMENTED:     "Not implemented",
+	INTERNAL_ERROR:      "Internal error",
+}
