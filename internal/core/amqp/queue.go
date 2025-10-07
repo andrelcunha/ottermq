@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func createQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
+func createQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
 		ClassID:  request.ClassID,
@@ -24,7 +24,7 @@ func createQueueDeclareFrame(request *RequestMethodMessage, queueName string, me
 				},
 				{
 					Key:   INT_LONG,
-					Value: counsumerCount,
+					Value: consumerCount,
 				},
 			},
 		},
