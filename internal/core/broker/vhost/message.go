@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -66,6 +67,13 @@ func (vh *VHost) getMessageCount(queueName string) (int, error) {
 func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	vh.mu.Lock()
 	exchange, ok := vh.Exchanges[exchangeName]
+	// verify if exchange is internal
+	isInternal := exchange.Props.Internal
+	if isInternal {
+		vh.mu.Unlock()
+		// TODO: send the proper error code and channel exception
+		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
+	}
 	vh.mu.Unlock()
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
