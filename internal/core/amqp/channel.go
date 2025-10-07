@@ -1,15 +1,5 @@
 package amqp
 
-func closeChannelFrame(request *RequestMethodMessage) []byte {
-	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  uint16(CHANNEL),
-		MethodID: uint16(CHANNEL_CLOSE_OK),
-		Content:  ContentList{},
-	}.FormatMethodFrame()
-	return frame
-}
-
 func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,
@@ -23,6 +13,16 @@ func createChannelOpenOkFrame(request *RequestMethodMessage) []byte {
 				},
 			},
 		},
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createChannelCloseOkFrame(channel uint16) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(CHANNEL),
+		MethodID: uint16(CHANNEL_CLOSE_OK),
+		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }

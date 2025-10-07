@@ -2,102 +2,10 @@ package amqp
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
-	"net"
 )
-
-type Framer interface {
-	ReadFrame(conn net.Conn) ([]byte, error)
-	SendFrame(conn net.Conn, frame []byte) error
-	Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error)
-	ParseFrame(frame []byte) (any, error)
-
-	// Basic Methods
-	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
-	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
-
-	// Queue Methods
-	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte
-	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
-	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
-
-	// Exchange Methods
-	CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte
-	CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte
-
-	// Channel Methods
-	CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte
-	CreateChannelCloseFrame(request *RequestMethodMessage) []byte
-
-	// Connection Methods
-	CreateConnectionCloseFrame(channel, replyCode, methodId, classId uint16, replyText string) []byte
-	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
-}
-
-type DefaultFramer struct{}
-
-func (d *DefaultFramer) ReadFrame(conn net.Conn) ([]byte, error) {
-	return readFrame(conn)
-}
-
-func (d *DefaultFramer) SendFrame(conn net.Conn, frame []byte) error {
-	return sendFrame(conn, frame)
-}
-
-func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error) {
-	return handshake(configurations, conn, connCtxt)
-}
-
-func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
-	return parseFrame(frame)
-}
-
-func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
-	return createQueueDeclareFrame(request, queueName, messageCount, counsumerCount)
-}
-
-func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {
-	return createQueueBindOkFrame(request)
-}
-
-func (d *DefaultFramer) CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte {
-	return createQueueDeleteOkFrame(request, messageCount)
-}
-
-func (d *DefaultFramer) CreateExchangeDeclareFrame(request *RequestMethodMessage) []byte {
-	return createExchangeDeclareFrame(request)
-}
-
-func (d *DefaultFramer) CreateExchangeDeleteFrame(request *RequestMethodMessage) []byte {
-	return createExchangeDeleteFrame(request)
-}
-
-func (d *DefaultFramer) CreateChannelOpenOkFrame(request *RequestMethodMessage) []byte {
-	return createChannelOpenOkFrame(request)
-}
-
-func (d *DefaultFramer) CreateChannelCloseFrame(request *RequestMethodMessage) []byte {
-	return closeChannelFrame(request)
-}
-
-func (d *DefaultFramer) CreateConnectionCloseFrame(channel, replyCode, methodId, classId uint16, replyText string) []byte {
-	return createConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
-}
-
-func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
-	return createConnectionCloseOkFrame(request)
-}
-
-func (d *DefaultFramer) CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
-	return createBasicGetEmptyFrame(request)
-}
-
-func (d *DefaultFramer) CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
-	return createBasicGetOkFrame(request, exchange, routingkey, msgCount)
-}
 
 func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProperties, error) {
 	props := &BasicProperties{}

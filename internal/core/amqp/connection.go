@@ -43,6 +43,35 @@ func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, re
 	return frame
 }
 
+func createCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
+	replyCodeKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: replyCode,
+	}
+	replyTextKv := KeyValue{
+		Key:   STRING_SHORT,
+		Value: replyText,
+	}
+	classIDKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: classID,
+	}
+	methodIDKv := KeyValue{
+		Key:   INT_SHORT,
+		Value: methodID,
+	}
+	content := ContentList{
+		KeyValuePairs: []KeyValue{replyCodeKv, replyTextKv, classIDKv, methodIDKv},
+	}
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  closeClassID,
+		MethodID: closeClassMethod,
+		Content:  content,
+	}.FormatMethodFrame()
+	return frame
+}
+
 func createConnectionCloseOkFrame(request *RequestMethodMessage) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  request.Channel,

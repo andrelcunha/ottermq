@@ -132,7 +132,7 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	vhName := connInfo.VHostName
 	delete(b.Connections, conn)
 	b.mu.Unlock()
-	
+
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
 	if vh != nil {
@@ -150,7 +150,7 @@ func (b *Broker) closeConnectionRequested(request *amqp.RequestMethodMessage, co
 
 // closeConnection sends `connection.close` when the server needs to shutdown for some reason
 func (b *Broker) sendCloseConnection(conn net.Conn, channel, replyCode, methodId, classId uint16, replyText string) (any, error) {
-	frame := b.framer.CreateConnectionCloseFrame(channel, replyCode, methodId, classId, replyText)
+	frame := b.framer.CreateCloseFrame(channel, replyCode, methodId, classId, uint16(amqp.CONNECTION_CLOSE), uint16(amqp.CONNECTION_CLOSE), replyText)
 	err := b.framer.SendFrame(conn, frame)
 
 	return nil, err
@@ -176,7 +176,7 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		b.sendCloseConnection(conn, 0, 320, 0, 0, "Server shutting down")
+		b.sendCloseConnection(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED])
 	}
 }
 
