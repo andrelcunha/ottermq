@@ -16,7 +16,7 @@ type Framer interface {
 	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
 
 	// Queue Methods
-	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte
+	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
 	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
 	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
 
@@ -52,8 +52,8 @@ func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
 	return parseFrame(frame)
 }
 
-func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, counsumerCount uint32) []byte {
-	return createQueueDeclareFrame(request, queueName, messageCount, counsumerCount)
+func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+	return createQueueDeclareFrame(request, queueName, messageCount, consumerCount)
 }
 
 func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {

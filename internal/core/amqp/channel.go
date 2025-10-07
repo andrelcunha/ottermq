@@ -1,9 +1,9 @@
 package amqp
 
-func closeChannelFrame(channel, replycode, classID, methodID uint16, replyText string) []byte {
+func CloseChannelFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
 	replyCodeKv := KeyValue{
 		Key:   INT_SHORT,
-		Value: replycode,
+		Value: replyCode,
 	}
 	replyTextKv := KeyValue{
 		Key:   STRING_SHORT,
@@ -23,7 +23,7 @@ func closeChannelFrame(channel, replycode, classID, methodID uint16, replyText s
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(CHANNEL),
-		MethodID: uint16(CHANNEL_CLOSE_OK),
+		MethodID: uint16(CHANNEL_CLOSE),
 		Content:  content,
 	}.FormatMethodFrame()
 	return frame

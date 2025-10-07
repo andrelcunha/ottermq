@@ -43,10 +43,9 @@ func (b *Broker) closeChannel(request *amqp.RequestMethodMessage, conn net.Conn)
 		return nil, nil
 	}
 	b.removeChannel(conn, request.Channel)
-	// This implementation is wrong, because it should respond close ok
 	frame := b.framer.CreateChannelCloseOkFrame(request.Channel)
-	b.framer.SendFrame(conn, frame)
-	return nil, nil
+	err := b.framer.SendFrame(conn, frame)
+	return nil, err
 }
 
 // registerChannel register a new channel to the connection
