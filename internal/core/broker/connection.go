@@ -176,7 +176,7 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		b.sendCloseConnection(conn, 0, 320, 0, 0, "Server shutting down")
+		b.sendCloseConnection(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED])
 	}
 }
 
