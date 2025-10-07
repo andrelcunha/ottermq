@@ -38,12 +38,13 @@ func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) 
 }
 
 func (b *Broker) closeChannel(request *amqp.RequestMethodMessage, conn net.Conn) (any, error) {
-	if b.checkChannel(conn, request.Channel) {
-		log.Debug().Uint16("channel", request.Channel).Msg("Channel already open")
-		return nil, fmt.Errorf("channel already open")
+	if !b.checkChannel(conn, request.Channel) {
+		log.Debug().Uint16("channel", request.Channel).Msg("Channel already closed")
+		return nil, nil
 	}
 	b.removeChannel(conn, request.Channel)
-	frame := b.framer.CreateChannelCloseFrame(request)
+	// This implementation is wrong, because it should respond close ok
+	frame := b.framer.CreateChannelCloseOkFrame(request.Channel)
 	b.framer.SendFrame(conn, frame)
 	return nil, nil
 }
