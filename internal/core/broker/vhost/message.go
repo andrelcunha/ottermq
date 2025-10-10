@@ -105,12 +105,6 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 		UserID:          props.UserID,
 		AppID:           props.AppID,
 	}
-	// The persistence should be verified at the routing phase
-	if err := vh.persist.SaveMessage(vh.Name, routingKey, msgID, body, msgProps); err != nil {
-		log.Printf("Failed to save message to file: %v", err)
-		return "", err
-	}
-
 	switch exchange.Typ {
 	case DIRECT:
 		queues, ok := exchange.Bindings[routingKey]
@@ -146,7 +140,7 @@ func (vh *VHost) saveMessageIfDurable(props *amqp.BasicProperties, queue *Queue,
 		if queue.Props.Durable {
 			// Persist the message
 			if err := vh.persist.SaveMessage(vh.Name, routingKey, msgID, body, msgProps); err != nil {
-				log.Printf("Failed to save message to file: %v", err)
+				log.Error().Err(err).Msg("Failed to save message to file")
 				return err
 			}
 		}
