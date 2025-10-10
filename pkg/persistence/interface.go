@@ -19,11 +19,7 @@ type Persistence interface {
 
 	// Message operations (to be defined)
 	SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps MessageProperties) error
-	LoadMessages(vhostName, queueName string) ([]struct {
-		ID         string            `json:"id"`
-		Body       []byte            `json:"body"`
-		Properties MessageProperties `json:"properties"`
-	}, error)
+	LoadMessages(vhostName, queueName string) ([]Message, error)
 
 	// Lifecycle
 	Initialize() error

@@ -17,6 +17,13 @@ type MessageProperties struct {
 	AppID           string         `json:"app_id,omitempty"`
 }
 
+// Message represents a stored message (universal across implementations)
+type Message struct {
+	ID         string            `json:"id"`
+	Body       []byte            `json:"body"`
+	Properties MessageProperties `json:"properties"`
+}
+
 // Basic queue/exchange properties - universal concepts
 type QueueProperties struct {
 	Passive    bool           `json:"passive"` // Not needed in persistence*

@@ -204,3 +204,95 @@ func TestDeleteQueue(t *testing.T) {
 	safeName := safeVHostName(vhostName)
 	os.RemoveAll("data/vhosts/" + safeName)
 }
+
+func TestSaveLoadMessages(t *testing.T) {
+	// get temp dir for testing
+	tempDir := t.TempDir()
+	config := persistence.Config{
+		Type:    "json",
+		DataDir: tempDir,
+	}
+	jsonPersistence, err := NewJsonPersistence(&config)
+	if err != nil {
+		t.Fatalf("Failed to create JSON persistence: %v", err)
+	}
+
+	vhostName := "/"
+	queueName := "test-messages-queue"
+
+	// Create queue first
+	props := persistence.QueueProperties{
+		Durable:    true,
+		Exclusive:  false,
+		AutoDelete: false,
+		Arguments:  nil,
+	}
+	err = jsonPersistence.SaveQueueMetadata(vhostName, queueName, props)
+	if err != nil {
+		t.Fatalf("Failed to create queue: %v", err)
+	}
+
+	// Test saving messages
+	messages := []persistence.Message{
+		{
+			ID:   "msg1",
+			Body: []byte("Hello World 1"),
+			Properties: persistence.MessageProperties{
+				DeliveryMode: 2,
+				ContentType:  "text/plain",
+			},
+		},
+		{
+			ID:   "msg2",
+			Body: []byte("Hello World 2"),
+			Properties: persistence.MessageProperties{
+				DeliveryMode: 1,
+				ContentType:  "application/json",
+				Headers:      map[string]any{"test": "value"},
+			},
+		},
+	}
+
+	// Save messages
+	for _, msg := range messages {
+		err = jsonPersistence.SaveMessage(vhostName, queueName, msg.ID, msg.Body, msg.Properties)
+		if err != nil {
+			t.Fatalf("Failed to save message %s: %v", msg.ID, err)
+		}
+	}
+
+	// Load messages and verify
+	loadedMessages, err := jsonPersistence.LoadMessages(vhostName, queueName)
+	if err != nil {
+		t.Fatalf("Failed to load messages: %v", err)
+	}
+
+	if len(loadedMessages) != len(messages) {
+		t.Errorf("Expected %d messages, got %d", len(messages), len(loadedMessages))
+	}
+
+	// Verify message content
+	for i, expected := range messages {
+		if i >= len(loadedMessages) {
+			t.Errorf("Missing message at index %d", i)
+			continue
+		}
+
+		actual := loadedMessages[i]
+		if actual.ID != expected.ID {
+			t.Errorf("Message %d: expected ID %s, got %s", i, expected.ID, actual.ID)
+		}
+
+		if string(actual.Body) != string(expected.Body) {
+			t.Errorf("Message %d: expected body %s, got %s", i, string(expected.Body), string(actual.Body))
+		}
+
+		if actual.Properties.DeliveryMode != expected.Properties.DeliveryMode {
+			t.Errorf("Message %d: expected delivery mode %d, got %d", i, expected.Properties.DeliveryMode, actual.Properties.DeliveryMode)
+		}
+
+		if actual.Properties.ContentType != expected.Properties.ContentType {
+			t.Errorf("Message %d: expected content type %s, got %s", i, expected.Properties.ContentType, actual.Properties.ContentType)
+		}
+	}
+}

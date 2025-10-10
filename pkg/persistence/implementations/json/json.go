@@ -146,31 +146,19 @@ func (jp *JsonPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byt
 
 	qData.Messages = append(qData.Messages, newMessage)
 
-	return jp.SaveQueueMetadata(vhost, queue, qData.Properties)
-
+	// Save the complete queue data including messages
+	return jp.saveQueueFile(vhost, queue, qData)
 }
 
-func (jp *JsonPersistence) LoadMessages(vhostName, queueName string) ([]struct {
-	ID         string                        `json:"id"`
-	Body       []byte                        `json:"body"`
-	Properties persistence.MessageProperties `json:"properties"`
-}, error) {
+func (jp *JsonPersistence) LoadMessages(vhostName, queueName string) ([]persistence.Message, error) {
 	qData, err := jp.loadQueueFile(vhostName, queueName)
 	if err != nil {
 		return nil, fmt.Errorf("queue not found: %v", err)
 	}
 
-	var messages []struct {
-		ID         string                        `json:"id"`
-		Body       []byte                        `json:"body"`
-		Properties persistence.MessageProperties `json:"properties"`
-	}
+	var messages []persistence.Message
 	for _, msg := range qData.Messages {
-		messages = append(messages, struct {
-			ID         string                        `json:"id"`
-			Body       []byte                        `json:"body"`
-			Properties persistence.MessageProperties `json:"properties"`
-		}{
+		messages = append(messages, persistence.Message{
 			ID:         msg.ID,
 			Body:       msg.Body,
 			Properties: msg.Properties,
@@ -248,6 +236,21 @@ func (jp *JsonPersistence) AckMessage(vhost, queue, messageID string) error {
     return nil
 }
 */
+
+func (jp *JsonPersistence) saveQueueFile(vhost, queueName string, queueData *JsonQueueData) error {
+	safeName := safeVHostName(vhost)
+	dir := filepath.Join(jp.dataDir, "vhosts", safeName, "queues")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	file := filepath.Join(dir, queueName+".json")
+	data, err := json.MarshalIndent(queueData, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, data, 0644)
+}
 
 // DeleteQueue removes a single queue JSON file
 func (jp *JsonPersistence) DeleteQueueMetadata(vhostName, queueName string) error {

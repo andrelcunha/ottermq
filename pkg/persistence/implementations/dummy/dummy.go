@@ -24,16 +24,8 @@ func (d *DummyPersistence) Initialize() error { return nil }
 func (d *DummyPersistence) Close() error      { return nil }
 
 // LoadMessages returns an empty slice
-func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]struct {
-	ID         string                        `json:"id"`
-	Body       []byte                        `json:"body"`
-	Properties persistence.MessageProperties `json:"properties"`
-}, error) {
-	return []struct {
-		ID         string                        `json:"id"`
-		Body       []byte                        `json:"body"`
-		Properties persistence.MessageProperties `json:"properties"`
-	}{}, nil
+func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]persistence.Message, error) {
+	return []persistence.Message{}, nil
 }
 
 // SaveMessage
