@@ -118,25 +118,25 @@ const (
 type ReplyCode uint16
 
 const (
-	REPLY_SUCCESS          ReplyCode = 200 // reply-success
-	CONTENT_TOO_LARGE      ReplyCode = 311 // content-too-large
-	NO_ROUTE               ReplyCode = 312 // no-route
-	NO_CONSUMERS           ReplyCode = 313 // no-consumers
-	CONNECTION_FORCED      ReplyCode = 320 // connection-forced
-	INVALID_PATH           ReplyCode = 402 // invalid-path
-	ACCESS_REFUSED         ReplyCode = 403 // access-refused
-	NOT_FOUND              ReplyCode = 404 // not-found
-	RESOURCE_LOCKED        ReplyCode = 405 // resource-locked
-	PRECONDITION_FAILED    ReplyCode = 406 // precondition-failed
-	FRAME_ERROR            ReplyCode = 501 // frame-error
-	SYNTAX_ERROR           ReplyCode = 502 // syntax-error
-	COMMAND_INVALID        ReplyCode = 503 // command-invalid
-	CHANNEL_ERROR          ReplyCode = 504 // channel-error
-	UNEXPECTED_FRAME       ReplyCode = 505 // unexpected-frame
-	RESOURCE_ERROR         ReplyCode = 506 // resource-error
-	NOT_ALLOWED            ReplyCode = 530 // not-allowed
-	NOT_IMPLEMENTED        ReplyCode = 540 // not-implemented
-	INTERNAL_ERROR         ReplyCode = 541 // internal-error
+	REPLY_SUCCESS       ReplyCode = 200 // reply-success
+	CONTENT_TOO_LARGE   ReplyCode = 311 // content-too-large
+	NO_ROUTE            ReplyCode = 312 // no-route
+	NO_CONSUMERS        ReplyCode = 313 // no-consumers
+	CONNECTION_FORCED   ReplyCode = 320 // connection-forced
+	INVALID_PATH        ReplyCode = 402 // invalid-path
+	ACCESS_REFUSED      ReplyCode = 403 // access-refused
+	NOT_FOUND           ReplyCode = 404 // not-found
+	RESOURCE_LOCKED     ReplyCode = 405 // resource-locked
+	PRECONDITION_FAILED ReplyCode = 406 // precondition-failed
+	FRAME_ERROR         ReplyCode = 501 // frame-error
+	SYNTAX_ERROR        ReplyCode = 502 // syntax-error
+	COMMAND_INVALID     ReplyCode = 503 // command-invalid
+	CHANNEL_ERROR       ReplyCode = 504 // channel-error
+	UNEXPECTED_FRAME    ReplyCode = 505 // unexpected-frame
+	RESOURCE_ERROR      ReplyCode = 506 // resource-error
+	NOT_ALLOWED         ReplyCode = 530 // not-allowed
+	NOT_IMPLEMENTED     ReplyCode = 540 // not-implemented
+	INTERNAL_ERROR      ReplyCode = 541 // internal-error
 )
 
 // ReplyText returns the default reply text for a given reply code
@@ -161,3 +161,21 @@ var ReplyText = map[ReplyCode]string{
 	NOT_IMPLEMENTED:     "Not implemented",
 	INTERNAL_ERROR:      "Internal error",
 }
+
+type DeliveryModeType uint8
+
+const (
+	DELIVERY_MODE_NON_PERSISTENT DeliveryModeType = 1
+	DELIVERY_MODE_PERSISTENT     DeliveryModeType = 2
+)
+
+// Common AMQP content types
+const (
+	ContentTypeTextPlain       = "text/plain"
+	ContentTypeTextHTML        = "text/html"
+	ContentTypeApplicationJSON = "application/json"
+	ContentTypeApplicationXML  = "application/xml"
+	ContentTypeImagePNG        = "image/png"
+	ContentTypeImageJPEG       = "image/jpeg"
+	ContentTypeMultipartForm   = "multipart/form-data"
+)

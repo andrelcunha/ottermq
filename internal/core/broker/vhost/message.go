@@ -67,19 +67,20 @@ func (vh *VHost) getMessageCount(queueName string) (int, error) {
 
 func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	
 	exchange, ok := vh.Exchanges[exchangeName]
-	// verify if exchange is internal
-	isInternal := exchange.Props.Internal
-	if isInternal {
-		vh.mu.Unlock()
-		// TODO: send the proper error code and channel exception
-		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
-	}
-	vh.mu.Unlock()
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
 		return "", fmt.Errorf("Exchange %s not found", exchangeName)
 	}
+	
+	// verify if exchange is internal
+	if exchange.Props.Internal {
+		// TODO: send the proper error code and channel exception
+		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
+	}
+	
 	msgID := uuid.New().String()
 	msg := amqp.Message{
 		ID:         msgID,
@@ -90,6 +91,12 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 	}
 	log.Debug().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
 
+	var timestamp int64
+	if props.Timestamp.IsZero() {
+		timestamp = 0
+	} else {
+		timestamp = props.Timestamp.Unix()
+	}
 	msgProps := persistence.MessageProperties{
 		ContentType:     props.ContentType,
 		ContentEncoding: props.ContentEncoding,
@@ -100,7 +107,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 		ReplyTo:         props.ReplyTo,
 		Expiration:      props.Expiration,
 		MessageID:       props.MessageID,
-		Timestamp:       props.Timestamp.Unix(),
+		Timestamp:       timestamp,
 		Type:            props.Type,
 		UserID:          props.UserID,
 		AppID:           props.AppID,
@@ -108,38 +115,65 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 	switch exchange.Typ {
 	case DIRECT:
 		queues, ok := exchange.Bindings[routingKey]
-		if ok {
-			for _, queue := range queues {
-				err := vh.saveMessageIfDurable(props, queue, routingKey, msgID, body, msgProps)
-				if err != nil {
-					return "", err
-				}
-
-				queue.Push(msg)
-			}
-			return msgID, nil
+		if !ok {
+			log.Error().Str("routing_key", routingKey).Str("exchange", exchangeName).Msg("Routing key not found for exchange")
+			return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
 		}
-		log.Error().Str("routing_key", routingKey).Str("exchange", exchangeName).Msg("Routing key not found for exchange")
-		return "", fmt.Errorf("routing key %s not found for exchange %s", routingKey, exchangeName)
+		for _, queue := range queues {
+			err := vh.saveMessageIfDurable(SaveMessageRequest{
+				Props:      props,
+				Queue:      queue,
+				RoutingKey: routingKey,
+				MsgID:      msgID,
+				Body:       body,
+				MsgProps:   msgProps,
+			})
+			if err != nil {
+				return "", err
+			}
+
+			queue.Push(msg)
+		}
+		return msgID, nil
 
 	case FANOUT:
 		for _, queue := range exchange.Queues {
-			err := vh.saveMessageIfDurable(props, queue, routingKey, msgID, body, msgProps)
+			err := vh.saveMessageIfDurable(SaveMessageRequest{
+				Props:      props,
+				Queue:      queue,
+				RoutingKey: routingKey,
+				MsgID:      msgID,
+				Body:       body,
+				MsgProps:   msgProps,
+			})
 			if err != nil {
 				return "", err
 			}
 			queue.Push(msg)
 		}
 		return msgID, nil
+	case TOPIC:
+		// TODO: Implement topic exchange routing
+		return "", fmt.Errorf("topic exchange not yet implemented")
+	default:
+		return "", fmt.Errorf("unknown exchange type")
 	}
-	return "", fmt.Errorf("unknown exchange type")
 }
 
-func (vh *VHost) saveMessageIfDurable(props *amqp.BasicProperties, queue *Queue, routingKey string, msgID string, body []byte, msgProps persistence.MessageProperties) error {
-	if props.DeliveryMode == 2 {
-		if queue.Props.Durable {
+type SaveMessageRequest struct {
+	Props      *amqp.BasicProperties
+	Queue      *Queue
+	RoutingKey string
+	MsgID      string
+	Body       []byte
+	MsgProps   persistence.MessageProperties
+}
+
+func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
+	if req.Props.DeliveryMode == uint8(amqp.DELIVERY_MODE_PERSISTENT) { // Persistent
+		if req.Queue.Props.Durable {
 			// Persist the message
-			if err := vh.persist.SaveMessage(vh.Name, routingKey, msgID, body, msgProps); err != nil {
+			if err := vh.persist.SaveMessage(vh.Name, req.RoutingKey, req.MsgID, req.Body, req.MsgProps); err != nil {
 				log.Error().Err(err).Msg("Failed to save message to file")
 				return err
 			}

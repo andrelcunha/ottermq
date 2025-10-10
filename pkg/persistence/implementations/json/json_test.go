@@ -91,11 +91,11 @@ func TestSaveLoadQueue(t *testing.T) {
 		NoWait:     false,
 		Arguments:  nil,
 	}
-	msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}
+	// msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}
 	queue := &JsonQueueData{
 		Name:       "test-queue",
 		Properties: props,
-		Messages:   []JsonMessageData{msg},
+		// Messages:   []JsonMessageData{msg},
 	}
 	err = jsonPersistence.SaveQueueMetadata(vhostName, queue.Name, queue.Properties)
 	if err != nil {
@@ -138,7 +138,7 @@ func TestDeleteExchange(t *testing.T) {
 		Name:       "delete-exchange",
 		Type:       "direct",
 		Properties: props,
-		Bindings:   []JsonBindingData{},
+		// Bindings:   []JsonBindingData{},
 	}
 	// Save exchange first
 	err = jsonPersistence.SaveExchangeMetadata(vhostName, exchange.Name, exchange.Type, exchange.Properties)
@@ -180,11 +180,11 @@ func TestDeleteQueue(t *testing.T) {
 		NoWait:     false,
 		Arguments:  nil,
 	}
-	msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}
+	// msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}
 	queue := &JsonQueueData{
 		Name:       "delete-queue",
 		Properties: props,
-		Messages:   []JsonMessageData{msg},
+		// Messages:   []JsonMessageData{msg},
 	}
 	err = jsonPersistence.SaveQueueMetadata(vhostName, queue.Name, queue.Properties)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 
 type Exchange struct {
 	Name     string              `json:"name"`
-	Queues   map[string]*Queue   `json:"queues"` // Queues bound directly to this exchange (e.g., for fanout)
+	Queues   map[string]*Queue   `json:"queues"` // Queues bound directly to this exchange using queue name (e.g., for fanout)
 	Typ      ExchangeType        `json:"type"`
 	Bindings map[string][]*Queue `json:"bindings"` // RoutingKey to Queues bindings
 	Props    *ExchangeProperties `json:"properties"`
