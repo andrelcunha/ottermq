@@ -27,10 +27,12 @@ func RecoverBrokerState(b *Broker) error {
 		for _, exFile := range exFiles {
 			exName := exFile.Name()
 			exName = strings.TrimSuffix(exName, ".json")
-			persistedEx, err := b.persist.LoadExchange(vhostName, exName)
+			// persistedEx, err := b.persist.LoadExchange(vhostName, exName)
+			exchangeType, props, err := b.persist.LoadExchangeMetadata(vhostName, exName)
+
 			if err == nil {
 				// Create exchange in vhost using persistedEx
-				v.RecoverExchange(persistedEx)
+				v.RecoverExchange(exName, exchangeType, props)
 			}
 		}
 		queuesDir := filepath.Join(vhostsDir, vhostName, "queues")
@@ -38,10 +40,10 @@ func RecoverBrokerState(b *Broker) error {
 		for _, qFile := range qFiles {
 			qName := qFile.Name()
 			qName = strings.TrimSuffix(qName, ".json")
-			persistedQ, err := b.persist.LoadQueue(vhostName, qName)
+			props, err := b.persist.LoadQueueMetadata(vhostName, qName)
 			if err == nil {
 				// Create queue in vhost using persistedQ
-				v.RecoverQueue(persistedQ)
+				v.RecoverQueue(qName, &props)
 			}
 		}
 		b.VHosts[vhostName] = v

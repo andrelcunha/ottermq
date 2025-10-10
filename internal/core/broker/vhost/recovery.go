@@ -2,22 +2,22 @@ package vhost
 
 import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
-// RecoverExchange recreates an exchange from its persisted state
-func (vh *VHost) RecoverExchange(persistedEx *persistence.PersistedExchange) {
+func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties) {
 	ex := &Exchange{
-		Name:     persistedEx.Name,
-		Typ:      ExchangeType(persistedEx.Type),
+		Name:     name,
+		Typ:      ExchangeType(typ),
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
 		Props: &ExchangeProperties{
-			Durable:    persistedEx.Properties.Durable,
-			AutoDelete: persistedEx.Properties.AutoDelete,
-			Internal:   persistedEx.Properties.Internal,
-			NoWait:     persistedEx.Properties.NoWait,
-			Arguments:  persistedEx.Properties.Arguments,
+			Passive:    props.Passive,
+			Durable:    props.Durable,
+			AutoDelete: props.AutoDelete,
+			Internal:   props.Internal,
+			NoWait:     props.NoWait,
+			Arguments:  props.Arguments,
 		},
 	}
 	vh.Exchanges[ex.Name] = ex
@@ -25,24 +25,31 @@ func (vh *VHost) RecoverExchange(persistedEx *persistence.PersistedExchange) {
 }
 
 // RecoverQueue recreates a queue from its persisted state
-func (vh *VHost) RecoverQueue(persistedQ *persistence.PersistedQueue) {
+func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) error {
 	q := &Queue{
-		Name: persistedQ.Name,
+		Name: name,
 		Props: &QueueProperties{
-			Passive:    persistedQ.Properties.Passive,
-			Durable:    persistedQ.Properties.Durable,
-			AutoDelete: persistedQ.Properties.AutoDelete,
-			Exclusive:  persistedQ.Properties.Exclusive,
-			NoWait:     persistedQ.Properties.NoWait,
-			Arguments:  persistedQ.Properties.Arguments,
+			Passive:    props.Passive,
+			Durable:    props.Durable,
+			Exclusive:  props.Exclusive,
+			AutoDelete: props.AutoDelete,
+			NoWait:     props.NoWait,
+			Arguments:  props.Arguments,
 		},
 	}
 	vh.Queues[q.Name] = q
 	// Recreate messages
-	for _, msgData := range persistedQ.Messages {
+	msgs, err := vh.persist.LoadMessages(vh.Name, name)
+	if err != nil {
+		// log.Error().Err(err).Str("queue", name).Msg("Failed to load messages")
+		return err
+	}
+
+	for _, msgData := range msgs {
 		msg := &amqp.Message{
 			ID:   msgData.ID,
 			Body: msgData.Body,
+			// TODO: map properties
 		}
 		select {
 		case q.messages <- *msg:
@@ -51,4 +58,5 @@ func (vh *VHost) RecoverQueue(persistedQ *persistence.PersistedQueue) {
 			// Optionally handle the case where the channel is full
 		}
 	}
+	return nil
 }

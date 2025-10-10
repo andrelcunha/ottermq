@@ -9,7 +9,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/persistdb"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
 )
 

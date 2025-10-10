@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
 type QueueArgs map[string]any
@@ -64,7 +64,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 
 	vh.Queues[name] = queue
 	if props.Durable {
-		vh.persist.SaveQueue(vh.Name, queue.ToPersistence())
+		vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence())
 	}
 
 	log.Debug().Str("queue", name).Msg("Created queue")
@@ -125,7 +125,7 @@ func (vh *VHost) DeleteQueue(name string) error {
 	log.Debug().Str("queue", name).Msg("Deleted queue")
 	// Call persistence layer to delete the queue
 	if queue.Props.Durable {
-		if err := vh.persist.DeleteQueue(vh.Name, name); err != nil {
+		if err := vh.persist.DeleteQueueMetadata(vh.Name, name); err != nil {
 			log.Error().Err(err).Str("queue", name).Msg("Failed to delete queue from persistence")
 			return err
 		}
@@ -134,17 +134,17 @@ func (vh *VHost) DeleteQueue(name string) error {
 	return nil
 }
 
-func (q *Queue) ToPersistence() *persistence.PersistedQueue {
-	messages := make([]persistence.PersistedMessage, 0)
-	return &persistence.PersistedQueue{
-		Name:       q.Name,
-		Properties: q.Props.ToPersistence(),
-		Messages:   messages,
-	}
-}
+// func (q *Queue) ToPersistence() *persistence.PersistedQueue {
+// 	messages := make([]persistence.PersistedMessage, 0)
+// 	return &persistence.PersistedQueue{
+// 		Name:       q.Name,
+// 		Properties: q.Props.ToPersistence(),
+// 		Messages:   messages,
+// 	}
+// }
 
-func (qp *QueueProperties) ToPersistence() persistence.QProps {
-	return persistence.QProps{
+func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
+	return persistence.QueueProperties{
 		Passive:    qp.Passive,
 		Durable:    qp.Durable,
 		AutoDelete: qp.AutoDelete,

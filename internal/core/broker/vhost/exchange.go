@@ -3,7 +3,7 @@ package vhost
 import (
 	"fmt"
 
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
 )
 
@@ -116,7 +116,7 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 	vh.Exchanges[name] = exchange
 	// Handle durable property
 	if props.Durable {
-		vh.persist.SaveExchange(vh.Name, exchange.ToPersistence())
+		vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence())
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (vh *VHost) deleteExchangeUnlocked(name string) error {
 
 	delete(vh.Exchanges, name)
 	// Handle durable property
-	if err := vh.persist.DeleteExchange(vh.Name, name); err != nil {
+	if err := vh.persist.DeleteExchangeMetadata(vh.Name, name); err != nil {
 		return fmt.Errorf("failed to delete exchange from persistence: %v", err)
 	}
 	log.Debug().Str("exchange", name).Msg("Deleted exchange")
@@ -177,32 +177,33 @@ func (vh *VHost) CheckAutoDeleteExchange(name string) (bool, error) {
 }
 
 // ToPersistence convert Exchange to persistence format
-func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
-	bindings := make([]persistence.PersistedBinding, 0)
-	for routingKey, queues := range e.Bindings {
-		for _, queue := range queues {
-			bindings = append(bindings, persistence.PersistedBinding{
-				QueueName:  queue.Name,
-				RoutingKey: routingKey,
-				Arguments:  nil, // TODO: Add support for binding arguments
-			})
-		}
-	}
-	return &persistence.PersistedExchange{
-		Name:       e.Name,
-		Type:       string(e.Typ),
-		Properties: e.Props.ToPersistence(),
-		Bindings:   bindings,
-	}
-}
+// func (e *Exchange) ToPersistence() *persistence.PersistedExchange {
+// 	bindings := make([]persistence.PersistedBinding, 0)
+// 	for routingKey, queues := range e.Bindings {
+// 		for _, queue := range queues {
+// 			bindings = append(bindings, persistence.PersistedBinding{
+// 				QueueName:  queue.Name,
+// 				RoutingKey: routingKey,
+// 				Arguments:  nil, // TODO: Add support for binding arguments
+// 			})
+// 		}
+// 	}
+// 	return &persistence.PersistedExchange{
+// 		Name:       e.Name,
+// 		Type:       string(e.Typ),
+// 		Properties: e.Props.ToPersistence(),
+// 		Bindings:   bindings,
+// 	}
+// }
 
 // ToPersistence convert ExchangeProperties to persistence format
-func (ep *ExchangeProperties) ToPersistence() persistence.ExchangePropertiesDb {
-	return persistence.ExchangePropertiesDb{
+func (ep *ExchangeProperties) ToPersistence() persistence.ExchangeProperties {
+	return persistence.ExchangeProperties{
+		// Passive:    ep.Passive, // Not needed in persistence
 		Durable:    ep.Durable,
 		AutoDelete: ep.AutoDelete,
 		Internal:   ep.Internal,
-		NoWait:     ep.NoWait,
-		Arguments:  ep.Arguments,
+		// NoWait:     ep.NoWait, // Not needed in persistence
+		Arguments: ep.Arguments,
 	}
 }

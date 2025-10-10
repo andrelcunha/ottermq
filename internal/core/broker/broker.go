@@ -8,10 +8,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/andrelcunha/ottermq/pkg/persistence"
+    "github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
 	"github.com/rs/zerolog/log"
 
 	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
@@ -38,13 +39,24 @@ type Broker struct {
 }
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
+	// Create persistence layer based on config
+    persistConfig := &persistence.Config{
+        Type:    "json", // from config or env var
+        DataDir: "data",
+        Options: make(map[string]string),
+    }
+	persist, err := json.NewJsonPersistence(persistConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create JSON persistence")
+	}
+
 	b := &Broker{
 		VHosts:      make(map[string]*vhost.VHost),
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
 		config:      config,
 		rootCtx:     rootCtx,
 		rootCancel:  rootCancel,
-		persist:     persistence.NewDefaultPersistence(),
+		persist:     persist,
 	}
 	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
 	b.framer = &amqp.DefaultFramer{}

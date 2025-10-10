@@ -3,14 +3,14 @@ package vhost
 import (
 	"testing"
 
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
 func TestDeleteBinding_AutoDeleteExchange(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	// Create exchange with auto-delete
 	ex := &Exchange{
@@ -39,7 +39,7 @@ func TestDeleteBinding_NoAutoDeleteExchange(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	ex := &Exchange{
 		Name:     "ex2",
@@ -65,7 +65,7 @@ func TestDeleteBinding_QueueNotFound(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	ex := &Exchange{
 		Name:     "ex3",
@@ -87,7 +87,7 @@ func TestDeleteBinding_BindingNotFound(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	ex := &Exchange{
 		Name:     "ex4",

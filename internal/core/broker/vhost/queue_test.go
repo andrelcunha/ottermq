@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
 func TestQueueCapacityExceeds1000(t *testing.T) {
@@ -44,7 +44,7 @@ func TestDeleteQueue_AutoDeleteDirectExchange(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	// Create auto-delete direct exchange
 	ex := &Exchange{
@@ -74,7 +74,7 @@ func TestDeleteQueue_AutoDeleteFanoutExchange(t *testing.T) {
 	vh := &VHost{
 		Exchanges: make(map[string]*Exchange),
 		Queues:    make(map[string]*Queue),
-		persist:   &persistence.DummyPersistence{},
+		persist:   &dummy.DummyPersistence{},
 	}
 	// Create auto-delete fanout exchange
 	ex := &Exchange{
