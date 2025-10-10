@@ -26,44 +26,42 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 - RabbitMQ Client Compatibility (basic)
 
 ## ⚙️ Installation
-### Broker Setup
 ```sh
 git clone https://github.com/andrelcunha/ottermq.git
 cd ottermq
-make build && make install
-```
-
-### UI Setup (Vue + Quasar)
-```sh
-cd ottermq_ui
-npm install
+make build-all && make install
 ```
 
 ## 🚀 Usage
 ### Development Mode (UI runs separately)
 ```sh
 # Run the broker:
-ottermq
+make run-dev
 
-# Run the UI
+# In another terminal, run the UI:
 cd ottermq_ui
 quasar dev
 ```
-### Integrated Mode (UI served by OtterMq)
-1. Build the UI as a SPA:
-```sh
-quasar build
-```
-2. Link the built UI to the broker:
-```sh
-cd ..
-ln -s ./ottermq_ui/dist/spa ./ui
-```
-Alternatively, copy the contents of dist/spa into a folder named ui at the project root (not recommended due to duplication).
 
-3. Run the broker:
+### Production Mode (Integrated UI)
 ```sh
-ottermq
+# Build everything (UI + broker):
+make build-all
+
+# Run the integrated server:
+make run
+```
+
+### Available Commands
+```sh
+make build           # Build broker only
+make build-all       # Build UI and broker (production ready)
+make run            # Run broker (with embedded UI if built)
+make run-dev        # Run broker in development mode
+make test           # Run all tests
+make lint           # Run code quality checks
+make clean          # Clean all build artifacts
+make docs           # Generate API documentation
 ```
 OtterMq uses:
 
