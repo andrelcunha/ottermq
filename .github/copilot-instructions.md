@@ -32,7 +32,10 @@ Uses atomic flags and wait groups for coordinated shutdown:
 3. `ActiveConns.Wait()` for graceful cleanup
 
 #### Persistence Interface
-Implements swappable persistence via `internal/core/persistdb/persistence/`. Currently uses JSON files in `data/` directory, designed for future database backends.
+Implements swappable persistence via `internal/core/persistdb/persistence/`. Currently uses JSON files in `data/` directory. Future plans include:
+- Refactoring to `pkg/persistence/` with pluggable backends
+- **Memento WAL Engine**: Custom append-only transaction log inspired by RabbitMQ's Mnesia
+- Event-driven persistence optimized for message broker workloads
 
 ## Development Workflows
 
@@ -92,5 +95,12 @@ VHost contains `MessageController` interface for exchange-to-queue routing. Defa
 - Web handlers inject broker instance for read operations (listings, stats)
 - AMQP operations go through connected client for consistency
 - Persistence layer abstracts storage from broker logic
+
+### Persistence Architecture
+Currently uses JSON file storage with plans for **Memento WAL Engine**:
+- **Current**: JSON snapshots in `data/` directory via `DefaultPersistence`
+- **Planned**: Event-sourced WAL similar to RabbitMQ's Mnesia approach
+- **Architecture**: Swappable backends via persistence interface
+- **Events vs State**: Memento will use append-only event log vs JSON's state snapshots
 
 Focus on **protocol compliance**, **connection lifecycle management**, and **stateful message assembly** when working with AMQP components. UI changes require understanding the REST API contract defined in `web/handlers/api/`.

@@ -85,9 +85,16 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 ## Architecture Improvements
 
 ### **Persistence Layer**
-- [ ] **Database backend** - Replace JSON file storage
-  - [ ] PostgreSQL adapter
-  - [ ] Message persistence options
+- [ ] **Swappable Persistence Architecture** - Move to pluggable persistence backends
+  - [ ] Refactor current JSON implementation to `pkg/persistence/implementations/json/`
+  - [ ] Create abstract persistence interface for multiple backends
+  - [ ] Configuration-based persistence selection
+- [ ] **Memento WAL Engine** - Custom append-only transaction log (Long-term)
+  - [ ] WAL-based persistence inspired by RabbitMQ's Mnesia approach
+  - [ ] Message event streaming (publish/ack/reject)
+  - [ ] Crash recovery via log replay
+  - [ ] Periodic state snapshots for performance
+  - [ ] Foundation for future clustering capabilities
 - [ ] **Recovery system** - Restore state after restart
   - [ ] Durable queues and exchanges
   - [ ] Persistent message recovery

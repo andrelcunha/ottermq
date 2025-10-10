@@ -19,7 +19,7 @@ The name "OtterMQ" comes from my son's nickname and is a way to honor him. He br
 ## ✨ Features
 - AMQP-style Message Queuing
 - Exchanges and Bindings
-- Persistent Storage (in progress)
+- Pluggable Persistence Layer (JSON files, Memento WAL planned)
 - High Availability (planned)
 - Management Interface (Vue + Quasar)
 - Docker Support via `docker-compose`
@@ -124,13 +124,12 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 ## 🚧 Development Status
 OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
 
-- `basic.consume` command
-
-- Message persistence flags
-
+- `basic.consume` command for push-based message delivery
+- Message acknowledgments and recovery
 - Advanced routing and delivery guarantees
+- Memento WAL persistence engine (planned)
 
-Basic compatibility with RabbitMQ clients is already functional, and more protocol features are being added incrementally.
+Basic compatibility with RabbitMQ clients is already functional, and more protocol features are being added incrementally. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 
 ## 📚 API Documentation
 OtterMq provides a built-in Swagger UI for exploring and testing the API.
