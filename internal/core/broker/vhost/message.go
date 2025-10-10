@@ -68,19 +68,19 @@ func (vh *VHost) getMessageCount(queueName string) (int, error) {
 func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	
+
 	exchange, ok := vh.Exchanges[exchangeName]
 	if !ok {
 		log.Error().Str("exchange", exchangeName).Msg("Exchange not found")
 		return "", fmt.Errorf("Exchange %s not found", exchangeName)
 	}
-	
+
 	// verify if exchange is internal
 	if exchange.Props.Internal {
 		// TODO: send the proper error code and channel exception
 		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
 	}
-	
+
 	msgID := uuid.New().String()
 	msg := amqp.Message{
 		ID:         msgID,
@@ -173,6 +173,10 @@ func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
 	if req.Props.DeliveryMode == uint8(amqp.DELIVERY_MODE_PERSISTENT) { // Persistent
 		if req.Queue.Props.Durable {
 			// Persist the message
+			if vh.persist == nil {
+				log.Error().Msg("Persistence layer is not initialized")
+				return fmt.Errorf("persistence layer is not initialized")
+			}
 			if err := vh.persist.SaveMessage(vh.Name, req.RoutingKey, req.MsgID, req.Body, req.MsgProps); err != nil {
 				log.Error().Err(err).Msg("Failed to save message to file")
 				return err
