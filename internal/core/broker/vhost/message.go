@@ -3,10 +3,11 @@ package vhost
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/google/uuid"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
 type MessageController interface {
@@ -89,18 +90,37 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 	}
 	log.Debug().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
 
-	// // Save message to file TODO: Persist
-	// err := vh.saveMessage(routingKey, msg)
-	// if err != nil {
-	// 	log.Printf("Failed to save message to file: %v", err)
-	// 	return "", err
-	// }
+	msgProps := persistence.MessageProperties{
+		ContentType:     props.ContentType,
+		ContentEncoding: props.ContentEncoding,
+		Headers:         props.Headers,
+		DeliveryMode:    props.DeliveryMode,
+		Priority:        props.Priority,
+		CorrelationID:   props.CorrelationID,
+		ReplyTo:         props.ReplyTo,
+		Expiration:      props.Expiration,
+		MessageID:       props.MessageID,
+		Timestamp:       props.Timestamp.Unix(),
+		Type:            props.Type,
+		UserID:          props.UserID,
+		AppID:           props.AppID,
+	}
+	// The persistence should be verified at the routing phase
+	if err := vh.persist.SaveMessage(vh.Name, routingKey, msgID, body, msgProps); err != nil {
+		log.Printf("Failed to save message to file: %v", err)
+		return "", err
+	}
 
 	switch exchange.Typ {
 	case DIRECT:
 		queues, ok := exchange.Bindings[routingKey]
 		if ok {
 			for _, queue := range queues {
+				err := vh.saveMessageIfDurable(props, queue, routingKey, msgID, body, msgProps)
+				if err != nil {
+					return "", err
+				}
+
 				queue.Push(msg)
 			}
 			return msgID, nil
@@ -110,11 +130,28 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 
 	case FANOUT:
 		for _, queue := range exchange.Queues {
+			err := vh.saveMessageIfDurable(props, queue, routingKey, msgID, body, msgProps)
+			if err != nil {
+				return "", err
+			}
 			queue.Push(msg)
 		}
 		return msgID, nil
 	}
 	return "", fmt.Errorf("unknown exchange type")
+}
+
+func (vh *VHost) saveMessageIfDurable(props *amqp.BasicProperties, queue *Queue, routingKey string, msgID string, body []byte, msgProps persistence.MessageProperties) error {
+	if props.DeliveryMode == 2 {
+		if queue.Props.Durable {
+			// Persist the message
+			if err := vh.persist.SaveMessage(vh.Name, routingKey, msgID, body, msgProps); err != nil {
+				log.Printf("Failed to save message to file: %v", err)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // func (vh *Broker) GetMessage(queueName string) <-chan Message {
