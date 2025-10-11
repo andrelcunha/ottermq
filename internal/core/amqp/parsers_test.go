@@ -12,16 +12,16 @@ func TestParseHeaderFrame(t *testing.T) {
 	var payload bytes.Buffer
 
 	// ClassID (short) - BASIC class (60)
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
 
 	// Weight (short) - must be 0
-	binary.Write(&payload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0))
 
 	// Body size (long long)
-	binary.Write(&payload, binary.BigEndian, uint64(100))
+	_ = binary.Write(&payload, binary.BigEndian, uint64(100))
 
 	// Property flags (short) - bit 15 set for contentType
-	binary.Write(&payload, binary.BigEndian, uint16(0x8000))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0x8000))
 
 	// Content type (short string)
 	payload.Write(EncodeShortStr("text/plain"))
@@ -60,13 +60,13 @@ func TestParseHeaderFrame_InvalidWeight(t *testing.T) {
 	var payload bytes.Buffer
 
 	// ClassID (short)
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
 
 	// Weight (short) - invalid non-zero value
-	binary.Write(&payload, binary.BigEndian, uint16(5))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(5))
 
 	// Body size (long long)
-	binary.Write(&payload, binary.BigEndian, uint64(100))
+	_ = binary.Write(&payload, binary.BigEndian, uint64(100))
 
 	channel := uint16(1)
 	payloadSize := uint32(payload.Len())
@@ -134,8 +134,8 @@ func TestParseMethodFrame_ConnectionClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(CONNECTION))
-	binary.Write(&payload, binary.BigEndian, uint16(CONNECTION_START_OK))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CONNECTION))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CONNECTION_START_OK))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(0)
@@ -184,8 +184,8 @@ func TestParseMethodFrame_ChannelClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL))
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -213,7 +213,7 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Queue name (short string)
 	methodPayload.Write(EncodeShortStr("test-queue"))
@@ -230,8 +230,8 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(QUEUE))
-	binary.Write(&payload, binary.BigEndian, uint16(QUEUE_DECLARE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(QUEUE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(QUEUE_DECLARE))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -259,7 +259,7 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
 	methodPayload.Write(EncodeShortStr("test-exchange"))
@@ -279,8 +279,8 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE))
-	binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE_DECLARE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE_DECLARE))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -308,7 +308,7 @@ func TestParseMethodFrame_BasicClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
 	methodPayload.Write(EncodeShortStr(""))
@@ -322,8 +322,8 @@ func TestParseMethodFrame_BasicClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC_PUBLISH))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC_PUBLISH))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)

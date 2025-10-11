@@ -313,8 +313,8 @@ func TestReadFrame_IncompletePayload(t *testing.T) {
 func TestFrameRoundTrip(t *testing.T) {
 	// Create a complete METHOD frame
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL))
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL)) // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN)) // Error ignored as bytes.Buffer.Write never fails
 	payload.Write([]byte{0x00}) // empty short string
 
 	channelNum := uint16(1)

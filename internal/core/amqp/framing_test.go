@@ -130,10 +130,10 @@ func TestFormatMethodFrame(t *testing.T) {
 	// Create method payload for Channel.Close
 	// reply-code (short), reply-text (shortstr), class-id (short), method-id (short)
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(200)) // reply code
+	_ = binary.Write(&payload, binary.BigEndian, uint16(200)) // reply code - Error ignored as bytes.Buffer.Write never fails
 	payload.WriteByte(0)                                  // empty shortstr (length 0)
-	binary.Write(&payload, binary.BigEndian, uint16(0))   // class id
-	binary.Write(&payload, binary.BigEndian, uint16(0))   // method id
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0))   // class id - Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0))   // method id - Error ignored as bytes.Buffer.Write never fails
 
 	frame := formatMethodFrame(channelNum, class, method, payload.Bytes())
 

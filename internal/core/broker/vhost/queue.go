@@ -64,7 +64,9 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 
 	vh.Queues[name] = queue
 	if props.Durable {
-		vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence())
+		if err := vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence()); err != nil {
+			log.Error().Err(err).Str("queue", name).Msg("Failed to save queue metadata")
+		}
 	}
 
 	log.Debug().Str("queue", name).Msg("Created queue")

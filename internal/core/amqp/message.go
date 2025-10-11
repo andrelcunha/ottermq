@@ -77,10 +77,10 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 		return nil
 	}
 
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(classID))
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(weight))
-	binary.Write(&payloadBuf, binary.BigEndian, uint64(bodySize))
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(flags))
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(classID))  // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(weight))   // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint64(bodySize)) // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(flags))    // Error ignored as bytes.Buffer.Write never fails
 	payloadBuf.Write(flag_list)
 
 	payloadSize := uint32(payloadBuf.Len())
@@ -112,8 +112,8 @@ func (msg ResponseMethodMessage) FormatMethodFrame() []byte {
 	method := msg.MethodID
 	channelNum := msg.Channel
 
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(class))  // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(method)) // Error ignored as bytes.Buffer.Write never fails
 
 	var methodPayload []byte
 	if len(msg.Content.KeyValuePairs) > 0 {
@@ -140,13 +140,13 @@ func formatMethodPayload(content ContentList) []byte {
 	for _, kv := range content.KeyValuePairs {
 		switch kv.Key {
 		case INT_OCTET:
-			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint8))
+			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint8)) // Error ignored as bytes.Buffer.Write never fails
 		case INT_SHORT:
-			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint16))
+			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint16)) // Error ignored as bytes.Buffer.Write never fails
 		case INT_LONG:
-			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint32))
+			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint32)) // Error ignored as bytes.Buffer.Write never fails
 		case INT_LONG_LONG:
-			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint64))
+			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(uint64)) // Error ignored as bytes.Buffer.Write never fails
 		case BIT:
 			if kv.Value.(bool) {
 				payloadBuf.WriteByte(1)
@@ -158,7 +158,7 @@ func formatMethodPayload(content ContentList) []byte {
 		case STRING_LONG:
 			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
 		case TIMESTAMP:
-			binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64))
+			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64)) // Error ignored as bytes.Buffer.Write never fails
 		case TABLE:
 			encodedTable := EncodeTable(kv.Value.(map[string]any))
 			payloadBuf.Write(EncodeLongStr(encodedTable))

@@ -10,7 +10,9 @@ var defaultPermissions = []Permission{
 }
 
 func AddDefaultPermissions() {
-	OpenDB()
+	if err := OpenDB(); err != nil {
+		return
+	}
 	defer CloseDB()
 	// Add permissions to the database
 	for _, permission := range defaultPermissions {

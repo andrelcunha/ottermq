@@ -129,8 +129,8 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 func formatMethodFrame(channelNum uint16, class TypeClass, method TypeMethod, methodPayload []byte) []byte {
 	var payloadBuf bytes.Buffer
 
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(class))
-	binary.Write(&payloadBuf, binary.BigEndian, uint16(method))
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(class))  // Error ignored as bytes.Buffer.Write never fails
+	_ = binary.Write(&payloadBuf, binary.BigEndian, uint16(method)) // Error ignored as bytes.Buffer.Write never fails
 
 	payloadBuf.Write(methodPayload)
 

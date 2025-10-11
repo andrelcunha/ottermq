@@ -42,7 +42,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		consumerCount := uint32(0)
 
 		frame := b.framer.CreateQueueDeclareFrame(request, queueName, messageCount, consumerCount)
-		b.framer.SendFrame(conn, frame)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue declare frame")
+		}
 		return nil, nil
 
 	case uint16(amqp.QUEUE_BIND):
@@ -63,7 +65,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			return nil, err
 		}
 		frame := b.framer.CreateQueueBindOkFrame(request)
-		b.framer.SendFrame(conn, frame)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue bind ok frame")
+		}
 		return nil, nil
 
 	case uint16(amqp.QUEUE_DELETE):
@@ -105,7 +109,9 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		// Honor no-wait flag
 		if !content.NoWait {
 			frame := b.framer.CreateQueueDeleteOkFrame(request, messageCount)
-			b.framer.SendFrame(conn, frame)
+			if err := b.framer.SendFrame(conn, frame); err != nil {
+				log.Error().Err(err).Msg("Failed to send queue delete ok frame")
+			}
 		}
 		return nil, nil
 

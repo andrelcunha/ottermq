@@ -66,13 +66,15 @@ func ParseExchangeType(s string) (ExchangeType, error) {
 
 func (vh *VHost) createMandatoryExchanges() {
 	for _, mandatoryExchange := range mandatoryExchanges {
-		vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type, &ExchangeProperties{
+		if err := vh.CreateExchange(mandatoryExchange.Name, mandatoryExchange.Type, &ExchangeProperties{
 			Durable:    false,
 			AutoDelete: false,
 			Internal:   false,
 			NoWait:     false,
 			Arguments:  nil,
-		})
+		}); err != nil {
+			log.Error().Err(err).Str("exchange", mandatoryExchange.Name).Msg("Failed to create mandatory exchange")
+		}
 	}
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -116,7 +118,9 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 	vh.Exchanges[name] = exchange
 	// Handle durable property
 	if props.Durable {
-		vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence())
+		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
+			log.Error().Err(err).Str("exchange", name).Msg("Failed to save exchange metadata")
+		}
 	}
 	return nil
 }

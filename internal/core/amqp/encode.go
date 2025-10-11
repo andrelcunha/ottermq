@@ -22,7 +22,7 @@ func EncodeTable(table map[string]any) []byte {
 
 		case int:
 			buf.WriteByte('I') // Field value type 'I' (int)
-			binary.Write(&buf, binary.BigEndian, int32(v))
+			_ = binary.Write(&buf, binary.BigEndian, int32(v)) // Error ignored as bytes.Buffer.Write never fails
 
 		// In the case map[string]interface:
 		case map[string]any:
@@ -48,7 +48,7 @@ func EncodeTable(table map[string]any) []byte {
 
 func EncodeLongStr(data []byte) []byte {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, uint32(len(data)))
+	_ = binary.Write(&buf, binary.BigEndian, uint32(len(data))) // Error ignored as bytes.Buffer.Write never fails
 	buf.Write(data)
 	return buf.Bytes()
 }
@@ -68,7 +68,7 @@ func EncodeSecurityPlain(securityStr string) []byte {
 	// Encode length as a uint32 and append the encoded string
 	length := uint32(len(encodedStr))
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, length)
+	_ = binary.Write(buf, binary.BigEndian, length) // Error ignored as bytes.Buffer.Write never fails
 	buf.WriteString(encodedStr)
 	return buf.Bytes()
 }

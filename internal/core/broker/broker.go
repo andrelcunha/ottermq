@@ -241,7 +241,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			if msgCount == 0 {
 				frame := b.framer.CreateBasicGetEmptyFrame(request)
-				b.framer.SendFrame(conn, frame)
+				if err := b.framer.SendFrame(conn, frame); err != nil {
+					log.Error().Err(err).Msg("Failed to send basic get empty frame")
+				}
 				return nil, nil
 			}
 
@@ -265,10 +267,14 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 			}
 			// Header
 			frame = responseContent.FormatHeaderFrame()
-			b.framer.SendFrame(conn, frame)
+			if err := b.framer.SendFrame(conn, frame); err != nil {
+				log.Error().Err(err).Msg("Failed to send header frame")
+			}
 			// Body
 			frame = responseContent.FormatBodyFrame()
-			b.framer.SendFrame(conn, frame)
+			if err := b.framer.SendFrame(conn, frame); err != nil {
+				log.Error().Err(err).Msg("Failed to send body frame")
+			}
 			return nil, nil
 
 		case uint16(amqp.BASIC_ACK):

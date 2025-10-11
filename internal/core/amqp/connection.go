@@ -13,36 +13,6 @@ func sendHeartbeat(conn net.Conn) error {
 	return sendFrame(conn, heartbeatFrame)
 }
 
-// createConnectionCloseFrame creates a connection close frame,
-func createConnectionCloseFrame(channel, replyCode, classID, methodID uint16, replyText string) []byte {
-	replyCodeKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: replyCode,
-	}
-	replyTextKv := KeyValue{
-		Key:   STRING_SHORT,
-		Value: replyText,
-	}
-	classIDKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: classID,
-	}
-	methodIDKv := KeyValue{
-		Key:   INT_SHORT,
-		Value: methodID,
-	}
-	content := ContentList{
-		KeyValuePairs: []KeyValue{replyCodeKv, replyTextKv, classIDKv, methodIDKv},
-	}
-	frame := ResponseMethodMessage{
-		Channel:  channel,
-		ClassID:  uint16(CONNECTION),
-		MethodID: uint16(CONNECTION_CLOSE),
-		Content:  content,
-	}.FormatMethodFrame()
-	return frame
-}
-
 func createCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
 	replyCodeKv := KeyValue{
 		Key:   INT_SHORT,
@@ -136,9 +106,15 @@ func createConnectionTuneFrame(tune *ConnectionTune) []byte {
 	classID := CONNECTION
 	methodID := CONNECTION_TUNE
 
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax); err != nil {
+		return nil
+	}
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax); err != nil {
+		return nil
+	}
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat); err != nil {
+		return nil
+	}
 
 	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
 	return frame
@@ -150,9 +126,15 @@ func createConnectionTuneOkFrame(tune *ConnectionTune) []byte {
 	classID := CONNECTION
 	methodID := CONNECTION_TUNE_OK
 
-	binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax)
-	binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat)
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.ChannelMax); err != nil {
+		return nil
+	}
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.FrameMax); err != nil {
+		return nil
+	}
+	if err := binary.Write(&payloadBuf, binary.BigEndian, tune.Heartbeat); err != nil {
+		return nil
+	}
 
 	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
 	return frame

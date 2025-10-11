@@ -69,7 +69,9 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 		}
 
 		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
-			b.registerHeartbeat(conn)
+			if err := b.registerHeartbeat(conn); err != nil {
+				log.Error().Err(err).Msg("Failed to register heartbeat")
+			}
 		}
 
 		//Process frame
@@ -112,7 +114,9 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 				continue
 			}
 		}
-		b.processRequest(conn, newState)
+		if _, err := b.processRequest(conn, newState); err != nil {
+			log.Error().Err(err).Msg("Failed to process request")
+		}
 	}
 }
 
@@ -136,7 +140,9 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
 	if vh != nil {
-		vh.CleanupConnection(conn)
+		if err := vh.CleanupConnection(conn); err != nil {
+			log.Error().Err(err).Msg("Failed to cleanup connection")
+		}
 	}
 }
 
@@ -176,7 +182,9 @@ func (b *Broker) BroadcastConnectionClose() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for conn := range b.Connections {
-		b.sendCloseConnection(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED])
+		if _, err := b.sendCloseConnection(conn, 0, uint16(amqp.CONNECTION_FORCED), 0, 0, amqp.ReplyText[amqp.CONNECTION_FORCED]); err != nil {
+			log.Error().Err(err).Msg("Failed to send close connection")
+		}
 	}
 }
 
