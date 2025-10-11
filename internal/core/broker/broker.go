@@ -164,7 +164,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 	request := newState.MethodFrame
 	connInfo, exist := b.Connections[conn]
 	if !exist {
-		return nil, fmt.Errorf("connection not found")
+		// connection terminated while processing the request
+		log.Info().Str("client", conn.RemoteAddr().String()).Msg("Connection closed")
+		return nil, nil
 	}
 	vh := b.VHosts[connInfo.VHostName]
 	if ok := b.ShuttingDown.Load(); ok {

@@ -1,7 +1,6 @@
 package vhost
 
 import (
-	"fmt"
 	"net"
 	"sync"
 
@@ -57,16 +56,16 @@ func (vh *VHost) createMandatoryStructure() {
 	vh.createMandatoryExchanges()
 }
 
-func (vh *VHost) CleanupConnection(conn net.Conn) error {
+func (vh *VHost) CleanupConnection(conn net.Conn) {
 	log.Debug().Msg("Cleaning vhost connection")
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
 	if sessionId, ok := vh.getSessionID(conn); ok {
 		vh.handleConsumerDisconnection(sessionId)
-		return nil
+	} else {
+		log.Debug().Str("remote_addr", conn.RemoteAddr().String()).Msg("No session found for connection")
 	}
-	return fmt.Errorf("session not found")
 }
 
 func (vh *VHost) handleConsumerDisconnection(sessionID string) {
