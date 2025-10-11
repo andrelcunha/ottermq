@@ -2,7 +2,7 @@ package api_admin
 
 import (
 	"github.com/andrelcunha/ottermq/internal/core/models"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/gofiber/fiber/v2"
 )
 

@@ -10,7 +10,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
-	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
+	// _ "github.com/andrelcunha/ottermq/internal/persistdb"
 )
 
 type ConnManager interface {

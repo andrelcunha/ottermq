@@ -8,14 +8,14 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/andrelcunha/ottermq/pkg/persistence"
-    "github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
+	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/json"
 	"github.com/rs/zerolog/log"
 
-	_ "github.com/andrelcunha/ottermq/internal/core/persistdb"
+	_ "github.com/andrelcunha/ottermq/internal/persistdb"
 )
 
 const (
@@ -40,11 +40,11 @@ type Broker struct {
 
 func NewBroker(config *config.Config, rootCtx context.Context, rootCancel context.CancelFunc) *Broker {
 	// Create persistence layer based on config
-    persistConfig := &persistence.Config{
-        Type:    "json", // from config or env var
-        DataDir: "data",
-        Options: make(map[string]string),
-    }
+	persistConfig := &persistence.Config{
+		Type:    "json", // from config or env var
+		DataDir: "data",
+		Options: make(map[string]string),
+	}
 	persist, err := json.NewJsonPersistence(persistConfig)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create JSON persistence")
