@@ -8,33 +8,8 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
-	// _ "github.com/andrelcunha/ottermq/internal/persistdb"
 )
-
-type ConnManager interface {
-	HandleConnection(configurations *map[string]any, conn net.Conn) error
-	ProcessRequest(conn net.Conn, newState *amqp.ChannelState) (any, error)
-	GetChannelState(conn net.Conn, channel uint16) *amqp.ChannelState
-	UpdateChannelState(conn net.Conn, channel uint16, newState *amqp.ChannelState)
-	HandleHeartbeat(conn net.Conn) error
-	GetVHostFromName(vhostName string) *vhost.VHost
-}
-
-// DefaultConnManager implements ConnManager
-type DefaultConnManager struct {
-	broker *Broker
-	framer amqp.Framer
-}
-
-// NewDefaultConnManager creates a new connection manager
-func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManager {
-	return &DefaultConnManager{
-		broker: broker,
-		framer: framer,
-	}
-}
 
 func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
 	b.ActiveConns.Add(1)
