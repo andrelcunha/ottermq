@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/andrelcunha/ottermq/internal/core/broker"
 	"github.com/andrelcunha/ottermq/internal/core/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rabbitmq/amqp091-go"
@@ -26,13 +27,17 @@ func PublishMessage(c *fiber.Ctx, ch *amqp091.Channel) error {
 			Error: err.Error(),
 		})
 	}
+	exchange := request.ExchangeName
+	if exchange == broker.DEFAULT_EXCHANGE_ALIAS {
+		exchange = ""
+	}
 
 	msg := amqp091.Publishing{
 		ContentType: "text/plain",
 		Body:        []byte(request.Message),
 	}
 	err := ch.Publish(
-		request.ExchangeName,
+		exchange,
 		request.RoutingKey,
 		false, // mandatory
 		false, // immediate
