@@ -1,5 +1,7 @@
 package amqp
 
+import "fmt"
+
 const (
 	INT_OCTET     = "octet"
 	INT_SHORT     = "short"
@@ -162,20 +164,41 @@ var ReplyText = map[ReplyCode]string{
 	INTERNAL_ERROR:      "Internal error",
 }
 
-type DeliveryModeType uint8
+type DeliveryMode uint8
 
 const (
-	DELIVERY_MODE_NON_PERSISTENT DeliveryModeType = 1
-	DELIVERY_MODE_PERSISTENT     DeliveryModeType = 2
+	DEFAULT        DeliveryMode = 0 // It means the same as NON_PERSISTENT
+	NON_PERSISTENT DeliveryMode = 1
+	PERSISTENT     DeliveryMode = 2
 )
+
+func (dm DeliveryMode) String() string {
+	return []string{"default", "non-persistent", "persistent"}[dm]
+}
+
+func (dm DeliveryMode) Validate() error {
+	if dm != 0 && dm != 1 && dm != 2 {
+		return fmt.Errorf("invalid delivery mode: %d (must be 0, 1, or 2)", dm)
+	}
+	return nil
+}
+
+func (dm DeliveryMode) Normalize() DeliveryMode {
+	if dm == 0 {
+		return NON_PERSISTENT
+	}
+	return dm
+}
+
+type ContentType string
 
 // Common AMQP content types
 const (
-	ContentTypeTextPlain       = "text/plain"
-	ContentTypeTextHTML        = "text/html"
-	ContentTypeApplicationJSON = "application/json"
-	ContentTypeApplicationXML  = "application/xml"
-	ContentTypeImagePNG        = "image/png"
-	ContentTypeImageJPEG       = "image/jpeg"
-	ContentTypeMultipartForm   = "multipart/form-data"
+	TEXT_PLAIN       ContentType = "text/plain"
+	TEXT_HTML        ContentType = "text/html"
+	APPLICATION_JSON ContentType = "application/json"
+	APPLICATION_XML  ContentType = "application/xml"
+	IMAGE_PNG        ContentType = "image/png"
+	IMAGE_JPEG       ContentType = "image/jpeg"
+	MULTIPART_FORM   ContentType = "multipart/form-data"
 )

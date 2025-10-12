@@ -31,10 +31,10 @@ type BasicGetOk struct {
 }
 
 type BasicProperties struct {
-	ContentType     string         // shortstr
+	ContentType     ContentType    // shortstr
 	ContentEncoding string         // shortstr
 	Headers         map[string]any // table
-	DeliveryMode    uint8          // octet
+	DeliveryMode    DeliveryMode   // from octet: (1=non-persistent, 2=persistent)
 	Priority        uint8          // octet
 	CorrelationID   string         // shortstr
 	ReplyTo         string         // shortstr
@@ -86,7 +86,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 
 	if props.ContentType != "" {
 		flags |= (1 << 15)
-		if err := encodeShortStr(&buf, props.ContentType); err != nil {
+		if err := encodeShortStr(&buf, string(props.ContentType)); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -108,7 +108,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.DeliveryMode != 0 {
 		flags |= (1 << 12)
-		if err := encodeOctet(&buf, props.DeliveryMode); err != nil {
+		if err := encodeOctet(&buf, uint8(props.DeliveryMode)); err != nil {
 			return nil, 0, err
 		}
 	}
