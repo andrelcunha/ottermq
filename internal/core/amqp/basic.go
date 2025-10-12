@@ -9,7 +9,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type BasicPublishMessage struct {
+type BasicConsumeContent struct {
+	Queue       string
+	ConsumerTag string
+	NoLocal     bool
+	NoAck       bool
+	Exclusive   bool
+	NoWait      bool
+	Arguments   map[string]any
+}
+
+type BasicPublishContent struct {
 	Exchange   string
 	RoutingKey string
 	Mandatory  bool
