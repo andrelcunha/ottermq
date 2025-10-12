@@ -175,7 +175,7 @@ func formatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
 	return header
 }
 
-func EncodeGetOkToContentList(msg *BasicGetOk) *ContentList {
+func EncodeGetOkToContentList(content *BasicGetOkContent) *ContentList {
 	KeyValuePairs := []KeyValue{
 		{ // delivery_tag
 			Key:   INT_LONG_LONG,
