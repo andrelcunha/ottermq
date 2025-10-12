@@ -337,6 +337,14 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 
 func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
+	case uint16(BASIC_QOS):
+		log.Printf("[DEBUG] Received BASIC_QOS frame \n")
+		return nil, fmt.Errorf(" basic.qos not implemented")
+
+	case uint16(BASIC_CONSUME):
+		log.Printf("[DEBUG] Received BASIC_CONSUME frame \n")
+		return parseBasicConsumeFrame(payload)
+
 	// case uint16(BASIC_ACK):
 	// 	log.Printf("[DEBUG] Received BASIC_ACK frame \n")
 	// 	return parseBasicAckFrame(payload)
