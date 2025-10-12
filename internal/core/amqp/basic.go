@@ -367,17 +367,23 @@ func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 }
 
 func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 10 {
+	// the payload must be at least 5 bytes long
+	// 2 (reserved1) => 2 bytes
+	// 1+ (exchange name) => short str = 1  (length) + 1 byte
+	// 1+ (routing key) => short str = 1 (length) + 1 byte
+	// 1 (flags) => octet = 1 byte
+	if len(payload) < 5 {
 		return nil, fmt.Errorf("payload too short")
 	}
 
 	buf := bytes.NewReader(payload)
-	reserved1, err := DecodeShortInt(buf)
+
+	// Note: AMQP spec says "shortstr" but all real implementations
+	// (RabbitMQ, major clients) use short int (2 bytes) for reserved fields.
+	// We follow industry practice for compatibility.
+	_, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
-	}
-	if reserved1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
 	}
 	exchange, err := DecodeShortStr(buf)
 	if err != nil {
@@ -394,7 +400,7 @@ func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
 	flags := DecodeFlags(octet, []string{"mandatory", "immediate"}, true)
 	mandatory := flags["mandatory"]
 	immediate := flags["immediate"]
-	msg := &BasicPublishMessage{
+	msg := &BasicPublishContent{
 		Exchange:   exchange,
 		RoutingKey: routingKey,
 		Mandatory:  mandatory,
