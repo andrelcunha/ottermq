@@ -24,8 +24,8 @@ type QueueProperties struct {
 	Passive    bool      `json:"passive"`
 	Durable    bool      `json:"durable"`
 	AutoDelete bool      `json:"auto_delete"`
-	Exclusive  bool      `json:"exclusive"`
-	NoWait     bool      `json:"no_wait"`
+	Exclusive  bool      `json:"exclusive"` // not implemented yet
+	NoWait     bool      `json:"no_wait"`   // not necessary to persist this. TODO: remove from persistence and here. Implementation at connection level
 	Arguments  QueueArgs `json:"arguments"`
 }
 
@@ -55,12 +55,8 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 			Arguments:  make(map[string]any),
 		}
 	}
-	queue := &Queue{
-		Name:     name,
-		Props:    props,
-		messages: make(chan amqp.Message, vh.QueueBufferSize),
-		count:    0,
-	}
+	queue := NewQueue(name, vh.queueBufferSize)
+	queue.Props = props
 
 	vh.Queues[name] = queue
 	if props.Durable {
@@ -70,15 +66,7 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	}
 
 	log.Debug().Str("queue", name).Msg("Created queue")
-	// adminQueues := make(map[string]bool)
-	// queues := []string{ADMIN_QUEUES, ADMIN_EXCHANGES, ADMIN_BINDINGS, ADMIN_CONNECTIONS}
-	// for _, queueName := range queues {
-	// 	adminQueues[queueName] = true
-	// }
 
-	// if _, ok := adminQueues[name]; !ok {
-	// 	vh.publishQueueUpdate()
-	// }
 	return queue, nil
 }
 
@@ -136,15 +124,6 @@ func (vh *VHost) DeleteQueue(name string) error {
 	return nil
 }
 
-// func (q *Queue) ToPersistence() *persistence.PersistedQueue {
-// 	messages := make([]persistence.PersistedMessage, 0)
-// 	return &persistence.PersistedQueue{
-// 		Name:       q.Name,
-// 		Properties: q.Props.ToPersistence(),
-// 		Messages:   messages,
-// 	}
-// }
-
 func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 	return persistence.QueueProperties{
 		Passive:    qp.Passive,
@@ -157,7 +136,6 @@ func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 }
 
 func (q *Queue) Push(msg amqp.Message) {
-	// queue.messages <- msg
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {
@@ -170,7 +148,6 @@ func (q *Queue) Push(msg amqp.Message) {
 }
 
 func (q *Queue) Pop() *amqp.Message {
-	// return <-queue.messages
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {
@@ -201,15 +178,3 @@ func (q *Queue) Len() int {
 	defer q.mu.Unlock()
 	return q.count
 }
-
-// func (vh *VHost) subscribe(consumerID, queueName string) {
-// 	vh.mu.Lock()
-// 	defer vh.mu.Unlock()
-// 	if _, ok := vh.Queues[queueName]; !ok {
-// 		vh.CreateQueue(queueName)
-// 	}
-// 	if consumer, ok := vh.Consumers[consumerID]; ok {
-// 		consumer.Queue = queueName
-// 		log.Printf("[DEBUG] Subscribed consumer %s to queue %s", consumerID, queueName)
-// 	}
-// }
