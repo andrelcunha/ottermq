@@ -39,20 +39,7 @@ func (m *DefaultMessageController) Acknowledge(consumerID, msgID string) error {
 
 // acknowledge removes the message with the given ID frrom the unackedMessages map.
 func (vh *VHost) acknowledge(consumerID, msgID string) error {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-
-	if vh.ConsumerUnackMsgs[consumerID] == nil {
-		return fmt.Errorf("no unack messages for consumer %s", consumerID)
-	}
-	if _, ok := vh.ConsumerUnackMsgs[consumerID][msgID]; !ok {
-		return fmt.Errorf("message ID %s not found in unack messages for consumer %s", msgID, consumerID)
-	}
-	delete(vh.ConsumerUnackMsgs[consumerID], msgID)
-	log.Debug().Str("msg_id", msgID).Str("consumer_id", consumerID).Msg("Acknowledged message")
-
-	// vh.saveBrokerState() // TODO: Persist
-	return nil
+	panic("Not implemented")
 }
 
 func (vh *VHost) getMessageCount(queueName string) (int, error) {
@@ -77,7 +64,7 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 
 	// verify if exchange is internal
 	if exchange.Props.Internal {
-		// TODO: send the proper error code and channel exception
+		// TODO: raise channel exception (403)
 		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
 	}
 
@@ -202,25 +189,3 @@ func (vh *VHost) getMessage(queueName string) *amqp.Message {
 	}
 	return msg
 }
-
-// func (vh *VHost) registerSessionAndConsummer(sessionID, consumerID string) string {
-// 	// sessionID := generateSessionID()
-// 	// consumerID := conn.RemoteAddr().String()
-
-// 	vh.registerConsumer(consumerID, "default", sessionID)
-// 	log.Println("New connection registered")
-// 	return consumerID
-// }
-
-// func (vh *VHost) registerConsumer(consumerID, queue, sessionID string) {
-// 	vh.mu.Lock()
-// 	defer vh.mu.Unlock()
-// 	consumer := &Consumer{
-// 		ID:        consumerID,
-// 		Queue:     queue,
-// 		SessionID: sessionID,
-// 	}
-// 	vh.Consumers[consumerID] = consumer
-// 	vh.ConsumerSessions[sessionID] = consumerID
-// 	vh.ConsumerUnackMsgs[consumerID] = make(map[string]amqp.Message)
-// }
