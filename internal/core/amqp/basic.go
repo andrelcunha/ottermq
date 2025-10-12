@@ -366,6 +366,88 @@ func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 	}
 }
 
+func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 9 bytes long
+	// 2 (reserved1) => short int = 2 bytes
+	// 1+ (queue name) => short str = 1 (length) + 0+ bytes
+	// 1+ (consumer-tag) => short str = 1 (length) + 0+ bytes
+	// 1 (flags) => octet = 1 byte
+	// 4+ (arguments - optional) => table = 4 (length) + n bytes) => packed as long str
+
+	// Expected fields:
+	// reserved1(shortint),
+	// queue (short str),
+	// consumer tag (short str),
+	// noLocal (bit),
+	// noAck (bit),
+	// exclusive (bit),
+	// nowait (bit)
+
+	if len(payload) < 5 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	buf := bytes.NewReader(payload)
+	// reserved1
+	_, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
+	}
+
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue: %v", err)
+	}
+
+	consumerTag, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode consumer tag: %v", err)
+	}
+
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"noLocal", "noAck", "exclusive", "nowait"}, true)
+	noLocal := flags["noLocal"]
+	noAck := flags["noAck"]
+	exclusive := flags["exclusive"]
+	nowait := flags["nowait"]
+
+	var arguments map[string]any
+	if buf.Len() >= 4 {
+		argumentsStr, err := DecodeLongStr(buf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode arguments: %v", err)
+		}
+		if len(argumentsStr) > 0 {
+			arguments, err = DecodeTable([]byte(argumentsStr))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read arguments: %v", err)
+			}
+		} else {
+			// Empty table - create empty map to distinguish from nil
+			arguments = make(map[string]any)
+		}
+	}
+	// If buf.Len() < 4, no arguments table is present, keep arguments as nil
+
+	content := &BasicConsumeContent{
+		Queue:       queue,
+		ConsumerTag: consumerTag,
+		NoLocal:     noLocal,
+		NoAck:       noAck,
+		Exclusive:   exclusive,
+		NoWait:      nowait,
+		Arguments:   arguments,
+	}
+	request := &RequestMethodMessage{
+		Content: content,
+	}
+	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
+	return request, nil
+}
+
 func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
 	// the payload must be at least 5 bytes long
 	// 2 (reserved1) => 2 bytes
