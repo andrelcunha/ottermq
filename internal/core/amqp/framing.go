@@ -45,7 +45,7 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			if err := props.DeliveryMode.Validate(); err != nil {
 				return nil, err
 			}
-			props.DeliveryMode.Normalize()
+			props.DeliveryMode = props.DeliveryMode.Normalize()
 
 		case "priority": // octet (0-9)
 			priority, err := buf.ReadByte()
