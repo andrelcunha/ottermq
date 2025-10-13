@@ -156,12 +156,12 @@ func formatMethodPayload(content ContentList) []byte {
 		case STRING_SHORT:
 			EncodeShortStr(&payloadBuf, kv.Value.(string))
 		case STRING_LONG:
-			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
+			EncodeLongStr(&payloadBuf, kv.Value.([]byte))
 		case TIMESTAMP:
 			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64)) // Error ignored as bytes.Buffer.Write never fails
 		case TABLE:
 			encodedTable := EncodeTable(kv.Value.(map[string]any))
-			payloadBuf.Write(EncodeLongStr(encodedTable))
+			EncodeLongStr(&payloadBuf, encodedTable)
 		}
 	}
 	return payloadBuf.Bytes()

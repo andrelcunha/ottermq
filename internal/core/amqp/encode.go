@@ -18,7 +18,7 @@ func EncodeTable(table map[string]any) []byte {
 		switch v := value.(type) {
 		case string:
 			buf.WriteByte('S') // Field value type 'S' (string)
-			buf.Write(EncodeLongStr([]byte(v)))
+			EncodeLongStr(&buf, []byte(v))
 
 		case int:
 			buf.WriteByte('I')                                 // Field value type 'I' (int)
@@ -33,7 +33,7 @@ func EncodeTable(table map[string]any) []byte {
 			// Recursively encode the nested map
 			buf.WriteByte('F') // Field value type 'F' (field table)
 			encodedTable := EncodeTable(v)
-			buf.Write(EncodeLongStr(encodedTable))
+			EncodeLongStr(&buf, encodedTable)
 
 		case bool:
 			buf.WriteByte('t')
@@ -50,15 +50,13 @@ func EncodeTable(table map[string]any) []byte {
 	return buf.Bytes()
 }
 
-func EncodeLongStr(data []byte) []byte {
-	var buf bytes.Buffer
-	_ = binary.Write(&buf, binary.BigEndian, uint32(len(data))) // Error ignored as bytes.Buffer.Write never fails
+func EncodeLongStr(buf *bytes.Buffer, data []byte) {
+	_ = binary.Write(buf, binary.BigEndian, uint32(len(data))) // Error ignored as bytes.Buffer.Write never fails
 	buf.Write(data)
-	return buf.Bytes()
 }
 
 func EncodeShortStr(buf *bytes.Buffer, data string) {
-	buf.WriteByte(byte(len(data)))
+	_ = buf.WriteByte(byte(len(data)))
 	buf.WriteString(data)
 }
 

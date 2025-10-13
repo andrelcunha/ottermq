@@ -121,13 +121,13 @@ func TestParseMethodFrame_ConnectionClass(t *testing.T) {
 		"version": "1.0.0",
 	}
 	encodedProps := EncodeTable(clientProps)
-	methodPayload.Write(EncodeLongStr(encodedProps))
+	EncodeLongStr(&methodPayload, encodedProps)
 
 	// Mechanism (short string)
 	EncodeShortStr(&methodPayload, "PLAIN")
 
 	// Response (long string)
-	methodPayload.Write(EncodeLongStr([]byte("\x00test\x00password")))
+	EncodeLongStr(&methodPayload, []byte("\x00test\x00password"))
 
 	// Locale (short string)
 	EncodeShortStr(&methodPayload, "en_US")
@@ -226,7 +226,7 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
@@ -275,7 +275,7 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer

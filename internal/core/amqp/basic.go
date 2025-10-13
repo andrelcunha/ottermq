@@ -190,10 +190,7 @@ func encodeTable(table map[string]interface{}) ([]byte, error) {
 		// Field value type and value
 		switch v := value.(type) {
 		case string:
-			buf.WriteByte('S') // Field value type 'S' (string)
-			if err := encodeLongStr(&buf, v); err != nil {
-				return nil, err
-			}
+			EncodeLongStr(&buf, []byte(v))
 
 		case int:
 			buf.WriteByte('I') // Field value type 'I' (int)
@@ -207,10 +204,7 @@ func encodeTable(table map[string]interface{}) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := encodeLongStr(&buf, string(encodedTable)); err != nil {
-				return nil, err
-			}
-
+			EncodeLongStr(&buf, encodedTable)
 		case bool:
 			buf.WriteByte('t')
 			if v {
@@ -232,16 +226,6 @@ func encodeOctet(buf *bytes.Buffer, value uint8) error {
 func encodeTimestamp(buf *bytes.Buffer, value time.Time) error {
 	timestamp := value.Unix()
 	return binary.Write(buf, binary.BigEndian, timestamp)
-}
-
-func encodeLongStr(buf *bytes.Buffer, value string) error {
-	if err := binary.Write(buf, binary.BigEndian, int32(len(value))); err != nil {
-		return err
-	}
-	if _, err := buf.WriteString(value); err != nil {
-		return err
-	}
-	return nil
 }
 
 func decodeBasicHeaderFlags(short uint16) []string {
