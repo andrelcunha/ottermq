@@ -154,7 +154,7 @@ func formatMethodPayload(content ContentList) []byte {
 				payloadBuf.WriteByte(0)
 			}
 		case STRING_SHORT:
-			payloadBuf.Write(EncodeShortStr(kv.Value.(string)))
+			EncodeShortStr(&payloadBuf, kv.Value.(string))
 		case STRING_LONG:
 			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
 		case TIMESTAMP:

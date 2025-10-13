@@ -113,15 +113,11 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 
 	if props.ContentType != "" {
 		flags |= (1 << 15)
-		if err := encodeShortStr(&buf, string(props.ContentType)); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, string(props.ContentType))
 	}
 	if props.ContentEncoding != "" {
 		flags |= (1 << 14)
-		if err := encodeShortStr(&buf, props.ContentEncoding); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.ContentEncoding)
 	}
 	if props.Headers != nil {
 		flags |= (1 << 13)
@@ -147,27 +143,19 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.CorrelationID != "" {
 		flags |= (1 << 10)
-		if err := encodeShortStr(&buf, props.CorrelationID); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.CorrelationID)
 	}
 	if props.ReplyTo != "" {
 		flags |= (1 << 9)
-		if err := encodeShortStr(&buf, props.ReplyTo); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.ReplyTo)
 	}
 	if props.Expiration != "" {
 		flags |= (1 << 8)
-		if err := encodeShortStr(&buf, props.Expiration); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.Expiration)
 	}
 	if props.MessageID != "" {
 		flags |= (1 << 7)
-		if err := encodeShortStr(&buf, props.MessageID); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.MessageID)
 	}
 	if !props.Timestamp.IsZero() {
 		flags |= (1 << 6)
@@ -177,47 +165,27 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.Type != "" {
 		flags |= (1 << 5)
-		if err := encodeShortStr(&buf, props.Type); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.Type)
 	}
 	if props.UserID != "" {
 		flags |= (1 << 4)
-		if err := encodeShortStr(&buf, props.UserID); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.UserID)
 	}
 	if props.AppID != "" {
 		flags |= (1 << 3)
-		if err := encodeShortStr(&buf, props.AppID); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.AppID)
 	}
 	if props.Reserved != "" {
 		flags |= (1 << 2)
-		if err := encodeShortStr(&buf, props.Reserved); err != nil {
-			return nil, 0, err
-		}
+		EncodeShortStr(&buf, props.Reserved)
 	}
 	return buf.Bytes(), flags, nil
-}
-
-func encodeShortStr(buf *bytes.Buffer, value string) error {
-	if err := buf.WriteByte(byte(len(value))); err != nil {
-		return err
-	}
-	if _, err := buf.WriteString(value); err != nil {
-		return err
-	}
-	return nil
 }
 
 func encodeTable(table map[string]interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	for key, value := range table { // Field name
-		if err := encodeShortStr(&buf, key); err != nil {
-			return nil, err
-		}
+		EncodeShortStr(&buf, key)
 
 		// Field value type and value
 		switch v := value.(type) {
@@ -307,7 +275,6 @@ func decodeBasicHeaderFlags(short uint16) []string {
 // Body Size: long long
 // Properties flags: short
 // Properties: long (table)
-
 func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 
 	buf := bytes.NewReader(headerPayload)

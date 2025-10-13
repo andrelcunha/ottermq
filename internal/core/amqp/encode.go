@@ -12,7 +12,7 @@ func EncodeTable(table map[string]any) []byte {
 
 	for key, value := range table {
 		// Field name
-		buf.Write(EncodeShortStr(key))
+		EncodeShortStr(&buf, key)
 
 		// Field value type and value
 		switch v := value.(type) {
@@ -57,11 +57,9 @@ func EncodeLongStr(data []byte) []byte {
 	return buf.Bytes()
 }
 
-func EncodeShortStr(data string) []byte {
-	var buf bytes.Buffer
+func EncodeShortStr(buf *bytes.Buffer, data string) {
 	buf.WriteByte(byte(len(data)))
 	buf.WriteString(data)
-	return buf.Bytes()
 }
 
 func EncodeSecurityPlain(securityStr string) []byte {
