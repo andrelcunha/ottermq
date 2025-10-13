@@ -10,8 +10,11 @@ type Framer interface {
 	SendFrame(conn net.Conn, frame []byte) error
 	Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*ConnectionInfo, error)
 	ParseFrame(frame []byte) (any, error)
+	CreateHeaderFrame(channel, classID uint16, msg Message) []byte
+	CreateBodyFrame(channel uint16, content []byte) []byte
 
 	// Basic Methods
+	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
 	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
 	CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte
@@ -35,10 +38,6 @@ type Framer interface {
 	CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte
 }
 
-func (d *DefaultFramer) CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
-	return createBasicConsumeOkFrame(request, consumerTag)
-}
-
 type DefaultFramer struct{}
 
 func (d *DefaultFramer) ReadFrame(conn net.Conn) ([]byte, error) {
@@ -56,6 +55,16 @@ func (d *DefaultFramer) Handshake(configurations *map[string]any, conn net.Conn,
 func (d *DefaultFramer) ParseFrame(frame []byte) (any, error) {
 	return parseFrame(frame)
 }
+
+func (d *DefaultFramer) CreateHeaderFrame(channel, classID uint16, msg Message) []byte {
+	return createHeaderFrame(channel, classID, msg)
+}
+
+func (d *DefaultFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
+	return createBodyFrame(channel, content)
+}
+
+// Queue Methods
 
 func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return createQueueDeclareFrame(request, queueName, messageCount, consumerCount)
@@ -87,6 +96,14 @@ func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessa
 
 func (d *DefaultFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return createChannelCloseOkFrame(channel)
+}
+
+func (d *DefaultFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
+	return createBasicDeliverFrame(channel, consumerTag, exchange, routingKey, deliveryTag, redelivered)
+}
+
+func (d *DefaultFramer) CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
+	return createBasicConsumeOkFrame(request, consumerTag)
 }
 
 func (d *DefaultFramer) CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
