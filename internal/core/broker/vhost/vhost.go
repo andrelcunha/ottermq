@@ -1,10 +1,7 @@
 package vhost
 
 import (
-	"net"
 	"sync"
-
-	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
@@ -20,9 +17,9 @@ type VHost struct {
 	mu                 sync.Mutex                 `json:"-"`
 	queueBufferSize    int                        `json:"-"`
 	persist            persistence.Persistence
-	Consumers          map[ConsumerKey]*Consumer `json:"consumers"`            // <- Primary registry
-	ConsumersByQueue   map[string][]*Consumer    `json:"consumers_by_queue"`   // <- Delivery Index
-	ConsumersByChannel map[uint16][]*Consumer    `json:"consumers_by_channel"` // <- Channel Index
+	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
+	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
+	ConsumersByChannel map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
 }
 
 func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
@@ -37,7 +34,7 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		persist:            persist,
 		Consumers:          make(map[ConsumerKey]*Consumer),
 		ConsumersByQueue:   make(map[string][]*Consumer),
-		ConsumersByChannel: make(map[uint16][]*Consumer),
+		ConsumersByChannel: make(map[ConnectionChannelKey][]*Consumer),
 	}
 	vh.createMandatoryStructure()
 	return vh
@@ -45,26 +42,4 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 
 func (vh *VHost) createMandatoryStructure() {
 	vh.createMandatoryExchanges()
-}
-
-func (vh *VHost) CleanupConnection(conn net.Conn) {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-
-	// Find and cleanup all consumers for this connection
-	var channelsToCleanup []uint16
-	for key, consumer := range vh.Consumers {
-		if consumer.Connection == conn {
-			channelsToCleanup = append(channelsToCleanup, key.Channel)
-		}
-	}
-
-	// Cleanup channels (release lock temporarily to avoid deadlock)
-	vh.mu.Unlock()
-	for _, channel := range channelsToCleanup {
-		vh.CleanupChannel(channel)
-	}
-	vh.mu.Lock()
-
-	log.Debug().Msg("Cleaned vhost connection")
 }

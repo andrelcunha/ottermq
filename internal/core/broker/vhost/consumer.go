@@ -12,6 +12,12 @@ type ConsumerKey struct {
 	Tag     string
 }
 
+// ConnectionChannelKey uniquely identifies a channel within a connection
+type ConnectionChannelKey struct {
+	Connection net.Conn
+	Channel    uint16
+}
+
 type Consumer struct {
 	Tag         string
 	Channel     uint16
@@ -86,12 +92,13 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 		vh.ConsumersByQueue[consumer.QueueName],
 		consumer,
 	)
-	// Index for channel
-	if _, exists := vh.ConsumersByChannel[key.Channel]; !exists {
-		vh.ConsumersByChannel[key.Channel] = []*Consumer{}
+	// Index for channel (connection-scoped)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	if _, exists := vh.ConsumersByChannel[channelKey]; !exists {
+		vh.ConsumersByChannel[channelKey] = []*Consumer{}
 	}
-	vh.ConsumersByChannel[key.Channel] = append(
-		vh.ConsumersByChannel[key.Channel],
+	vh.ConsumersByChannel[channelKey] = append(
+		vh.ConsumersByChannel[channelKey],
 		consumer,
 	)
 
@@ -122,34 +129,63 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 		delete(vh.ConsumersByQueue, consumer.QueueName)
 	}
 
-	// Remove from ConsumersByChannel
-	consumersForChannel := vh.ConsumersByChannel[channel]
+	// Remove from ConsumersByChannel (connection-scoped)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	consumersForChannel := vh.ConsumersByChannel[channelKey]
 	for i, c := range consumersForChannel {
 		if c.Tag == tag {
-			vh.ConsumersByChannel[channel] = append(consumersForChannel[:i], consumersForChannel[i+1:]...)
+			vh.ConsumersByChannel[channelKey] = append(consumersForChannel[:i], consumersForChannel[i+1:]...)
 			break
 		}
+	}
+	// Clean up empty channel entries
+	if len(vh.ConsumersByChannel[channelKey]) == 0 {
+		delete(vh.ConsumersByChannel, channelKey)
 	}
 
 	return nil
 }
 
-func (vh *VHost) CleanupChannel(channel uint16) {
+func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
+	channelKey := ConnectionChannelKey{connection, channel}
 	// Get copy of consumers to avoid modification during iteration
-	consumersForChannel := make([]*Consumer, len(vh.ConsumersByChannel[channel]))
-	copy(consumersForChannel, vh.ConsumersByChannel[channel])
+	consumersForChannel, exists := vh.ConsumersByChannel[channelKey]
+	if !exists {
+		return // No consumers on this channel
+	}
+
+	consumersCopy := make([]*Consumer, len(consumersForChannel))
+	copy(consumersCopy, consumersForChannel)
 
 	// Cancel each consumer (this will modify the maps)
-	for _, c := range consumersForChannel {
+	for _, c := range consumersCopy {
 		// Unlock to call CancelConsumer (which also locks)
 		vh.mu.Unlock()
 		vh.CancelConsumer(c.Channel, c.Tag)
 		vh.mu.Lock()
 	}
+}
 
-	// Clean up the channel entry
-	delete(vh.ConsumersByChannel, channel)
+func (vh *VHost) CleanupConnection(connection net.Conn) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	// Find all consumers for this connection
+	var consumersToRemove []*Consumer
+	for _, consumer := range vh.Consumers {
+		if consumer.Connection == connection {
+			consumersToRemove = append(consumersToRemove, consumer)
+		}
+	}
+
+	// Cancel each consumer
+	for _, consumer := range consumersToRemove {
+		// Unlock to call CancelConsumer (which also locks)
+		vh.mu.Unlock()
+		vh.CancelConsumer(consumer.Channel, consumer.Tag)
+		vh.mu.Lock()
+	}
 }
