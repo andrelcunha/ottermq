@@ -545,7 +545,7 @@ func TestCreateBasicDeliverFrame(t *testing.T) {
 			// Verify the frame contains expected class and method IDs
 			// This would require parsing the full frame, but we can at least
 			// verify the frame was created without panicking and has reasonable size
-			expectedMinSize := 8 + // frame header
+			expectedMinSize := 7 + // frame header (1 byte type + 2 bytes channel + 4 bytes payload size)
 				2 + // class ID
 				2 + // method ID
 				1 + len(tt.consumerTag) + // consumer tag (shortstr)
