@@ -469,7 +469,7 @@ func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: content,
 	}
-	log.Printf("[DEBUG] BasicConsume formatted: %+v \n", content)
+	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
 	return request, nil
 }
 
