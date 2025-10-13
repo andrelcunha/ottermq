@@ -63,15 +63,16 @@ type KeyValue struct {
 	Value interface{}
 }
 
-func (msg ResponseContent) FormatHeaderFrame() []byte {
+func (rc ResponseContent) FormatHeaderFrame() []byte {
+	return formatHeaderFrame_(rc.Channel, rc.ClassID, rc.Weight, rc.Message)
+}
+
+func formatHeaderFrame_(channel, classID, weight uint16, msg Message) []byte {
 	frameType := uint8(TYPE_HEADER)
 	var payloadBuf bytes.Buffer
-	channel := msg.Channel
-	classID := msg.ClassID
 
-	weight := msg.Weight
-	bodySize := len(msg.Message.Body)
-	flag_list, flags, err := msg.Message.Properties.encodeBasicProperties()
+	bodySize := len(msg.Body)
+	flag_list, flags, err := msg.Properties.encodeBasicProperties()
 	if err != nil {
 		log.Error().Err(err).Msg("Error")
 		return nil
@@ -92,11 +93,11 @@ func (msg ResponseContent) FormatHeaderFrame() []byte {
 	return frame
 }
 
-func (msg ResponseContent) FormatBodyFrame() []byte {
+func (rc ResponseContent) FormatBodyFrame() []byte {
 	frameType := uint8(TYPE_BODY)
 	var payloadBuf bytes.Buffer
-	channel := msg.Channel
-	content := msg.Message.Body
+	channel := rc.Channel
+	content := rc.Message.Body
 	payloadBuf.Write(content)
 
 	payloadSize := uint32(payloadBuf.Len())
