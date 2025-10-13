@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// encodeTable encodes a proper AMQP field table
+// EncodeTable encodes a proper AMQP field table
 func EncodeTable(table map[string]any) []byte {
 	var buf bytes.Buffer
 	for key, value := range table {
@@ -60,23 +60,22 @@ func EncodeShortStr(buf *bytes.Buffer, data string) {
 	buf.WriteString(data)
 }
 
-func encodeOctet(buf *bytes.Buffer, value uint8) error {
+func EncodeOctet(buf *bytes.Buffer, value uint8) error {
 	return buf.WriteByte(value)
 }
 
-func encodeTimestamp(buf *bytes.Buffer, value time.Time) error {
+func EncodeTimestamp(buf *bytes.Buffer, value time.Time) error {
 	timestamp := value.Unix()
 	return binary.Write(buf, binary.BigEndian, timestamp)
 }
 
-func EncodeSecurityPlain(securityStr string) []byte {
+func EncodeSecurityPlain(buf *bytes.Buffer, securityStr string) []byte {
 	// Concatenate username, null byte, and password
 	// securityStr := username + "\x00" + password
 	// Replace spaces with null bytes
 	encodedStr := strings.ReplaceAll(securityStr, " ", "\x00")
 	// Encode length as a uint32 and append the encoded string
 	length := uint32(len(encodedStr))
-	buf := new(bytes.Buffer)
 	_ = binary.Write(buf, binary.BigEndian, length) // Error ignored as bytes.Buffer.Write never fails
 	buf.WriteString(encodedStr)
 	return buf.Bytes()

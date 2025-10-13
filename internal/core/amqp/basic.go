@@ -127,13 +127,13 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.DeliveryMode != 0 {
 		flags |= (1 << 12)
-		if err := encodeOctet(&buf, uint8(props.DeliveryMode)); err != nil {
+		if err := EncodeOctet(&buf, uint8(props.DeliveryMode)); err != nil {
 			return nil, 0, err
 		}
 	}
 	if props.Priority != 0 {
 		flags |= (1 << 11)
-		if err := encodeOctet(&buf, props.Priority); err != nil {
+		if err := EncodeOctet(&buf, props.Priority); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -155,7 +155,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if !props.Timestamp.IsZero() {
 		flags |= (1 << 6)
-		if err := encodeTimestamp(&buf, props.Timestamp); err != nil {
+		if err := EncodeTimestamp(&buf, props.Timestamp); err != nil {
 			return nil, 0, err
 		}
 	}
