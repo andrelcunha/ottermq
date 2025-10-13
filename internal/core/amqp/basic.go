@@ -73,6 +73,46 @@ func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string
 	return frame
 }
 
+// createBasicDeliverFrame creates a Basic.Deliver (60) frame for the given message and delivery tag.
+// Sent fields:
+// - consumer-tag (shortstr)
+// - delivery-tag (longlong)
+// - redelivered (bit)
+// - exchange (shortstr)
+// - routing-key (shortstr)
+func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
+	consumerTagKv := KeyValue{
+		Key:   STRING_SHORT,
+		Value: consumerTag,
+	}
+	deliveryTagKv := KeyValue{
+		Key:   INT_LONG_LONG,
+		Value: deliveryTag,
+	}
+	redeliveredKv := KeyValue{
+		Key:   BIT,
+		Value: redelivered,
+	}
+	exchangeKv := KeyValue{
+		Key:   STRING_SHORT,
+		Value: exchange,
+	}
+	routingKeyKv := KeyValue{
+		Key:   STRING_SHORT,
+		Value: routingKey,
+	}
+	content := ContentList{
+		KeyValuePairs: []KeyValue{consumerTagKv, deliveryTagKv, redeliveredKv, exchangeKv, routingKeyKv},
+	}
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_DELIVER),
+		Content:  content,
+	}.FormatMethodFrame()
+	return frame
+}
+
 func createBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
 	// Send Basic.GetEmpty
 	reserved1 := KeyValue{
