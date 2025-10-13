@@ -74,12 +74,6 @@ func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string
 }
 
 // createBasicDeliverFrame creates a Basic.Deliver (60) frame for the given message and delivery tag.
-// Sent fields:
-// - consumer-tag (shortstr)
-// - delivery-tag (longlong)
-// - redelivered (bit)
-// - exchange (shortstr)
-// - routing-key (shortstr)
 func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	consumerTagKv := KeyValue{
 		Key:   STRING_SHORT,
