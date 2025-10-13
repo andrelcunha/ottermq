@@ -189,7 +189,11 @@ func TestBasicConsumeHandler_ValidConsumer(t *testing.T) {
 		t.Errorf("Expected 1 consumer for queue, got %d", len(queueConsumers))
 	}
 
-	channelConsumers := vh.ConsumersByChannel[1]
+	channelKey := vhost.ConnectionChannelKey{
+		Connection: conn,
+		Channel:    1,
+	}
+	channelConsumers := vh.ConsumersByChannel[channelKey]
 	if len(channelConsumers) != 1 {
 		t.Errorf("Expected 1 consumer for channel, got %d", len(channelConsumers))
 	}
