@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"strings"
+	"time"
 )
 
 // encodeTable encodes a proper AMQP field table
 func EncodeTable(table map[string]any) []byte {
 	var buf bytes.Buffer
-
 	for key, value := range table {
 		// Field name
 		EncodeShortStr(&buf, key)
@@ -58,6 +58,15 @@ func EncodeLongStr(buf *bytes.Buffer, data []byte) {
 func EncodeShortStr(buf *bytes.Buffer, data string) {
 	_ = buf.WriteByte(byte(len(data)))
 	buf.WriteString(data)
+}
+
+func encodeOctet(buf *bytes.Buffer, value uint8) error {
+	return buf.WriteByte(value)
+}
+
+func encodeTimestamp(buf *bytes.Buffer, value time.Time) error {
+	timestamp := value.Unix()
+	return binary.Write(buf, binary.BigEndian, timestamp)
 }
 
 func EncodeSecurityPlain(securityStr string) []byte {

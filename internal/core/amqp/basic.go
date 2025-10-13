@@ -2,7 +2,6 @@ package amqp
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -121,10 +120,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.Headers != nil {
 		flags |= (1 << 13)
-		encodedTable, err := encodeTable(props.Headers)
-		if err != nil {
-			return nil, 0, err
-		}
+		encodedTable := EncodeTable(props.Headers)
 		if _, err := buf.Write(encodedTable); err != nil {
 			return nil, 0, err
 		}
@@ -180,52 +176,6 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 		EncodeShortStr(&buf, props.Reserved)
 	}
 	return buf.Bytes(), flags, nil
-}
-
-func encodeTable(table map[string]interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	for key, value := range table { // Field name
-		EncodeShortStr(&buf, key)
-
-		// Field value type and value
-		switch v := value.(type) {
-		case string:
-			EncodeLongStr(&buf, []byte(v))
-
-		case int:
-			buf.WriteByte('I') // Field value type 'I' (int)
-			if err := binary.Write(&buf, binary.BigEndian, int32(v)); err != nil {
-				return nil, err
-			}
-
-		case map[string]interface{}: // Recursively encode the nested map
-			buf.WriteByte('F') // Field value type 'F' (field table)
-			encodedTable, err := encodeTable(v)
-			if err != nil {
-				return nil, err
-			}
-			EncodeLongStr(&buf, encodedTable)
-		case bool:
-			buf.WriteByte('t')
-			if v {
-				buf.WriteByte(1)
-			} else {
-				buf.WriteByte(0)
-			}
-		default:
-			buf.WriteByte('U')
-		}
-	}
-	return buf.Bytes(), nil
-}
-
-func encodeOctet(buf *bytes.Buffer, value uint8) error {
-	return buf.WriteByte(value)
-}
-
-func encodeTimestamp(buf *bytes.Buffer, value time.Time) error {
-	timestamp := value.Unix()
-	return binary.Write(buf, binary.BigEndian, timestamp)
 }
 
 func decodeBasicHeaderFlags(short uint16) []string {
@@ -303,7 +253,7 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 
 // REGION Basic_Methods
 
-func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
+func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(BASIC_QOS):
 		log.Printf("[DEBUG] Received BASIC_QOS frame \n")
