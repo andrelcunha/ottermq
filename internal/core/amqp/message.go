@@ -64,13 +64,13 @@ type KeyValue struct {
 }
 
 func (rc ResponseContent) FormatHeaderFrame() []byte {
-	return formatHeaderFrame_(rc.Channel, rc.ClassID, rc.Weight, rc.Message)
+	return createHeaderFrame(rc.Channel, rc.ClassID, rc.Message)
 }
 
-func formatHeaderFrame_(channel, classID, weight uint16, msg Message) []byte {
+func createHeaderFrame(channel, classID uint16, msg Message) []byte {
 	frameType := uint8(TYPE_HEADER)
 	var payloadBuf bytes.Buffer
-
+	weight := uint16(0) // amqp-0-9-1 spec says "weight field is unused and must be zero"
 	bodySize := len(msg.Body)
 	flag_list, flags, err := msg.Properties.encodeBasicProperties()
 	if err != nil {
@@ -94,10 +94,12 @@ func formatHeaderFrame_(channel, classID, weight uint16, msg Message) []byte {
 }
 
 func (rc ResponseContent) FormatBodyFrame() []byte {
+	return createBodyFrame(rc.Channel, rc.Message.Body)
+}
+
+func createBodyFrame(channel uint16, content []byte) []byte {
 	frameType := uint8(TYPE_BODY)
 	var payloadBuf bytes.Buffer
-	channel := rc.Channel
-	content := rc.Message.Body
 	payloadBuf.Write(content)
 
 	payloadSize := uint32(payloadBuf.Len())
