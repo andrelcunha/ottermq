@@ -10,49 +10,16 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
-type MessageController interface {
-	Publish(exchange, routingKey string, body []byte, props *amqp.BasicProperties) (string, error)
-	GetMessage(queueName string) *amqp.Message
-	GetMessageCount(queueName string) (int, error)
-	Acknowledge(consumerID, msgID string) error
+type SaveMessageRequest struct {
+	Props      *amqp.BasicProperties
+	Queue      *Queue
+	RoutingKey string
+	MsgID      string
+	Body       []byte
+	MsgProps   persistence.MessageProperties
 }
 
-type DefaultMessageController struct {
-	vhost *VHost
-}
-
-func (m *DefaultMessageController) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
-	return m.vhost.publish(exchangeName, routingKey, body, props)
-}
-
-func (m *DefaultMessageController) GetMessage(queueName string) *amqp.Message {
-	return m.vhost.getMessage(queueName)
-}
-
-func (m *DefaultMessageController) GetMessageCount(queueName string) (int, error) {
-	return m.vhost.getMessageCount(queueName)
-}
-
-func (m *DefaultMessageController) Acknowledge(consumerID, msgID string) error {
-	return m.vhost.acknowledge(consumerID, msgID)
-}
-
-// acknowledge removes the message with the given ID frrom the unackedMessages map.
-func (vh *VHost) acknowledge(consumerID, msgID string) error {
-	panic("Not implemented")
-}
-
-func (vh *VHost) getMessageCount(queueName string) (int, error) {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	queue, ok := vh.Queues[queueName]
-	if !ok {
-		return 0, fmt.Errorf("queue %s not found", queueName)
-	}
-	return queue.Len(), nil
-}
-
-func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -147,13 +114,36 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 	}
 }
 
-type SaveMessageRequest struct {
-	Props      *amqp.BasicProperties
-	Queue      *Queue
-	RoutingKey string
-	MsgID      string
-	Body       []byte
-	MsgProps   persistence.MessageProperties
+// func (vh *Broker) GetMessage(queueName string) <-chan Message {
+func (vh *VHost) GetMessage(queueName string) *amqp.Message {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	queue, ok := vh.Queues[queueName]
+	if !ok {
+		log.Error().Str("queue", queueName).Msg("Queue not found")
+		return nil
+	}
+	msg := queue.Pop()
+	if msg == nil {
+		log.Debug().Str("queue", queueName).Msg("No messages in queue")
+		return nil
+	}
+	return msg
+}
+
+func (vh *VHost) GetMessageCount(queueName string) (int, error) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	queue, ok := vh.Queues[queueName]
+	if !ok {
+		return 0, fmt.Errorf("queue %s not found", queueName)
+	}
+	return queue.Len(), nil
+}
+
+// acknowledge removes the message with the given ID from the unackedMessages map.
+func (vh *VHost) Acknowledge(consumerID, msgID string) error {
+	panic("Not implemented")
 }
 
 func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
@@ -171,21 +161,4 @@ func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
 		}
 	}
 	return nil
-}
-
-// func (vh *Broker) GetMessage(queueName string) <-chan Message {
-func (vh *VHost) getMessage(queueName string) *amqp.Message {
-	vh.mu.Lock()
-	defer vh.mu.Unlock()
-	queue, ok := vh.Queues[queueName]
-	if !ok {
-		log.Error().Str("queue", queueName).Msg("Queue not found")
-		return nil
-	}
-	msg := queue.Pop()
-	if msg == nil {
-		log.Debug().Str("queue", queueName).Msg("No messages in queue")
-		return nil
-	}
-	return msg
 }

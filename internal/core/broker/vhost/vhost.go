@@ -18,8 +18,7 @@ type VHost struct {
 	Queues             map[string]*Queue          `json:"queues"`
 	Users              map[string]*persistdb.User `json:"users"`
 	mu                 sync.Mutex                 `json:"-"`
-	MsgCtrlr           MessageController
-	queueBufferSize    int `json:"-"`
+	queueBufferSize    int                        `json:"-"`
 	persist            persistence.Persistence
 	Consumers          map[ConsumerKey]*Consumer `json:"consumers"`            // <- Primary registry
 	ConsumersByQueue   map[string][]*Consumer    `json:"consumers_by_queue"`   // <- Delivery Index
@@ -40,7 +39,6 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		ConsumersByQueue:   make(map[string][]*Consumer),
 		ConsumersByChannel: make(map[uint16][]*Consumer),
 	}
-	vh.MsgCtrlr = &DefaultMessageController{vh}
 	vh.createMandatoryStructure()
 	return vh
 }

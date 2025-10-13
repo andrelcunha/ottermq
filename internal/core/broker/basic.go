@@ -54,7 +54,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			routingKey := publishRequest.RoutingKey
 			body := currentState.Body
 			props := currentState.HeaderFrame.Properties
-			_, err := vh.MsgCtrlr.Publish(exchanege, routingKey, body, props)
+			_, err := vh.Publish(exchanege, routingKey, body, props)
 			if err == nil {
 				log.Debug().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 				b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
@@ -65,7 +65,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_GET):
 		getMsg := request.Content.(*amqp.BasicGetMessage)
 		queue := getMsg.Queue
-		msgCount, err := vh.MsgCtrlr.GetMessageCount(queue)
+		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {
 			log.Error().Err(err).Msg("Error getting message count")
 			return nil, err
@@ -79,7 +79,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		}
 
 		// Send Basic.GetOk + header + body
-		msg := vh.MsgCtrlr.GetMessage(queue)
+		msg := vh.GetMessage(queue)
 
 		frame := b.framer.CreateBasicGetOkFrame(request, msg.Exchange, msg.RoutingKey, uint32(msgCount))
 		err = b.framer.SendFrame(conn, frame)

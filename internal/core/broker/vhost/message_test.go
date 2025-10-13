@@ -21,7 +21,7 @@ func TestPublishToInternalExchange(t *testing.T) {
 	}
 
 	// Try to publish to the internal exchange
-	_, err := vh.publish(exchangeName, "rk", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "rk", []byte("test"), &amqp.BasicProperties{})
 	if err == nil {
 		t.Errorf("Expected error when publishing to internal exchange, got nil")
 	}
@@ -37,7 +37,7 @@ func TestPublishToNonExistentExchange(t *testing.T) {
 	}
 
 	// Try to publish to non-existent exchange
-	_, err := vh.publish("non-existent", "rk", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish("non-existent", "rk", []byte("test"), &amqp.BasicProperties{})
 	if err == nil {
 		t.Errorf("Expected error when publishing to non-existent exchange, got nil")
 	}
@@ -73,7 +73,7 @@ func TestPublishToDirectExchangeWithBinding(t *testing.T) {
 	}
 
 	// Publish message
-	msgID, err := vh.publish(exchangeName, routingKey, []byte("test message"), &amqp.BasicProperties{})
+	msgID, err := vh.Publish(exchangeName, routingKey, []byte("test message"), &amqp.BasicProperties{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestPublishToDirectExchangeWithoutBinding(t *testing.T) {
 	}
 
 	// Try to publish with unbound routing key
-	_, err := vh.publish(exchangeName, "unbound.key", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "unbound.key", []byte("test"), &amqp.BasicProperties{})
 	if err == nil {
 		t.Errorf("Expected error when publishing to unbound routing key, got nil")
 	}
@@ -143,7 +143,7 @@ func TestPublishToFanoutExchange(t *testing.T) {
 	}
 
 	// Publish message
-	msgID, err := vh.publish(exchangeName, "any.key", []byte("fanout message"), &amqp.BasicProperties{})
+	msgID, err := vh.Publish(exchangeName, "any.key", []byte("fanout message"), &amqp.BasicProperties{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 	}
 
 	// Try to publish
-	_, err := vh.publish(exchangeName, "test.key", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "test.key", []byte("test"), &amqp.BasicProperties{})
 	if err == nil {
 		t.Errorf("Expected error for unsupported exchange type, got nil")
 	}
