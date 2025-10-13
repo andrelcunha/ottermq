@@ -1,8 +1,10 @@
 package vhost
 
 import (
+	"context"
 	"sync"
 
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
@@ -20,6 +22,9 @@ type VHost struct {
 	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
 	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
 	ConsumersByChannel map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
+	/*Delivery*/
+	activeDeliveries map[string]context.CancelFunc // queueName -> cancelFunc
+	framer           amqp.Framer
 }
 
 func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
@@ -35,9 +40,14 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		Consumers:          make(map[ConsumerKey]*Consumer),
 		ConsumersByQueue:   make(map[string][]*Consumer),
 		ConsumersByChannel: make(map[ConnectionChannelKey][]*Consumer),
+		activeDeliveries:   make(map[string]context.CancelFunc),
 	}
 	vh.createMandatoryStructure()
 	return vh
+}
+
+func (vh *VHost) SetFramer(framer amqp.Framer) {
+	vh.framer = framer
 }
 
 func (vh *VHost) createMandatoryStructure() {

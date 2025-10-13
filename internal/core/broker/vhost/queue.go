@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -18,6 +19,10 @@ type Queue struct {
 	messages chan amqp.Message `json:"-"`
 	count    int               `json:"-"`
 	mu       sync.Mutex        `json:"-"`
+	/* Delivery */
+	deliveryCtx    context.Context    `json:"-"`
+	deliveryCancel context.CancelFunc `json:"-"`
+	delivering     bool
 }
 
 type QueueProperties struct {
@@ -30,12 +35,57 @@ type QueueProperties struct {
 }
 
 func NewQueue(name string, bufferSize int) *Queue {
+
 	return &Queue{
-		Name:     name,
-		Props:    &QueueProperties{},
-		messages: make(chan amqp.Message, bufferSize),
-		count:    0,
+		Name:       name,
+		Props:      &QueueProperties{},
+		messages:   make(chan amqp.Message, bufferSize),
+		count:      0,
+		delivering: false,
 	}
+}
+
+func (q *Queue) startDeliveryLoop(vh *VHost) {
+	if q.delivering {
+		return // already running
+	}
+	q.deliveryCtx, q.deliveryCancel = context.WithCancel(context.Background())
+	q.delivering = true
+	go func() {
+		for {
+			select {
+			case <-q.deliveryCtx.Done():
+				log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
+				q.delivering = false
+				return
+			case msg := <-q.messages:
+				// Here we would deliver the message to consumers
+				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
+				vh.mu.Lock()
+				consumers := vh.GetActiveConsumersForQueue(q.Name)
+				if len(consumers) > 0 {
+					// Simple round-robin delivery
+					consumer := consumers[0]
+					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
+					// TODO: improve delivery strategy using basic.qos and manual ack
+					if err := vh.deliverToConsumer(consumer, msg); err != nil {
+						q.ReQueue(msg) // requeue on failure
+					}
+					vh.mu.Unlock()
+				} else {
+					vh.mu.Unlock()
+				}
+			}
+		}
+	}()
+}
+
+func (q *Queue) stopDeliveryLoop() {
+	if !q.delivering {
+		return
+	}
+	q.deliveryCancel()
+	q.delivering = false
 }
 
 func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {

@@ -19,6 +19,8 @@ type SaveMessageRequest struct {
 	MsgProps   persistence.MessageProperties
 }
 
+// TODO: create a higher level abstraction of amqp.Message, exposing the content, requeued count, etc
+
 func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
