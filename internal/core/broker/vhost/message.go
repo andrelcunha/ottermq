@@ -98,10 +98,10 @@ func (vh *VHost) publish(exchangeName, routingKey string, body []byte, props *am
 		timestamp = props.Timestamp.Unix()
 	}
 	msgProps := persistence.MessageProperties{
-		ContentType:     props.ContentType,
+		ContentType:     string(props.ContentType),
 		ContentEncoding: props.ContentEncoding,
 		Headers:         props.Headers,
-		DeliveryMode:    props.DeliveryMode,
+		DeliveryMode:    uint8(props.DeliveryMode),
 		Priority:        props.Priority,
 		CorrelationID:   props.CorrelationID,
 		ReplyTo:         props.ReplyTo,
@@ -170,7 +170,7 @@ type SaveMessageRequest struct {
 }
 
 func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
-	if req.Props.DeliveryMode == uint8(amqp.DELIVERY_MODE_PERSISTENT) { // Persistent
+	if req.Props.DeliveryMode == amqp.PERSISTENT { // Persistent
 		if req.Queue.Props.Durable {
 			// Persist the message
 			if vh.persist == nil {

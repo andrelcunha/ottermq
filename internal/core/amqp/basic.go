@@ -9,7 +9,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type BasicPublishMessage struct {
+type BasicConsumeContent struct {
+	Queue       string
+	ConsumerTag string
+	NoLocal     bool
+	NoAck       bool
+	Exclusive   bool
+	NoWait      bool
+	Arguments   map[string]any
+}
+
+type BasicPublishContent struct {
 	Exchange   string
 	RoutingKey string
 	Mandatory  bool
@@ -31,10 +41,10 @@ type BasicGetOk struct {
 }
 
 type BasicProperties struct {
-	ContentType     string         // shortstr
+	ContentType     ContentType    // shortstr
 	ContentEncoding string         // shortstr
 	Headers         map[string]any // table
-	DeliveryMode    uint8          // octet
+	DeliveryMode    DeliveryMode   // from octet: (1=non-persistent, 2=persistent)
 	Priority        uint8          // octet
 	CorrelationID   string         // shortstr
 	ReplyTo         string         // shortstr
@@ -86,7 +96,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 
 	if props.ContentType != "" {
 		flags |= (1 << 15)
-		if err := encodeShortStr(&buf, props.ContentType); err != nil {
+		if err := encodeShortStr(&buf, string(props.ContentType)); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -108,7 +118,7 @@ func (props *BasicProperties) encodeBasicProperties() ([]byte, uint16, error) {
 	}
 	if props.DeliveryMode != 0 {
 		flags |= (1 << 12)
-		if err := encodeOctet(&buf, props.DeliveryMode); err != nil {
+		if err := encodeOctet(&buf, uint8(props.DeliveryMode)); err != nil {
 			return nil, 0, err
 		}
 	}
@@ -327,6 +337,14 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 
 func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
+	case uint16(BASIC_QOS):
+		log.Printf("[DEBUG] Received BASIC_QOS frame \n")
+		return nil, fmt.Errorf(" basic.qos not implemented")
+
+	case uint16(BASIC_CONSUME):
+		log.Printf("[DEBUG] Received BASIC_CONSUME frame \n")
+		return parseBasicConsumeFrame(payload)
+
 	// case uint16(BASIC_ACK):
 	// 	log.Printf("[DEBUG] Received BASIC_ACK frame \n")
 	// 	return parseBasicAckFrame(payload)
@@ -356,18 +374,106 @@ func parseBasicMethod(methodID uint16, payload []byte) (interface{}, error) {
 	}
 }
 
-func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
-	if len(payload) < 10 {
+func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 9 bytes long
+	// 2 (reserved1) => short int = 2 bytes
+	// 1+ (queue name) => short str = 1 (length) + 0+ bytes
+	// 1+ (consumer-tag) => short str = 1 (length) + 0+ bytes
+	// 1 (flags) => octet = 1 byte
+	// 4+ (arguments - optional) => table = 4 (length) + n bytes) => packed as long str
+
+	// Expected fields:
+	// reserved1(shortint),
+	// queue (short str),
+	// consumer tag (short str),
+	// noLocal (bit),
+	// noAck (bit),
+	// exclusive (bit),
+	// nowait (bit)
+
+	if len(payload) < 5 {
 		return nil, fmt.Errorf("payload too short")
 	}
 
 	buf := bytes.NewReader(payload)
-	reserved1, err := DecodeShortInt(buf)
+	// reserved1
+	_, err := DecodeShortInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
-	if reserved1 != 0 {
-		return nil, fmt.Errorf("reserved1 must be 0")
+
+	queue, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode queue: %v", err)
+	}
+
+	consumerTag, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode consumer tag: %v", err)
+	}
+
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"noLocal", "noAck", "exclusive", "nowait"}, true)
+	noLocal := flags["noLocal"]
+	noAck := flags["noAck"]
+	exclusive := flags["exclusive"]
+	nowait := flags["nowait"]
+
+	var arguments map[string]any
+	if buf.Len() >= 4 {
+		argumentsStr, err := DecodeLongStr(buf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode arguments: %v", err)
+		}
+		if len(argumentsStr) > 0 {
+			arguments, err = DecodeTable([]byte(argumentsStr))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read arguments: %v", err)
+			}
+		} else {
+			// Empty table - create empty map to distinguish from nil
+			arguments = make(map[string]any)
+		}
+	}
+	// If buf.Len() < 4, no arguments table is present, keep arguments as nil
+
+	content := &BasicConsumeContent{
+		Queue:       queue,
+		ConsumerTag: consumerTag,
+		NoLocal:     noLocal,
+		NoAck:       noAck,
+		Exclusive:   exclusive,
+		NoWait:      nowait,
+		Arguments:   arguments,
+	}
+	request := &RequestMethodMessage{
+		Content: content,
+	}
+	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
+	return request, nil
+}
+
+func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 5 bytes long
+	// 2 (reserved1) => 2 bytes
+	// 1+ (exchange name) => short str = 1  (length) + 1 byte
+	// 1+ (routing key) => short str = 1 (length) + 1 byte
+	// 1 (flags) => octet = 1 byte
+	if len(payload) < 5 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	buf := bytes.NewReader(payload)
+
+	// Note: AMQP spec says "shortstr" but all real implementations
+	// (RabbitMQ, major clients) use short int (2 bytes) for reserved fields.
+	// We follow industry practice for compatibility.
+	_, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserved1: %v", err)
 	}
 	exchange, err := DecodeShortStr(buf)
 	if err != nil {
@@ -384,7 +490,7 @@ func parseBasicPublishFrame(payload []byte) (*RequestMethodMessage, error) {
 	flags := DecodeFlags(octet, []string{"mandatory", "immediate"}, true)
 	mandatory := flags["mandatory"]
 	immediate := flags["immediate"]
-	msg := &BasicPublishMessage{
+	msg := &BasicPublishContent{
 		Exchange:   exchange,
 		RoutingKey: routingKey,
 		Mandatory:  mandatory,

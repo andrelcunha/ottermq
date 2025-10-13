@@ -32,8 +32,8 @@ Uses atomic flags and wait groups for coordinated shutdown:
 3. `ActiveConns.Wait()` for graceful cleanup
 
 #### Persistence Interface
-Implements swappable persistence via `internal/core/persistdb/persistence/`. Currently uses JSON files in `data/` directory. Future plans include:
-- Refactoring to `pkg/persistence/` with pluggable backends
+Implements swappable persistence via `pkg/persistence/`. Currently uses JSON files in `data/` directory. Future plans include:
+- implementing pluggable backends -- currently only JSON
 - **Memento WAL Engine**: Custom append-only transaction log inspired by RabbitMQ's Mnesia
 - Event-driven persistence optimized for message broker workloads
 

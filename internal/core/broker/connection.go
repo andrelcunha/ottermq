@@ -8,33 +8,8 @@ import (
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
 	"github.com/rs/zerolog/log"
-	// _ "github.com/andrelcunha/ottermq/internal/core/persistdb"
 )
-
-type ConnManager interface {
-	HandleConnection(configurations *map[string]any, conn net.Conn) error
-	ProcessRequest(conn net.Conn, newState *amqp.ChannelState) (any, error)
-	GetChannelState(conn net.Conn, channel uint16) *amqp.ChannelState
-	UpdateChannelState(conn net.Conn, channel uint16, newState *amqp.ChannelState)
-	HandleHeartbeat(conn net.Conn) error
-	GetVHostFromName(vhostName string) *vhost.VHost
-}
-
-// DefaultConnManager implements ConnManager
-type DefaultConnManager struct {
-	broker *Broker
-	framer amqp.Framer
-}
-
-// NewDefaultConnManager creates a new connection manager
-func NewDefaultConnManager(broker *Broker, framer amqp.Framer) *DefaultConnManager {
-	return &DefaultConnManager{
-		broker: broker,
-		framer: framer,
-	}
-}
 
 func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) {
 	b.ActiveConns.Add(1)
@@ -69,9 +44,7 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 		}
 
 		if len(frame) > 0 { // any octet shall be valid as heartbeat #AMQP_compliance
-			if err := b.registerHeartbeat(conn); err != nil {
-				log.Error().Err(err).Msg("Failed to register heartbeat")
-			}
+			b.registerHeartbeat(conn)
 		}
 
 		//Process frame
@@ -140,9 +113,9 @@ func (b *Broker) cleanupConnection(conn net.Conn) {
 	connInfo.Client.Ctx.Done()
 	vh := b.GetVHost(vhName)
 	if vh != nil {
-		if err := vh.CleanupConnection(conn); err != nil {
-			log.Error().Err(err).Msg("Failed to cleanup connection")
-		}
+		vh.CleanupConnection(conn)
+	} else {
+		log.Debug().Str("vhost", vhName).Msg("VHost not found during connection cleanup")
 	}
 }
 
@@ -168,14 +141,19 @@ func (b *Broker) connectionCloseOk(conn net.Conn) {
 }
 
 // registerHeartbeat registers a heartbeat for a connection
-func (b *Broker) registerHeartbeat(conn net.Conn) error {
+func (b *Broker) registerHeartbeat(conn net.Conn) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if connInfo, exists := b.Connections[conn]; exists {
 		connInfo.Client.LastHeartbeat = time.Now()
-		return nil
+	} else {
+		// it means that the connection was closed
+		// verify if the connection is still alive
+		if _, err := conn.Write([]byte{}); err != nil {
+			log.Debug().Err(err).Msg("Connection seems to be closed, cleaning up")
+			b.cleanupConnection(conn)
+		}
 	}
-	return fmt.Errorf("connection not found")
 }
 
 func (b *Broker) BroadcastConnectionClose() {

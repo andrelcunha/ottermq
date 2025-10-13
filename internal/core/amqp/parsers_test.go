@@ -431,7 +431,7 @@ func TestCreateContentPropertiesTable_DeliveryMode(t *testing.T) {
 	}{
 		{"Valid non-persistent", 1, false},
 		{"Valid persistent", 2, false},
-		{"Invalid delivery mode 0", 0, true},
+		{"Invalid delivery mode 0", 0, false}, // 0 normalizes to 1
 		{"Invalid delivery mode 3", 3, true},
 	}
 
@@ -451,8 +451,13 @@ func TestCreateContentPropertiesTable_DeliveryMode(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
-				if props.DeliveryMode != tt.deliveryMode {
-					t.Errorf("Expected delivery mode %d, got %d", tt.deliveryMode, props.DeliveryMode)
+				// Delivery mode 0 normalizes to 1
+				expectedMode := tt.deliveryMode
+				if expectedMode == 0 {
+					expectedMode = 1
+				}
+				if uint8(props.DeliveryMode) != expectedMode {
+					t.Errorf("Expected delivery mode %d, got %d", expectedMode, props.DeliveryMode)
 				}
 			}
 		})

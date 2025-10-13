@@ -21,8 +21,12 @@ func EncodeTable(table map[string]any) []byte {
 			buf.Write(EncodeLongStr([]byte(v)))
 
 		case int:
-			buf.WriteByte('I') // Field value type 'I' (int)
+			buf.WriteByte('I')                                 // Field value type 'I' (int)
 			_ = binary.Write(&buf, binary.BigEndian, int32(v)) // Error ignored as bytes.Buffer.Write never fails
+
+		case int32:
+			buf.WriteByte('I')                          // Field value type 'I' (int32)
+			_ = binary.Write(&buf, binary.BigEndian, v) // Error ignored as bytes.Buffer.Write never fails
 
 		// In the case map[string]interface:
 		case map[string]any:

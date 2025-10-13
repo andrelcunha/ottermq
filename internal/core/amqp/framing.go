@@ -16,7 +16,7 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode content type: %v", err)
 			}
-			props.ContentType = contentType
+			props.ContentType = ContentType(contentType)
 
 		case "contentEncoding": // shortstr
 			contentEncoding, err := DecodeShortStr(buf)
@@ -37,14 +37,15 @@ func createContentPropertiesTable(flags []string, buf *bytes.Reader) (*BasicProp
 			props.Headers = headers
 
 		case "deliveryMode": // octet
-			deliveryMode, err := buf.ReadByte()
+			val, err := buf.ReadByte()
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode delivery mode: %v", err)
 			}
-			if deliveryMode != 1 && deliveryMode != 2 { // 1: non-persistent, 2: persistent
-				return nil, fmt.Errorf("delivery mode must be 1 or 2")
+			props.DeliveryMode = DeliveryMode(val)
+			if err := props.DeliveryMode.Validate(); err != nil {
+				return nil, err
 			}
-			props.DeliveryMode = deliveryMode
+			props.DeliveryMode = props.DeliveryMode.Normalize()
 
 		case "priority": // octet (0-9)
 			priority, err := buf.ReadByte()

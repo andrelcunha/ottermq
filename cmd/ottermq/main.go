@@ -11,7 +11,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/logger"
 	"github.com/andrelcunha/ottermq/web"
 	"github.com/rs/zerolog/log"
