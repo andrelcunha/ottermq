@@ -122,8 +122,8 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 
 func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
 	// get properties from request: queue, consumer tag, ❌noLocal, noAck, exclusive, ❌nowait, arguments
-	content := request.Content.(*amqp.BasicConsumeContent)
-	if content == nil {
+	content, ok := request.Content.(*amqp.BasicConsumeContent)
+	if !ok || content == nil {
 		return nil, fmt.Errorf("invalid basic consume content")
 	}
 

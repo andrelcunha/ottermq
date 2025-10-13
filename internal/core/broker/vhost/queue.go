@@ -112,6 +112,10 @@ func (vh *VHost) DeleteQueue(name string) error {
 			}
 		}
 	}
+
+	// Remove the queue from the VHost's queue map
+	delete(vh.Queues, name)
+
 	log.Debug().Str("queue", name).Msg("Deleted queue")
 	// Call persistence layer to delete the queue
 	if queue.Props.Durable {
