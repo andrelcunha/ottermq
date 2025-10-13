@@ -14,6 +14,7 @@ type Framer interface {
 	// Basic Methods
 	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
 	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
+	CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte
 
 	// Queue Methods
 	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
@@ -32,6 +33,10 @@ type Framer interface {
 	CreateConnectionCloseOkFrame(request *RequestMethodMessage) []byte
 
 	CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte
+}
+
+func (d *DefaultFramer) CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
+	return createBasicConsumeOkFrame(request, consumerTag)
 }
 
 type DefaultFramer struct{}

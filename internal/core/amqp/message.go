@@ -179,23 +179,23 @@ func EncodeGetOkToContentList(content *BasicGetOkContent) *ContentList {
 	KeyValuePairs := []KeyValue{
 		{ // delivery_tag
 			Key:   INT_LONG_LONG,
-			Value: msg.DeliveryTag,
+			Value: content.DeliveryTag,
 		},
 		{ // redelivered
 			Key:   BIT,
-			Value: msg.Redelivered,
+			Value: content.Redelivered,
 		},
 		{ // exchange
 			Key:   STRING_SHORT,
-			Value: msg.Exchange,
+			Value: content.Exchange,
 		},
 		{ // routing_key
 			Key:   STRING_SHORT,
-			Value: msg.RoutingKey,
+			Value: content.RoutingKey,
 		},
 		{ // message_count
 			Key:   INT_LONG,
-			Value: msg.MessageCount,
+			Value: content.MessageCount,
 		},
 	}
 	contentList := &ContentList{KeyValuePairs: KeyValuePairs}

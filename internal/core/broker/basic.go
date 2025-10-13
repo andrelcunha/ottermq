@@ -15,20 +15,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	switch request.MethodID {
 	case uint16(amqp.BASIC_QOS):
 	case uint16(amqp.BASIC_CONSUME):
-		// get properties from request: queue, consumer tag, noLocal, noAck, exclusive, nowait, arguments
-		content := request.Content.(*amqp.BasicConsumeContent)
-		if content == nil {
-			return nil, fmt.Errorf("invalid basic consume content")
-		}
-		// Commented out to make compiler happy about unused variables
-		// queueName := content.Queue
-		// consumerTag := content.ConsumerTag
-		// noLocal := content.NoLocal
-		// noAck := content.NoAck
-		// exclusive := content.Exclusive
-		// nowait := content.NoWait
-		// arguments := content.Arguments
-		// TODO: register consumer
+		return b.basicConsumeHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_CANCEL):
 	case uint16(amqp.BASIC_PUBLISH):
@@ -129,6 +116,54 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_RECOVER):
 	default:
 		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
+}
+
+func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	// get properties from request: queue, consumer tag, ❌noLocal, noAck, exclusive, ❌nowait, arguments
+	content := request.Content.(*amqp.BasicConsumeContent)
+	if content == nil {
+		return nil, fmt.Errorf("invalid basic consume content")
+	}
+
+	queueName := content.Queue
+	consumerTag := content.ConsumerTag
+	noAck := content.NoAck
+	exclusive := content.Exclusive
+	noWait := content.NoWait
+	arguments := content.Arguments
+
+	// no-local means that the server will not deliver messages to the consumer
+	//  that were published on the same connection. We would need to track the connection
+	//  that published the message to implement this feature.
+	//  RabbitMQ does not implement it either.
+
+	// If tag is empty, generate a random one
+	consumer := vhost.NewConsumer(conn, request.Channel, queueName, consumerTag, &vhost.ConsumerProperties{
+		NoAck:     noAck,
+		Exclusive: exclusive,
+		Arguments: arguments,
+	})
+
+	err := vh.RegisterConsumer(consumer)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to register consumer")
+		// It would be a 500-like error
+		return nil, err
+	}
+
+	if !noWait {
+		frame := b.framer.CreateBasicConsumeOkFrame(request, consumerTag)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send basic consume ok frame")
+			// Verify if should return error (as channel exception) or just log it
+			// Maybe we should return a custom error, representing a channel exception
+			//  and handle it in the caller function (processRequest)
+			// This channel exception would have some fields like ClassID, MethodID, ReplyCode, ReplyText
+			// This approach would be used in the other handlers as well
+			return nil, err
+		}
 	}
 	return nil, nil
 }
