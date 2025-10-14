@@ -26,7 +26,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		}
 		if currentState.MethodFrame != request { // request is "newState.MethodFrame"
 			b.Connections[conn].Channels[channel].MethodFrame = request
-			log.Debug().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
+			log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
 			return nil, nil
 		}
 		// if the class and method are not the same as the current state,
@@ -38,9 +38,11 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			return nil, nil
 		}
 		if currentState.Body == nil && newState.Body != nil {
+			log.Trace().Int("body_len", len(newState.Body)).Uint64("expected", currentState.BodySize).Msg("Updating body")
+			// Append the new body to the current body
 			b.Connections[conn].Channels[channel].Body = newState.Body
 		}
-		log.Debug().Interface("state", currentState).Msg("Current state after all")
+		log.Trace().Interface("state", currentState).Msg("Current state after all")
 		if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
 			log.Debug().Interface("state", currentState).Msg("All fields must be filled")
 			if len(currentState.Body) != int(currentState.BodySize) {
@@ -164,6 +166,7 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 			// This approach would be used in the other handlers as well
 			return nil, err
 		}
+		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.ConsumeOk frame")
 	}
 	return nil, nil
 }

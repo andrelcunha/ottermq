@@ -50,6 +50,16 @@ func (m *MockFramer) Handshake(configurations *map[string]any, conn net.Conn, co
 	return nil, nil
 }
 func (m *MockFramer) ParseFrame(frame []byte) (any, error) { return nil, nil }
+func (m *MockFramer) CreateHeaderFrame(channel, classID uint16, msg amqp.Message) []byte {
+	return []byte("header-frame")
+}
+func (m *MockFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
+	return []byte("body-frame")
+}
+
+func (m *MockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
+	return []byte("basic-deliver")
+}
 func (m *MockFramer) CreateBasicGetEmptyFrame(request *amqp.RequestMethodMessage) []byte {
 	return []byte("basic-get-empty")
 }

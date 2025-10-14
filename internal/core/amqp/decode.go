@@ -217,6 +217,13 @@ func min(a, b int) int {
 	return b
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func DecodeSecurityPlain(buf *bytes.Reader) (string, error) {
 	var strLen uint32
 	err := binary.Read(buf, binary.BigEndian, &strLen)

@@ -39,11 +39,11 @@ func parseFrame(frame []byte) (any, error) {
 		return parseBodyFrame(channel, payloadSize, payload)
 
 	case byte(TYPE_HEARTBEAT):
-		log.Printf("[TRACE] Received HEARTBEAT frame on channel %d\n", channel)
+		log.Trace().Msg("Received HEARTBEAT frame")
 		return &Heartbeat{}, nil
 
 	default:
-		log.Printf("[TRACE] Received: %x\n", frame)
+		log.Trace().Bytes("frame", frame).Msg("Received unknown frame")
 		return nil, fmt.Errorf("unknown frame type: %d", frameType)
 	}
 }
@@ -59,7 +59,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 
 	switch classID {
 	case uint16(CONNECTION):
-		log.Printf("[DEBUG] Received CONNECTION frame on channel %d\n", channel)
+		log.Trace().Msgf("Received CONNECTION frame on channel %d\n", channel)
 		startOkFrame, err := parseConnectionMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
@@ -77,7 +77,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		return state, nil
 
 	case uint16(CHANNEL):
-		log.Printf("[DEBUG] Received CHANNEL frame on channel %d\n", channel)
+		log.Trace().Msgf("Received CHANNEL frame on channel %d\n", channel)
 		request, err := parseChannelMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
@@ -97,7 +97,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		return nil, nil
 
 	case uint16(EXCHANGE):
-		log.Printf("[DEBUG] Received EXCHANGE frame on channel %d\n", channel)
+		log.Trace().Msgf("Received EXCHANGE frame on channel %d\n", channel)
 		request, err := parseExchangeMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
@@ -117,7 +117,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		return nil, nil
 
 	case uint16(QUEUE):
-		log.Printf("[DEBUG] Received QUEUE frame on channel %d\n", channel)
+		log.Trace().Msgf("Received QUEUE frame on channel %d\n", channel)
 		request, err := parseQueueMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
@@ -137,7 +137,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		return nil, nil
 
 	case uint16(BASIC):
-		log.Printf("[DEBUG] Received BASIC frame on channel %d\n", channel)
+		log.Debug().Uint16("channel", channel).Msg("Received BASIC frame")
 		request, err := parseBasicMethod(methodID, methodPayload)
 		if err != nil {
 			return nil, err
@@ -157,7 +157,7 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		return nil, nil
 
 	default:
-		log.Printf("[DEBUG] Unknown class ID: %d\n", classID)
+		log.Warn().Uint16("class_id", classID).Msg("Unknown class ID")
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
 }
@@ -167,14 +167,14 @@ func parseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*Chan
 	if len(payload) < int(payloadSize) {
 		return nil, fmt.Errorf("payload too short")
 	}
-	log.Printf("[DEBUG] payload size: %d\n", payloadSize)
+	log.Trace().Uint32("payload_size", payloadSize).Msg("Received payload size")
 
 	classID := binary.BigEndian.Uint16(payload[0:2])
 
 	switch classID {
 
 	case uint16(BASIC):
-		log.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
+		log.Debug().Uint16("channel", channel).Msg("Received BASIC HEADER frame")
 		request, err := parseBasicHeader(payload)
 		if err != nil {
 			return nil, err
@@ -189,7 +189,7 @@ func parseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*Chan
 		return nil, nil
 
 	default:
-		log.Printf("[DEBUG] Unknown class ID: %d\n", classID)
+		log.Warn().Uint16("class_id", classID).Msg("Unknown class ID")
 		return nil, fmt.Errorf("unknown class ID: %d", classID)
 	}
 }
@@ -199,9 +199,7 @@ func parseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*Channe
 	if len(payload) < int(payloadSize) {
 		return nil, fmt.Errorf("payload too short")
 	}
-	log.Printf("[DEBUG] payload size: %d\n", payloadSize)
-
-	log.Printf("[DEBUG] Received BASIC HEADER frame on channel %d\n", channel)
+	log.Trace().Uint32("payload_size", payloadSize).Msg("Received payload size")
 
 	state := &ChannelState{
 		Body: payload,
@@ -214,10 +212,10 @@ func parseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*Channe
 func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(EXCHANGE_DECLARE):
-		log.Printf("[DEBUG] Received EXCHANGE_DECLARE frame \n")
+		log.Debug().Msg("Received EXCHANGE_DECLARE frame \n")
 		return parseExchangeDeclareFrame(payload)
 	case uint16(EXCHANGE_DELETE):
-		log.Printf("[DEBUG] Received EXCHANGE_DELETE frame \n")
+		log.Debug().Msg("Received EXCHANGE_DELETE frame \n")
 		return parseExchangeDeleteFrame(payload)
 
 	default:
@@ -230,15 +228,15 @@ func parseExchangeMethod(methodID uint16, payload []byte) (interface{}, error) {
 func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(CONNECTION_START):
-		log.Printf("[DEBUG] Received CONNECTION_START frame \n")
+		log.Debug().Msg("Received CONNECTION_START frame")
 		return parseConnectionStartFrame(payload)
 
 	case uint16(CONNECTION_START_OK):
-		log.Printf("[DEBUG] Received connection.start-ok: %x\n", payload)
+		log.Trace().Bytes("payload", payload).Msg("Received connection.start-ok")
 		return parseConnectionStartOkFrame(payload)
 
 	case uint16(CONNECTION_TUNE):
-		log.Printf("[DEBUG] Received CONNECTION_TUNE_OK frame \n")
+		log.Debug().Msg("Received CONNECTION_TUNE frame")
 		tuneResponse, err := parseConnectionTuneFrame(payload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse connection.tune frame: %v", err)
@@ -247,15 +245,15 @@ func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 		return tuneOkRequest, nil
 
 	case uint16(CONNECTION_TUNE_OK):
-		log.Printf("[DEBUG] Received CONNECTION_TUNE_OK frame \n")
+		log.Debug().Msg("Received CONNECTION_TUNE_OK frame")
 		return parseConnectionTuneOkFrame(payload)
 
 	case uint16(CONNECTION_OPEN):
-		log.Printf("[DEBUG] Received CONNECTION_OPEN frame \n")
+		log.Debug().Msg("Received CONNECTION_OPEN frame")
 		return parseConnectionOpenFrame(payload)
 
 	case uint16(CONNECTION_OPEN_OK):
-		log.Printf("[DEBUG] Received CONNECTION_OPEN frame \n")
+		log.Debug().Msg("Received CONNECTION_OPEN_OK frame")
 		return parseConnectionOpenOkFrame(payload)
 
 	case uint16(CONNECTION_CLOSE):
@@ -268,7 +266,7 @@ func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid message content type")
 		}
-		log.Printf("[TRACE] Received CONNECTION_CLOSE: (%d) '%s'", content.ReplyCode, content.ReplyText)
+		log.Debug().Msgf("Received CONNECTION_CLOSE: (%d) '%s'", content.ReplyCode, content.ReplyText)
 		return request, nil
 
 	case uint16(CONNECTION_CLOSE_OK):
@@ -277,7 +275,7 @@ func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 			return nil, fmt.Errorf("failed to parse CONNECTION_CLOSE_OK frame: %v", err)
 		}
 		request.MethodID = methodID
-		log.Printf("[TRACE] Received CONNECTION_CLOSE_OK")
+		log.Debug().Msg("Received CONNECTION_CLOSE_OK")
 		return request, nil
 
 	default:
@@ -309,7 +307,7 @@ func parseConnectionCloseFrame(payload []byte) (*RequestMethodMessage, error) {
 	request := &RequestMethodMessage{
 		Content: msg,
 	}
-	log.Printf("[DEBUG] connection close request: %+v\n", request)
+	log.Trace().Msgf("connection close request: %+v\n", request)
 	return request, nil
 }
 
@@ -401,13 +399,13 @@ func parseConnectionStartFrame(payload []byte) (*ConnectionStartFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode version-major: %v", err)
 	}
-	// log.Printf("[DEBUG] Version Major: %d\n", versionMajor)
+	log.Trace().Msgf("Version Major: %d\n", versionMajor)
 
 	versionMinor, err := buf.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode version-minor: %v", err)
 	}
-	// log.Printf("[DEBUG] Version Minor: %d\n", versionMinor)
+	log.Trace().Msgf("Version Minor: %d\n", versionMinor)
 
 	/***Server Properties*/
 	serverPropertiesStr, err := DecodeLongStr(buf)
@@ -418,21 +416,21 @@ func parseConnectionStartFrame(payload []byte) (*ConnectionStartFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client properties: %v", err)
 	}
-	// log.Printf("[DEBUG] Server Properties: %+v\n", serverProperties)
+	log.Trace().Msgf("Server Properties: %+v\n", serverProperties)
 
 	/***Mechanisms*/
 	mechanismsStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode mechanism: %v", err)
 	}
-	// log.Printf("[DEBUG] Mechanisms Srt: %s\n", mechanismsStr)
+	log.Trace().Msgf("Mechanisms: %s\n", mechanismsStr)
 
 	/***Locales*/
 	localesStr, err := DecodeLongStr(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode locale: %v", err)
 	}
-	// log.Printf("[DEBUG] Locales Srt: %s\n", localesStr)
+	log.Trace().Msgf("Locales: %s\n", localesStr)
 
 	return &ConnectionStartFrame{
 		VersionMajor:     versionMajor,
@@ -491,19 +489,19 @@ func parseConnectionStartOkFrame(payload []byte) (*ConnectionStartOk, error) {
 func parseChannelMethod(methodID uint16, payload []byte) (interface{}, error) {
 	switch methodID {
 	case uint16(CHANNEL_OPEN):
-		log.Printf("[DEBUG] Received CHANNEL_OPEN frame")
+		log.Debug().Msg("Received CHANNEL_OPEN frame")
 		return parseChannelOpenFrame(payload)
 
 	case uint16(CHANNEL_OPEN_OK):
-		log.Printf("[DEBUG] Received CHANNEL_OPEN_OK frame \n")
+		log.Debug().Msg("Received CHANNEL_OPEN_OK frame")
 		return parseChannelOpenOkFrame(payload)
 
 	case uint16(CHANNEL_CLOSE):
-		log.Printf("[DEBUG] Received CHANNEL_CLOSE frame \n")
+		log.Debug().Msg("Received CHANNEL_CLOSE frame")
 		return parseChannelCloseFrame(payload)
 
 	case uint16(CHANNEL_CLOSE_OK):
-		log.Printf("[DEBUG] Received CHANNEL_CLOSE_OK frame \n")
+		log.Debug().Msg("Received CHANNEL_CLOSE_OK frame")
 		return parseChannelCloseOkFrame(payload)
 
 	default:
@@ -534,7 +532,7 @@ func parseChannelOpenOkFrame(payload []byte) (*RequestMethodMessage, error) {
 }
 
 func parseChannelCloseFrame(payload []byte) (*RequestMethodMessage, error) {
-	log.Printf("[DEBUG] Received CHANNEL_CLOSE frame: %x \n", payload)
+	log.Trace().Msgf("Received CHANNEL_CLOSE frame: %x \n", payload)
 	if len(payload) < 6 {
 		return nil, fmt.Errorf("frame too short")
 	}

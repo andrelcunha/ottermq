@@ -96,7 +96,7 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 	EncodeLongStr(&payloadBuf, []byte(localesSlice[0]))
 
 	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
-	log.Printf("[DEBUG] Sending CONNECTION_START frame: %v", frame)
+	log.Trace().Msgf("Sending CONNECTION_START frame: %v", frame)
 	return frame
 }
 

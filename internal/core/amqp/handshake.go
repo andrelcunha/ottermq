@@ -21,7 +21,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Debug().Str("header", fmt.Sprintf("%x", clientHeader)).Msg("Handshake - Received")
+	log.Trace().Str("header", fmt.Sprintf("%x", clientHeader)).Msg("Handshake - Received")
 	protocol := (*configurations)["protocol"].(string)
 	protocolHeader, err := buildProtocolHeader(protocol)
 	if err != nil {
@@ -51,7 +51,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
+	log.Trace().Msgf("Handshake - Received: %x\n", frame)
 	response, err := parseFrame(frame)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 }
 
 func sendFrame(conn net.Conn, frame []byte) error {
-	log.Printf("[TRACE] Sending frame: %x\n", frame)
+	log.Trace().Msgf("Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
 }

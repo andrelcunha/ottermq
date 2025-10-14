@@ -71,7 +71,6 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			request := newState.MethodFrame
 			if channelNum != request.Channel {
 				channelNum = newState.MethodFrame.Channel
-				log.Debug().Uint16("channel", request.Channel).Msg("Switching to channel")
 			}
 		} else {
 			if newState.HeaderFrame != nil {

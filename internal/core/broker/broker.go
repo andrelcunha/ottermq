@@ -60,6 +60,7 @@ func NewBroker(config *config.Config, rootCtx context.Context, rootCancel contex
 	}
 	b.VHosts["/"] = vhost.NewVhost("/", config.QueueBufferSize, b.persist)
 	b.framer = &amqp.DefaultFramer{}
+	b.VHosts["/"].SetFramer(b.framer)
 	b.ManagerApi = &DefaultManagerApi{b}
 	return b
 }
@@ -198,10 +199,9 @@ func (b *Broker) processRequest(conn net.Conn, newState *amqp.ChannelState) (any
 func (b *Broker) getCurrentState(conn net.Conn, channel uint16) *amqp.ChannelState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	log.Debug().Uint16("channel", channel).Msg("Getting current state for channel")
 	state, ok := b.Connections[conn].Channels[channel]
 	if !ok {
-		log.Debug().Msg("No channel found")
+		log.Debug().Uint16("channel", channel).Msg("No channel found")
 		return nil
 	}
 	return state

@@ -631,3 +631,415 @@ func TestNewConsumer_WithTag(t *testing.T) {
 		}
 	}
 }
+
+// Tests for delivery functionality
+func TestConsumerRegistrationAndCancellation(t *testing.T) {
+	vh := createTestVHost()
+	conn := NewMockConnection("test-conn")
+
+	// Create consumer
+	consumer := NewConsumer(conn, 1, "test-queue", "test-consumer", &ConsumerProperties{NoAck: false})
+
+	// Test successful registration
+	err := vh.RegisterConsumer(consumer)
+	if err != nil {
+		t.Fatalf("Failed to register consumer: %v", err)
+	}
+
+	// Verify consumer is registered
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer, got %d", len(vh.Consumers))
+	}
+
+	key := ConsumerKey{Channel: 1, Tag: "test-consumer"}
+	if _, exists := vh.Consumers[key]; !exists {
+		t.Error("Consumer should exist in consumers map")
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 1 {
+		t.Fatalf("Expected 1 consumer in round-robin list, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	if vh.ConsumersByQueue["test-queue"][0] != consumer {
+		t.Error("Consumer should be in round-robin list")
+	}
+
+	// Test successful cancellation
+	err = vh.CancelConsumer(1, "test-consumer")
+	if err != nil {
+		t.Fatalf("Failed to cancel consumer: %v", err)
+	}
+
+	// Verify consumer is removed
+	if len(vh.Consumers) != 0 {
+		t.Fatalf("Expected 0 consumers after cancellation, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 0 {
+		t.Fatalf("Expected 0 consumers in round-robin list after cancellation, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Test cancellation of non-existent consumer
+	err = vh.CancelConsumer(1, "non-existent")
+	if err == nil {
+		t.Error("Expected error when cancelling non-existent consumer")
+	}
+
+	expectedError := "consumer with tag non-existent on channel 1 does not exist"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestExclusiveConsumerLogic(t *testing.T) {
+	vh := createTestVHost()
+	conn1 := NewMockConnection("conn1")
+	conn2 := NewMockConnection("conn2")
+
+	// Register first consumer as exclusive
+	consumer1 := NewConsumer(conn1, 1, "test-queue", "exclusive-consumer", &ConsumerProperties{
+		NoAck:     false,
+		Exclusive: true,
+	})
+	err := vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register exclusive consumer: %v", err)
+	}
+
+	// Verify exclusive consumer is registered
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer, got %d", len(vh.Consumers))
+	}
+
+	// Try to register second consumer (should fail due to exclusive)
+	consumer2 := NewConsumer(conn2, 1, "test-queue", "second-consumer", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer2)
+	if err == nil {
+		t.Error("Expected error when registering second consumer with exclusive consumer present")
+	}
+
+	expectedError := "exclusive consumer already exists for queue test-queue"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+
+	// Verify only the exclusive consumer exists
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer after failed registration, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 1 {
+		t.Fatalf("Expected 1 consumer in round-robin list, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Cancel exclusive consumer
+	err = vh.CancelConsumer(1, "exclusive-consumer")
+	if err != nil {
+		t.Fatalf("Failed to cancel exclusive consumer: %v", err)
+	}
+
+	// Now should be able to register new consumer
+	consumer3 := NewConsumer(conn2, 1, "test-queue", "new-consumer", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer3)
+	if err != nil {
+		t.Fatalf("Failed to register consumer after exclusive removed: %v", err)
+	}
+
+	// Verify new consumer is registered
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer after new registration, got %d", len(vh.Consumers))
+	}
+
+	if vh.ConsumersByQueue["test-queue"][0] != consumer3 {
+		t.Error("New consumer should be in round-robin list")
+	}
+
+	// Test that regular consumers can coexist
+	consumer4 := NewConsumer(conn1, 2, "test-queue", "third-consumer", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer4)
+	if err != nil {
+		t.Fatalf("Failed to register third consumer: %v", err)
+	}
+
+	// Verify both non-exclusive consumers exist
+	if len(vh.Consumers) != 2 {
+		t.Fatalf("Expected 2 consumers, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 2 {
+		t.Fatalf("Expected 2 consumers in round-robin list, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Now try to register exclusive consumer (should fail with existing consumers)
+	consumer5 := NewConsumer(conn1, 3, "test-queue", "late-exclusive", &ConsumerProperties{
+		NoAck:     false,
+		Exclusive: true,
+	})
+	err = vh.RegisterConsumer(consumer5)
+	if err == nil {
+		t.Error("Expected error when registering exclusive consumer with existing consumers")
+	}
+
+	expectedError = "cannot add exclusive consumer when other consumers exist for queue test-queue"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}
+
+func TestConsumerCleanupOnConnectionClose(t *testing.T) {
+	vh := createTestVHost()
+	conn1 := NewMockConnection("conn1")
+	conn2 := NewMockConnection("conn2")
+
+	// Register consumers from both connections
+	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	err := vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register consumer1: %v", err)
+	}
+
+	consumer2 := NewConsumer(conn1, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer2)
+	if err != nil {
+		t.Fatalf("Failed to register consumer2: %v", err)
+	}
+
+	consumer3 := NewConsumer(conn2, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer3)
+	if err != nil {
+		t.Fatalf("Failed to register consumer3: %v", err)
+	}
+
+	// Verify all consumers are registered
+	if len(vh.Consumers) != 3 {
+		t.Fatalf("Expected 3 consumers, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 3 {
+		t.Fatalf("Expected 3 consumers in round-robin list, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Clean up conn1 consumers
+	vh.CleanupConnection(conn1)
+
+	// Verify only conn2 consumer remains
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer after cleanup, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 1 {
+		t.Fatalf("Expected 1 consumer in round-robin list after cleanup, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Verify the remaining consumer is from conn2
+	key := ConsumerKey{Channel: 1, Tag: "consumer3"}
+	if _, exists := vh.Consumers[key]; !exists {
+		t.Error("Consumer3 from conn2 should still exist")
+	}
+
+	if vh.ConsumersByQueue["test-queue"][0] != consumer3 {
+		t.Error("Consumer3 should be in round-robin list")
+	}
+
+	// Verify conn1 consumers are gone
+	key1 := ConsumerKey{Channel: 1, Tag: "consumer1"}
+	key2 := ConsumerKey{Channel: 2, Tag: "consumer2"}
+
+	if _, exists := vh.Consumers[key1]; exists {
+		t.Error("Consumer1 should be cleaned up")
+	}
+
+	if _, exists := vh.Consumers[key2]; exists {
+		t.Error("Consumer2 should be cleaned up")
+	}
+
+	// Verify consumer1 and consumer2 are not in round-robin list
+	for _, consumer := range vh.ConsumersByQueue["test-queue"] {
+		if consumer == consumer1 || consumer == consumer2 {
+			t.Error("Cleaned up consumers should not be in round-robin list")
+		}
+	}
+}
+
+func TestConsumerChannelCleanup(t *testing.T) {
+	vh := createTestVHost()
+	conn := NewMockConnection("test-conn")
+
+	// Register consumers on different channels
+	consumer1 := NewConsumer(conn, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	err := vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register consumer1: %v", err)
+	}
+
+	consumer2 := NewConsumer(conn, 2, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer2)
+	if err != nil {
+		t.Fatalf("Failed to register consumer2: %v", err)
+	}
+
+	// Verify both consumers exist
+	if len(vh.Consumers) != 2 {
+		t.Fatalf("Expected 2 consumers, got %d", len(vh.Consumers))
+	}
+
+	// Clean up only channel 1
+	vh.CleanupChannel(conn, 1)
+
+	// Verify only consumer2 remains
+	if len(vh.Consumers) != 1 {
+		t.Fatalf("Expected 1 consumer after channel cleanup, got %d", len(vh.Consumers))
+	}
+
+	if len(vh.ConsumersByQueue["test-queue"]) != 1 {
+		t.Fatalf("Expected 1 consumer in round-robin list after cleanup, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Verify consumer2 still exists
+	key2 := ConsumerKey{Channel: 2, Tag: "consumer2"}
+	if _, exists := vh.Consumers[key2]; !exists {
+		t.Error("Consumer2 should still exist after channel 1 cleanup")
+	}
+
+	if vh.ConsumersByQueue["test-queue"][0] != consumer2 {
+		t.Error("Consumer2 should be in round-robin list")
+	}
+
+	// Verify consumer1 is gone
+	key1 := ConsumerKey{Channel: 1, Tag: "consumer1"}
+	if _, exists := vh.Consumers[key1]; exists {
+		t.Error("Consumer1 should be cleaned up")
+	}
+
+	// Verify consumer1 is not in round-robin list
+	for _, consumer := range vh.ConsumersByQueue["test-queue"] {
+		if consumer == consumer1 {
+			t.Error("Consumer1 should not be in round-robin list after cleanup")
+		}
+	}
+}
+
+func TestRoundRobinConsumerRotation(t *testing.T) {
+	vh := createTestVHost()
+	conn1 := NewMockConnection("conn1")
+	conn2 := NewMockConnection("conn2")
+	conn3 := NewMockConnection("conn3")
+
+	// Register three consumers
+	consumer1 := NewConsumer(conn1, 1, "test-queue", "consumer1", &ConsumerProperties{NoAck: false})
+	err := vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register consumer1: %v", err)
+	}
+
+	consumer2 := NewConsumer(conn2, 1, "test-queue", "consumer2", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer2)
+	if err != nil {
+		t.Fatalf("Failed to register consumer2: %v", err)
+	}
+
+	consumer3 := NewConsumer(conn3, 1, "test-queue", "consumer3", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer3)
+	if err != nil {
+		t.Fatalf("Failed to register consumer3: %v", err)
+	}
+
+	// Verify consumers are registered in order
+	if len(vh.ConsumersByQueue["test-queue"]) != 3 {
+		t.Fatalf("Expected 3 consumers, got %d", len(vh.ConsumersByQueue["test-queue"]))
+	}
+
+	// Verify initial round-robin order
+	expectedOrder := []string{consumer1.Tag, consumer2.Tag, consumer3.Tag}
+	for i, consumer := range vh.ConsumersByQueue["test-queue"] {
+		if consumer.Tag != expectedOrder[i] {
+			t.Errorf("Initial round-robin order incorrect at index %d: expected %s, got %s",
+				i, expectedOrder[i], consumer.Tag)
+		}
+	}
+
+	// Test manual round-robin rotation as done in delivery loop
+	// Simulate the rotation that happens during message delivery
+	vh.mu.Lock()
+	consumers := vh.ConsumersByQueue["test-queue"]
+	if len(consumers) > 0 {
+		// Take first consumer and move to end (round-robin)
+		firstConsumer := consumers[0]
+		vh.ConsumersByQueue["test-queue"] = append(consumers[1:], firstConsumer)
+	}
+	vh.mu.Unlock()
+
+	// After rotation, order should be [consumer2, consumer3, consumer1]
+	rotatedOrder := []string{consumer2.Tag, consumer3.Tag, consumer1.Tag}
+	for i, consumer := range vh.ConsumersByQueue["test-queue"] {
+		if consumer.Tag != rotatedOrder[i] {
+			t.Errorf("Round-robin rotation incorrect at index %d: expected %s, got %s",
+				i, rotatedOrder[i], consumer.Tag)
+		}
+	}
+
+	// Test another rotation
+	vh.mu.Lock()
+	consumers = vh.ConsumersByQueue["test-queue"]
+	if len(consumers) > 0 {
+		firstConsumer := consumers[0]
+		vh.ConsumersByQueue["test-queue"] = append(consumers[1:], firstConsumer)
+	}
+	vh.mu.Unlock()
+
+	// After second rotation, order should be [consumer3, consumer1, consumer2]
+	secondRotatedOrder := []string{consumer3.Tag, consumer1.Tag, consumer2.Tag}
+	for i, consumer := range vh.ConsumersByQueue["test-queue"] {
+		if consumer.Tag != secondRotatedOrder[i] {
+			t.Errorf("Second round-robin rotation incorrect at index %d: expected %s, got %s",
+				i, secondRotatedOrder[i], consumer.Tag)
+		}
+	}
+}
+
+func TestConsumerEdgeCases(t *testing.T) {
+	vh := createTestVHost()
+	conn := NewMockConnection("test-conn")
+
+	// Test getting consumers for non-existent queue
+	consumers := vh.GetActiveConsumersForQueue("non-existent-queue")
+	if consumers != nil {
+		t.Error("Expected nil for non-existent queue consumers")
+	}
+
+	// Test getting consumers for empty queue
+	consumers = vh.GetActiveConsumersForQueue("test-queue")
+	if len(consumers) != 0 {
+		t.Errorf("Expected 0 consumers for empty queue, got %d", len(consumers))
+	}
+
+	// Test registering consumer for non-existent queue
+	consumer := NewConsumer(conn, 1, "non-existent-queue", "test-consumer", &ConsumerProperties{NoAck: false})
+	err := vh.RegisterConsumer(consumer)
+	if err == nil {
+		t.Error("Expected error when registering consumer for non-existent queue")
+	}
+
+	expectedError := "queue non-existent-queue does not exist"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+
+	// Test duplicate consumer registration
+	consumer1 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register first consumer: %v", err)
+	}
+
+	consumer2 := NewConsumer(conn, 1, "test-queue", "duplicate-tag", &ConsumerProperties{NoAck: false})
+	err = vh.RegisterConsumer(consumer2)
+	if err == nil {
+		t.Error("Expected error when registering duplicate consumer")
+	}
+
+	expectedError = "consumer with tag duplicate-tag already exists on channel 1"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+}
