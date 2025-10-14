@@ -89,6 +89,20 @@ func DecodeTable(data []byte) (map[string]interface{}, error) {
 			// No payload, just store nil or skip
 			table[string(fieldName)] = nil
 
+		case 'U': // Unsigned integer (32-bit)
+			var intValue uint32
+			if err := binary.Read(buf, binary.BigEndian, &intValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = intValue
+
+		case 'l': // Long signed integer (64-bit)
+			var longValue int64
+			if err := binary.Read(buf, binary.BigEndian, &longValue); err != nil {
+				return nil, err
+			}
+			table[string(fieldName)] = longValue
+
 		default:
 			return nil, fmt.Errorf("unknown field type: %c", fieldType)
 		}
@@ -111,6 +125,10 @@ func DecodeLongStr(buf *bytes.Reader) (string, error) {
 	err := binary.Read(buf, binary.BigEndian, &strLen)
 	if err != nil {
 		return "", err
+	}
+
+	if strLen == 0 {
+		return "", nil
 	}
 
 	strData := make([]byte, strLen)
@@ -194,6 +212,13 @@ func DecodeFlags(octet byte, flagNames []string, lsbFirst bool) map[string]bool 
 
 func min(a, b int) int {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
 		return a
 	}
 	return b

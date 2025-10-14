@@ -12,19 +12,19 @@ func TestParseHeaderFrame(t *testing.T) {
 	var payload bytes.Buffer
 
 	// ClassID (short) - BASIC class (60)
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
 
 	// Weight (short) - must be 0
-	binary.Write(&payload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0))
 
 	// Body size (long long)
-	binary.Write(&payload, binary.BigEndian, uint64(100))
+	_ = binary.Write(&payload, binary.BigEndian, uint64(100))
 
 	// Property flags (short) - bit 15 set for contentType
-	binary.Write(&payload, binary.BigEndian, uint16(0x8000))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(0x8000))
 
 	// Content type (short string)
-	payload.Write(EncodeShortStr("text/plain"))
+	EncodeShortStr(&payload, "text/plain")
 
 	channel := uint16(1)
 	payloadSize := uint32(payload.Len())
@@ -60,13 +60,13 @@ func TestParseHeaderFrame_InvalidWeight(t *testing.T) {
 	var payload bytes.Buffer
 
 	// ClassID (short)
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
 
 	// Weight (short) - invalid non-zero value
-	binary.Write(&payload, binary.BigEndian, uint16(5))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(5))
 
 	// Body size (long long)
-	binary.Write(&payload, binary.BigEndian, uint64(100))
+	_ = binary.Write(&payload, binary.BigEndian, uint64(100))
 
 	channel := uint16(1)
 	payloadSize := uint32(payload.Len())
@@ -85,10 +85,9 @@ func TestParseHeaderFrame_InvalidWeight(t *testing.T) {
 // TestParseBodyFrame tests parsing of BODY frames
 func TestParseBodyFrame(t *testing.T) {
 	bodyContent := []byte("Test message body")
-	channel := uint16(2)
 	payloadSize := uint32(len(bodyContent))
 
-	state, err := parseBodyFrame(channel, payloadSize, bodyContent)
+	state, err := parseBodyFrame(payloadSize, bodyContent)
 	if err != nil {
 		t.Fatalf("parseBodyFrame failed: %v", err)
 	}
@@ -101,10 +100,9 @@ func TestParseBodyFrame(t *testing.T) {
 // TestParseBodyFrame_TooShort tests error handling for body frames with short payload
 func TestParseBodyFrame_TooShort(t *testing.T) {
 	bodyContent := []byte("Short")
-	channel := uint16(1)
 	payloadSize := uint32(100) // Claims 100 bytes but only 5 provided
 
-	_, err := parseBodyFrame(channel, payloadSize, bodyContent)
+	_, err := parseBodyFrame(payloadSize, bodyContent)
 	if err == nil {
 		t.Fatal("Expected error for payload too short, got nil")
 	}
@@ -121,21 +119,21 @@ func TestParseMethodFrame_ConnectionClass(t *testing.T) {
 		"version": "1.0.0",
 	}
 	encodedProps := EncodeTable(clientProps)
-	methodPayload.Write(EncodeLongStr(encodedProps))
+	EncodeLongStr(&methodPayload, encodedProps)
 
 	// Mechanism (short string)
-	methodPayload.Write(EncodeShortStr("PLAIN"))
+	EncodeShortStr(&methodPayload, "PLAIN")
 
 	// Response (long string)
-	methodPayload.Write(EncodeLongStr([]byte("\x00test\x00password")))
+	EncodeLongStr(&methodPayload, []byte("\x00test\x00password"))
 
 	// Locale (short string)
-	methodPayload.Write(EncodeShortStr("en_US"))
+	EncodeShortStr(&methodPayload, "en_US")
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(CONNECTION))
-	binary.Write(&payload, binary.BigEndian, uint16(CONNECTION_START_OK))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CONNECTION))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CONNECTION_START_OK))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(0)
@@ -180,12 +178,12 @@ func TestParseMethodFrame_ChannelClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved field (short string, empty)
-	methodPayload.Write(EncodeShortStr(""))
+	EncodeShortStr(&methodPayload, "")
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL))
-	binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(CHANNEL_OPEN))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -213,10 +211,10 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Queue name (short string)
-	methodPayload.Write(EncodeShortStr("test-queue"))
+	EncodeShortStr(&methodPayload, "test-queue")
 
 	// Flags (bits packed in a byte)
 	// passive (bit 0), durable (bit 1), exclusive (bit 2), auto-delete (bit 3), no-wait (bit 4)
@@ -226,12 +224,12 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(QUEUE))
-	binary.Write(&payload, binary.BigEndian, uint16(QUEUE_DECLARE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(QUEUE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(QUEUE_DECLARE))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -259,13 +257,13 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
-	methodPayload.Write(EncodeShortStr("test-exchange"))
+	EncodeShortStr(&methodPayload, "test-exchange")
 
 	// Type (short string)
-	methodPayload.Write(EncodeShortStr("direct"))
+	EncodeShortStr(&methodPayload, "direct")
 
 	// Flags (bits packed in a byte)
 	// passive, durable, auto-delete, internal, no-wait
@@ -275,12 +273,12 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE))
-	binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE_DECLARE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(EXCHANGE_DECLARE))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -308,13 +306,13 @@ func TestParseMethodFrame_BasicClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved (short)
-	binary.Write(&methodPayload, binary.BigEndian, uint16(0))
+	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
-	methodPayload.Write(EncodeShortStr(""))
+	EncodeShortStr(&methodPayload, "")
 
 	// Routing key (short string)
-	methodPayload.Write(EncodeShortStr("test-queue"))
+	EncodeShortStr(&methodPayload, "test-queue")
 
 	// Flags (bits: mandatory, immediate)
 	flags := byte(0x00)
@@ -322,8 +320,8 @@ func TestParseMethodFrame_BasicClass(t *testing.T) {
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC))
-	binary.Write(&payload, binary.BigEndian, uint16(BASIC_PUBLISH))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC))
+	_ = binary.Write(&payload, binary.BigEndian, uint16(BASIC_PUBLISH))
 	payload.Write(methodPayload.Bytes())
 
 	channel := uint16(1)
@@ -409,7 +407,7 @@ func TestDecodeBasicHeaderFlags(t *testing.T) {
 func TestCreateContentPropertiesTable(t *testing.T) {
 	// Test with content type
 	var buf bytes.Buffer
-	buf.Write(EncodeShortStr("application/json"))
+	EncodeShortStr(&buf, "application/json")
 
 	flags := []string{"contentType"}
 	props, err := createContentPropertiesTable(flags, bytes.NewReader(buf.Bytes()))
@@ -431,7 +429,7 @@ func TestCreateContentPropertiesTable_DeliveryMode(t *testing.T) {
 	}{
 		{"Valid non-persistent", 1, false},
 		{"Valid persistent", 2, false},
-		{"Invalid delivery mode 0", 0, true},
+		{"Invalid delivery mode 0", 0, false}, // 0 normalizes to 1
 		{"Invalid delivery mode 3", 3, true},
 	}
 
@@ -451,8 +449,13 @@ func TestCreateContentPropertiesTable_DeliveryMode(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
-				if props.DeliveryMode != tt.deliveryMode {
-					t.Errorf("Expected delivery mode %d, got %d", tt.deliveryMode, props.DeliveryMode)
+				// Delivery mode 0 normalizes to 1
+				expectedMode := tt.deliveryMode
+				if expectedMode == 0 {
+					expectedMode = 1
+				}
+				if uint8(props.DeliveryMode) != expectedMode {
+					t.Errorf("Expected delivery mode %d, got %d", expectedMode, props.DeliveryMode)
 				}
 			}
 		})

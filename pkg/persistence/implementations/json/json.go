@@ -96,8 +96,6 @@ func (jp *JsonPersistence) SaveQueueMetadata(vhost, name string, props persisten
 		return err
 	}
 
-	existingQueue := &JsonQueueData{}
-
 	// Update metadata while preserving messages
 	queueData := JsonQueueData{
 		Name:       name,

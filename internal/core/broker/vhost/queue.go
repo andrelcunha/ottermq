@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -18,24 +19,71 @@ type Queue struct {
 	messages chan amqp.Message `json:"-"`
 	count    int               `json:"-"`
 	mu       sync.Mutex        `json:"-"`
+	/* Delivery */
+	deliveryCtx    context.Context    `json:"-"`
+	deliveryCancel context.CancelFunc `json:"-"`
+	delivering     bool
 }
 
 type QueueProperties struct {
-	Passive    bool      `json:"passive"`
+	Passive    bool      `json:"passive"` // TODO: #126 remove Passive Property and instead implement it at DeclareQueue
 	Durable    bool      `json:"durable"`
 	AutoDelete bool      `json:"auto_delete"`
-	Exclusive  bool      `json:"exclusive"`
-	NoWait     bool      `json:"no_wait"`
+	Exclusive  bool      `json:"exclusive"` // not implemented yet
 	Arguments  QueueArgs `json:"arguments"`
 }
 
 func NewQueue(name string, bufferSize int) *Queue {
+
 	return &Queue{
-		Name:     name,
-		Props:    &QueueProperties{},
-		messages: make(chan amqp.Message, bufferSize),
-		count:    0,
+		Name:       name,
+		Props:      &QueueProperties{},
+		messages:   make(chan amqp.Message, bufferSize),
+		count:      0,
+		delivering: false,
 	}
+}
+
+func (q *Queue) startDeliveryLoop(vh *VHost) {
+	if q.delivering {
+		return // already running
+	}
+	q.deliveryCtx, q.deliveryCancel = context.WithCancel(context.Background())
+	q.delivering = true
+	go func() {
+		for {
+			select {
+			case <-q.deliveryCtx.Done():
+				log.Debug().Str("queue", q.Name).Msg("Stopping delivery loop")
+				q.delivering = false
+				return
+			case msg := <-q.messages:
+				// Here we would deliver the message to consumers
+				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
+				consumers := vh.GetActiveConsumersForQueue(q.Name)
+				if len(consumers) > 0 {
+					// Simple round-robin delivery
+					consumer := consumers[0]
+					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
+					// TODO: improve delivery strategy using basic.qos and manual ack
+					if err := vh.deliverToConsumer(consumer, msg); err != nil {
+						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
+						vh.CancelConsumer(consumer.Channel, consumer.Tag)
+						// Requeue the message
+						// Requeue just if rejected and `requeue` is true
+					}
+				}
+			}
+		}
+	}()
+}
+
+func (q *Queue) stopDeliveryLoop() {
+	if !q.delivering {
+		return
+	}
+	q.deliveryCancel()
+	q.delivering = false
 }
 
 func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {
@@ -51,32 +99,21 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 			Durable:    false,
 			AutoDelete: false,
 			Exclusive:  false,
-			NoWait:     false,
 			Arguments:  make(map[string]any),
 		}
 	}
-	queue := &Queue{
-		Name:     name,
-		Props:    props,
-		messages: make(chan amqp.Message, vh.QueueBufferSize),
-		count:    0,
-	}
+	queue := NewQueue(name, vh.queueBufferSize)
+	queue.Props = props
 
 	vh.Queues[name] = queue
 	if props.Durable {
-		vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence())
+		if err := vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence()); err != nil {
+			log.Error().Err(err).Str("queue", name).Msg("Failed to save queue metadata")
+		}
 	}
 
 	log.Debug().Str("queue", name).Msg("Created queue")
-	// adminQueues := make(map[string]bool)
-	// queues := []string{ADMIN_QUEUES, ADMIN_EXCHANGES, ADMIN_BINDINGS, ADMIN_CONNECTIONS}
-	// for _, queueName := range queues {
-	// 	adminQueues[queueName] = true
-	// }
 
-	// if _, ok := adminQueues[name]; !ok {
-	// 	vh.publishQueueUpdate()
-	// }
 	return queue, nil
 }
 
@@ -122,6 +159,10 @@ func (vh *VHost) DeleteQueue(name string) error {
 			}
 		}
 	}
+
+	// Remove the queue from the VHost's queue map
+	delete(vh.Queues, name)
+
 	log.Debug().Str("queue", name).Msg("Deleted queue")
 	// Call persistence layer to delete the queue
 	if queue.Props.Durable {
@@ -134,28 +175,17 @@ func (vh *VHost) DeleteQueue(name string) error {
 	return nil
 }
 
-// func (q *Queue) ToPersistence() *persistence.PersistedQueue {
-// 	messages := make([]persistence.PersistedMessage, 0)
-// 	return &persistence.PersistedQueue{
-// 		Name:       q.Name,
-// 		Properties: q.Props.ToPersistence(),
-// 		Messages:   messages,
-// 	}
-// }
-
 func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 	return persistence.QueueProperties{
-		Passive:    qp.Passive,
+		Passive:    qp.Passive, //TODO(#126) remove Passive from persistence
 		Durable:    qp.Durable,
 		AutoDelete: qp.AutoDelete,
 		Exclusive:  qp.Exclusive,
-		NoWait:     qp.NoWait,
 		Arguments:  qp.Arguments,
 	}
 }
 
 func (q *Queue) Push(msg amqp.Message) {
-	// queue.messages <- msg
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {
@@ -168,7 +198,6 @@ func (q *Queue) Push(msg amqp.Message) {
 }
 
 func (q *Queue) Pop() *amqp.Message {
-	// return <-queue.messages
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	select {
@@ -199,15 +228,3 @@ func (q *Queue) Len() int {
 	defer q.mu.Unlock()
 	return q.count
 }
-
-// func (vh *VHost) subscribe(consumerID, queueName string) {
-// 	vh.mu.Lock()
-// 	defer vh.mu.Unlock()
-// 	if _, ok := vh.Queues[queueName]; !ok {
-// 		vh.CreateQueue(queueName)
-// 	}
-// 	if consumer, ok := vh.Consumers[consumerID]; ok {
-// 		consumer.Queue = queueName
-// 		log.Printf("[DEBUG] Subscribed consumer %s to queue %s", consumerID, queueName)
-// 	}
-// }

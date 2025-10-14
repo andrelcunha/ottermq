@@ -11,7 +11,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/config"
 	"github.com/andrelcunha/ottermq/internal/core/broker"
-	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/logger"
 	"github.com/andrelcunha/ottermq/web"
 	"github.com/rs/zerolog/log"
@@ -64,10 +64,14 @@ func main() {
 		persistdb.AddDefaultRoles()
 		persistdb.AddDefaultPermissions()
 		user := persistdb.UserCreateDTO{Username: cfg.Username, Password: cfg.Password, RoleID: 1}
-		persistdb.AddUser(user)
+		if err := persistdb.AddUser(user); err != nil {
+			log.Error().Err(err).Msg("Failed to add user")
+		}
 		persistdb.CloseDB()
 	}
-	persistdb.OpenDB()
+	if err := persistdb.OpenDB(); err != nil {
+		log.Error().Err(err).Msg("Failed to open database")
+	}
 	user, err := persistdb.GetUserByUsername(cfg.Username)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to get user")

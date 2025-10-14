@@ -33,7 +33,9 @@ func (b *Broker) openChannel(request *amqp.RequestMethodMessage, conn net.Conn) 
 	log.Trace().Interface("state", b.Connections[conn].Channels[request.Channel]).Msg("New state added")
 
 	frame := b.framer.CreateChannelOpenOkFrame(request)
-	b.framer.SendFrame(conn, frame)
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send channel open ok frame")
+	}
 	return nil, nil
 }
 

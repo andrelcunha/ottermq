@@ -12,7 +12,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/andrelcunha/ottermq/internal/core/persistdb"
+	"github.com/andrelcunha/ottermq/internal/persistdb"
 )
 
 func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Context) (*ConnectionInfo, error) {
@@ -21,7 +21,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Debug().Str("header", fmt.Sprintf("%x", clientHeader)).Msg("Handshake - Received")
+	log.Trace().Str("header", fmt.Sprintf("%x", clientHeader)).Msg("Handshake - Received")
 	protocol := (*configurations)["protocol"].(string)
 	protocolHeader, err := buildProtocolHeader(protocol)
 	if err != nil {
@@ -51,7 +51,7 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("\n[DEBUG] - Handshake - Received: %x\n", frame)
+	log.Trace().Msgf("Handshake - Received: %x\n", frame)
 	response, err := parseFrame(frame)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,17 @@ func handshake(configurations *map[string]any, conn net.Conn, connCtx context.Co
 	}
 
 	openFrame, _ := state.MethodFrame.Content.(*ConnectionOpen)
+	// TODO: #121 validate if the vhost exists - if not, raise connection exception - 402
+	// The challenge is that at this point we don't have access to the Broker struct
+	// We can return the VHostName in the ConnectionInfo struct and let the Broker handle it
+	// We could also pass a callback function to the handshake function to validate the vhost
+	// Or a list of valid vhosts in the configurations map
+
+	if openFrame == nil {
+		return nil, fmt.Errorf("type assertion ConnectionOpenFrame failed")
+	}
 	VHostName := openFrame.VirtualHost
+
 	connInfo := NewConnectionInfo(VHostName)
 	connInfo.Client = client
 
@@ -276,7 +286,7 @@ func readFrame(conn net.Conn) ([]byte, error) {
 }
 
 func sendFrame(conn net.Conn, frame []byte) error {
-	log.Printf("[TRACE] Sending frame: %x\n", frame)
+	log.Trace().Msgf("Sending frame: %x\n", frame)
 	_, err := conn.Write(frame)
 	return err
 }

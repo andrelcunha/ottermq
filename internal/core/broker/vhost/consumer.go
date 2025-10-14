@@ -1,0 +1,281 @@
+package vhost
+
+import (
+	"fmt"
+	"math/rand"
+	"net"
+
+	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/rs/zerolog/log"
+)
+
+type ConsumerKey struct {
+	Channel uint16
+	Tag     string
+}
+
+// ConnectionChannelKey uniquely identifies a channel within a connection
+type ConnectionChannelKey struct {
+	Connection net.Conn
+	Channel    uint16
+}
+
+type Consumer struct {
+	Tag         string
+	Channel     uint16
+	QueueName   string
+	Connection  net.Conn
+	DeliveryTag uint64 // will be incremented per delivery
+	Active      bool
+	Props       *ConsumerProperties
+}
+
+type ConsumerProperties struct {
+	NoAck     bool           `json:"no_ack"`
+	Exclusive bool           `json:"exclusive"`
+	Arguments map[string]any `json:"arguments"`
+}
+
+func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, props *ConsumerProperties) *Consumer {
+	return &Consumer{
+		Tag:        consumerTag,
+		Channel:    channel,
+		QueueName:  queueName,
+		Connection: conn,
+		Props:      props,
+	}
+}
+
+func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	// Check if queue exists
+	_, ok := vh.Queues[consumer.QueueName]
+	if !ok {
+		// TODO: return a channel exception error - 404
+		return fmt.Errorf("queue %s does not exist", consumer.QueueName)
+	}
+
+	var key ConsumerKey
+	if consumer.Tag == "" {
+		const maxRetries = 1000
+		var retries int
+		for {
+			consumer.Tag = generateConsumerTag()
+			key = ConsumerKey{consumer.Channel, consumer.Tag}
+			if _, exists := vh.Consumers[key]; !exists {
+				break
+			}
+			retries++
+			if retries >= maxRetries {
+				return fmt.Errorf("failed to generate unique consumer tag after %d attempts", maxRetries)
+			}
+		}
+	} else {
+		key = ConsumerKey{consumer.Channel, consumer.Tag}
+		// Check for duplicates
+		if _, exists := vh.Consumers[key]; exists {
+			// TODO: return a channel exception error
+			return fmt.Errorf("consumer with tag %s already exists on channel %d", key.Tag, key.Channel)
+		}
+	}
+
+	// Check if exclusive consumer already exists for this queue
+	// or if trying to add exclusive when others exist
+	if existingConsumers, exists := vh.ConsumersByQueue[consumer.QueueName]; exists {
+		for _, c := range existingConsumers {
+			if c.Props.Exclusive {
+				// TODO: return a channel exception error - 405
+				return fmt.Errorf("exclusive consumer already exists for queue %s", consumer.QueueName)
+			}
+		}
+		if consumer.Props.Exclusive && len(existingConsumers) > 0 {
+			// TODO: return a channel exception error - 405
+			return fmt.Errorf("cannot add exclusive consumer when other consumers exist for queue %s", consumer.QueueName)
+		}
+	}
+
+	// Activate consumer and register
+	consumer.Active = true
+	vh.Consumers[key] = consumer
+
+	// Index for delivery
+	// verify if map entry exists
+	if _, exists := vh.ConsumersByQueue[consumer.QueueName]; !exists {
+		vh.ConsumersByQueue[consumer.QueueName] = []*Consumer{}
+	}
+	vh.ConsumersByQueue[consumer.QueueName] = append(
+		vh.ConsumersByQueue[consumer.QueueName],
+		consumer,
+	)
+	// Index for channel (connection-scoped)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	if _, exists := vh.ConsumersByChannel[channelKey]; !exists {
+		vh.ConsumersByChannel[channelKey] = []*Consumer{}
+	}
+	vh.ConsumersByChannel[channelKey] = append(
+		vh.ConsumersByChannel[channelKey],
+		consumer,
+	)
+
+	// start delivery routine if not already running
+	queue := vh.Queues[consumer.QueueName]
+	if len(vh.ConsumersByQueue[queue.Name]) == 1 {
+		go queue.startDeliveryLoop(vh)
+	}
+
+	return nil
+}
+
+func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
+	key := ConsumerKey{channel, tag}
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	consumer, exists := vh.Consumers[key]
+	if !exists {
+		return fmt.Errorf("consumer with tag %s on channel %d does not exist", tag, channel)
+	}
+
+	consumer.Active = false
+	delete(vh.Consumers, key)
+
+	// Remove from ConsumersByQueue
+	consumersForQueue := vh.ConsumersByQueue[consumer.QueueName]
+	for i, c := range consumersForQueue {
+		if c.Tag == tag && c.Channel == channel {
+			vh.ConsumersByQueue[consumer.QueueName] = append(consumersForQueue[:i], consumersForQueue[i+1:]...)
+			break
+		}
+	}
+	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
+		queue := vh.Queues[consumer.QueueName]
+		queue.stopDeliveryLoop()
+	}
+
+	// Remove from ConsumersByChannel (connection-scoped)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	consumersForChannel := vh.ConsumersByChannel[channelKey]
+	for i, c := range consumersForChannel {
+		if c.Tag == tag {
+			vh.ConsumersByChannel[channelKey] = append(consumersForChannel[:i], consumersForChannel[i+1:]...)
+			break
+		}
+	}
+
+	return nil
+}
+
+func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	channelKey := ConnectionChannelKey{connection, channel}
+	// Get copy of consumers to avoid modification during iteration
+	consumersForChannel, exists := vh.ConsumersByChannel[channelKey]
+	if !exists {
+		return // No consumers on this channel
+	}
+
+	consumersCopy := make([]*Consumer, len(consumersForChannel))
+	copy(consumersCopy, consumersForChannel)
+
+	// Cancel each consumer (this will modify the maps)
+	for _, c := range consumersCopy {
+		// Unlock to call CancelConsumer (which also locks)
+		vh.mu.Unlock()
+		vh.CancelConsumer(c.Channel, c.Tag)
+		vh.mu.Lock()
+	}
+	delete(vh.ConsumersByChannel, channelKey)
+}
+
+func (vh *VHost) CleanupConnection(connection net.Conn) {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	// Find all consumers for this connection
+	var consumersToRemove []*Consumer
+	for _, consumer := range vh.Consumers {
+		if consumer.Connection == connection {
+			consumersToRemove = append(consumersToRemove, consumer)
+		}
+	}
+
+	// Cancel each consumer
+	for _, consumer := range consumersToRemove {
+		// Unlock to call CancelConsumer (which also locks)
+		vh.mu.Unlock()
+		vh.CancelConsumer(consumer.Channel, consumer.Tag)
+		vh.mu.Lock()
+	}
+}
+
+func (vh *VHost) GetActiveConsumersForQueue(queueName string) []*Consumer {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+	consumers := vh.ConsumersByQueue[queueName]
+	if consumers == nil {
+		return nil
+	}
+	// Filter only active consumers
+	activeConsumers := make([]*Consumer, 0, len(consumers))
+	for _, consumer := range consumers {
+		if consumer.Active {
+			activeConsumers = append(activeConsumers, consumer)
+		}
+	}
+	return activeConsumers
+}
+
+func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
+	// vh should not have access to framer
+	// nevertheless, i don't know how to get the framer without a circular dependency
+	if !consumer.Active {
+		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
+	}
+	consumer.DeliveryTag++
+	deliverFrame := vh.framer.CreateBasicDeliverFrame(
+		consumer.Channel,
+		consumer.Tag,
+		msg.Exchange,
+		msg.RoutingKey,
+		consumer.DeliveryTag,
+		false, // redelivered - TODO: implement redelivery logic
+	)
+
+	headerFrame := vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg)
+
+	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)
+
+	if err := vh.framer.SendFrame(consumer.Connection, deliverFrame); err != nil {
+		log.Error().Err(err).Msg("Failed to send deliver frame")
+		return err
+	}
+	if err := vh.framer.SendFrame(consumer.Connection, headerFrame); err != nil {
+		log.Error().Err(err).Msg("Failed to send header frame")
+		return err
+	}
+	if err := vh.framer.SendFrame(consumer.Connection, bodyFrame); err != nil {
+		log.Error().Err(err).Msg("Failed to send body frame")
+		return err
+	}
+
+	// TODO: realize how to handle NoAck consumers and message acks
+	// For now, we assume all consumers are NoAck
+	// So we don't need to track unacknowledged messages
+	return nil
+}
+
+func generatePseudoRandomString(n int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func generateConsumerTag() string {
+	return "amq.ctag-" + generatePseudoRandomString(12)
+}

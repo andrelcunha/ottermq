@@ -88,7 +88,6 @@ func TestSaveLoadQueue(t *testing.T) {
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	// msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}
@@ -177,7 +176,6 @@ func TestDeleteQueue(t *testing.T) {
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	// msg := JsonMessageData{ID: "m1", Body: []byte("hello"), Properties: persistence.MessageProperties{DeliveryMode: 2}}

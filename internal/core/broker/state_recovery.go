@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/rs/zerolog/log"
 )
 
 // RecoverBrokerState loads vhosts, exchanges, queues, bindings, and messages from disk
@@ -43,7 +44,9 @@ func RecoverBrokerState(b *Broker) error {
 			props, err := b.persist.LoadQueueMetadata(vhostName, qName)
 			if err == nil {
 				// Create queue in vhost using persistedQ
-				v.RecoverQueue(qName, &props)
+				if err := v.RecoverQueue(qName, &props); err != nil {
+					log.Error().Err(err).Str("queue", qName).Msg("Failed to recover queue")
+				}
 			}
 		}
 		b.VHosts[vhostName] = v
