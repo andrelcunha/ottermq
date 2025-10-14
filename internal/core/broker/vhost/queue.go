@@ -61,7 +61,6 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 			case msg := <-q.messages:
 				// Here we would deliver the message to consumers
 				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
-				vh.mu.Lock()
 				consumers := vh.GetActiveConsumersForQueue(q.Name)
 				if len(consumers) > 0 {
 					// Simple round-robin delivery
@@ -69,11 +68,11 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
 					// TODO: improve delivery strategy using basic.qos and manual ack
 					if err := vh.deliverToConsumer(consumer, msg); err != nil {
-						q.ReQueue(msg) // requeue on failure
+						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
+						vh.CancelConsumer(consumer.Channel, consumer.Tag)
+						// Requeue the message
+						// Requeue just if rejected and `requeue` is true
 					}
-					vh.mu.Unlock()
-				} else {
-					vh.mu.Unlock()
 				}
 			}
 		}
