@@ -259,13 +259,13 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 	if weight != 0 {
 		return nil, fmt.Errorf("weight must be 0")
 	}
-	log.Printf("[DEBUG] Weight: %d\n", weight)
+	log.Trace().Msgf("- HEADER - Weight: %d\n", weight)
 
 	bodySize, err := DecodeLongLongInt(buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode body size: %v", err)
 	}
-	log.Printf("[DEBUG] Body Size: %d\n", bodySize)
+	log.Trace().Msgf("- HEADER - Body Size: %d\n", bodySize)
 
 	shortFlags, err := DecodeShortInt(buf)
 	if err != nil {
@@ -276,7 +276,7 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode properties: %v", err)
 	}
-	log.Printf("[DEBUG] properties: %v\n", properties)
+	log.Trace().Msgf("- HEADER - properties: %v\n", properties)
 	header := &HeaderFrame{
 		ClassID:    classID,
 		BodySize:   bodySize,

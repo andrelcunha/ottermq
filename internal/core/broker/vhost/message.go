@@ -45,7 +45,7 @@ func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *am
 		Exchange:   exchangeName,
 		RoutingKey: routingKey,
 	}
-	log.Debug().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
+	log.Trace().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
 
 	var timestamp int64
 	if props.Timestamp.IsZero() {

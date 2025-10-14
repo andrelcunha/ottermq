@@ -266,7 +266,7 @@ func parseConnectionMethod(methodID uint16, payload []byte) (any, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid message content type")
 		}
-		log.Printf("[TRACE] Received CONNECTION_CLOSE: (%d) '%s'", content.ReplyCode, content.ReplyText)
+		log.Debug().Msgf("Received CONNECTION_CLOSE: (%d) '%s'", content.ReplyCode, content.ReplyText)
 		return request, nil
 
 	case uint16(CONNECTION_CLOSE_OK):
