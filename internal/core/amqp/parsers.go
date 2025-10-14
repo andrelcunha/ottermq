@@ -36,7 +36,7 @@ func parseFrame(frame []byte) (any, error) {
 
 	case byte(TYPE_BODY):
 		log.Trace().Uint16("channel", channel).Msg("Received BODY frame")
-		return parseBodyFrame(channel, payloadSize, payload)
+		return parseBodyFrame(payloadSize, payload)
 
 	case byte(TYPE_HEARTBEAT):
 		log.Trace().Msg("Received HEARTBEAT frame")
@@ -194,7 +194,7 @@ func parseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*Chan
 	}
 }
 
-func parseBodyFrame(channel uint16, payloadSize uint32, payload []byte) (*ChannelState, error) {
+func parseBodyFrame(payloadSize uint32, payload []byte) (*ChannelState, error) {
 
 	if len(payload) < int(payloadSize) {
 		return nil, fmt.Errorf("payload too short")

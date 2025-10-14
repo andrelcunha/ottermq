@@ -85,10 +85,9 @@ func TestParseHeaderFrame_InvalidWeight(t *testing.T) {
 // TestParseBodyFrame tests parsing of BODY frames
 func TestParseBodyFrame(t *testing.T) {
 	bodyContent := []byte("Test message body")
-	channel := uint16(2)
 	payloadSize := uint32(len(bodyContent))
 
-	state, err := parseBodyFrame(channel, payloadSize, bodyContent)
+	state, err := parseBodyFrame(payloadSize, bodyContent)
 	if err != nil {
 		t.Fatalf("parseBodyFrame failed: %v", err)
 	}
@@ -101,10 +100,9 @@ func TestParseBodyFrame(t *testing.T) {
 // TestParseBodyFrame_TooShort tests error handling for body frames with short payload
 func TestParseBodyFrame_TooShort(t *testing.T) {
 	bodyContent := []byte("Short")
-	channel := uint16(1)
 	payloadSize := uint32(100) // Claims 100 bytes but only 5 provided
 
-	_, err := parseBodyFrame(channel, payloadSize, bodyContent)
+	_, err := parseBodyFrame(payloadSize, bodyContent)
 	if err == nil {
 		t.Fatal("Expected error for payload too short, got nil")
 	}
