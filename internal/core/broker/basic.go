@@ -18,6 +18,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicConsumeHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_CANCEL):
+		return b.basicCancelHandler(request, conn, vh)
 	case uint16(amqp.BASIC_PUBLISH):
 		channel := request.Channel
 		currentState := b.getCurrentState(conn, channel)
@@ -118,6 +119,30 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_RECOVER):
 	default:
 		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
+}
+
+func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicCancelContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic cancel content")
+	}
+
+	consumerTag := content.ConsumerTag
+	err := vh.CancelConsumer(request.Channel, consumerTag)
+	if err != nil {
+		log.Error().Err(err).Str("consumer_tag", consumerTag).Msg("Failed to cancel consumer")
+		return nil, err
+	}
+
+	if !content.NoWait {
+		frame := b.framer.CreateBasicCancelOkFrame(request.Channel, consumerTag)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send basic cancel ok frame")
+			return nil, err
+		}
+		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.CancelOk frame")
 	}
 	return nil, nil
 }

@@ -83,6 +83,23 @@ func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string
 	return frame
 }
 
+func createBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
+	keyValuePairs := []KeyValue{
+		{
+			Key:   STRING_SHORT,
+			Value: consumerTag,
+		},
+	}
+
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_CANCEL_OK),
+		Content:  ContentList{KeyValuePairs: keyValuePairs},
+	}.FormatMethodFrame()
+	return frame
+}
+
 // createBasicDeliverFrame creates a Basic.Deliver (60) frame for the given message and delivery tag.
 func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	consumerTagKv := KeyValue{

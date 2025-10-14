@@ -18,6 +18,8 @@ type Framer interface {
 	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
 	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
 	CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte
+	CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte
+
 
 	// Queue Methods
 	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
