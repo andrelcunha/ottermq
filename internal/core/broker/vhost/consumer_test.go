@@ -2,6 +2,7 @@ package vhost
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -51,7 +52,6 @@ func createTestVHost() *VHost {
 			Durable:    false,
 			AutoDelete: false,
 			Exclusive:  false,
-			NoWait:     false,
 			Arguments:  nil,
 		},
 	}
@@ -64,7 +64,6 @@ func createTestVHost() *VHost {
 			Durable:    false,
 			AutoDelete: false,
 			Exclusive:  true,
-			NoWait:     false,
 			Arguments:  nil,
 		},
 	}
@@ -557,34 +556,42 @@ func TestConnectionScopedChannels_BugFix(t *testing.T) {
 	}
 }
 
-func TestNewConsumer_EmptyTag(t *testing.T) {
+func TestRegisterConsumer_GeneratesTagWhenEmpty(t *testing.T) {
+	vh := createTestVHost()
 	conn := NewMockConnection("test-conn")
 
+	// Create consumer with empty tag
 	consumer := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{
 		NoAck:     false,
 		Exclusive: false,
 		Arguments: nil,
 	})
 
+	// Initially the tag should be empty
+	if consumer.Tag != "" {
+		t.Errorf("Expected empty tag initially, got '%s'", consumer.Tag)
+	}
+
+	// Register the consumer - this should generate a unique tag
+	err := vh.RegisterConsumer(consumer)
+	if err != nil {
+		t.Fatalf("Failed to register consumer: %v", err)
+	}
+
+	// After registration, the tag should be generated
 	if consumer.Tag == "" {
-		t.Error("Consumer tag should have been generated when empty")
+		t.Error("Consumer tag should have been generated during registration")
 	}
 
-	if len(consumer.Tag) < 10 { // UUID should be much longer
-		t.Errorf("Generated consumer tag seems too short: '%s'", consumer.Tag)
+	// Tag should follow the expected format (amq.ctag-xxxxx)
+	if len(consumer.Tag) < 15 || !strings.HasPrefix(consumer.Tag, "amq.ctag-") {
+		t.Errorf("Generated consumer tag doesn't match expected format: '%s'", consumer.Tag)
 	}
 
-	// Check other properties
-	if consumer.Channel != 1 {
-		t.Errorf("Expected channel 1, got %d", consumer.Channel)
-	}
-
-	if consumer.QueueName != "test-queue" {
-		t.Errorf("Expected queue name 'test-queue', got '%s'", consumer.QueueName)
-	}
-
-	if consumer.Connection != conn {
-		t.Error("Consumer connection should match provided connection")
+	// Verify consumer is properly registered
+	key := ConsumerKey{Channel: 1, Tag: consumer.Tag}
+	if _, exists := vh.Consumers[key]; !exists {
+		t.Error("Consumer should exist in registry with generated tag")
 	}
 }
 
@@ -629,6 +636,91 @@ func TestNewConsumer_WithTag(t *testing.T) {
 		} else if consumer.Props.Arguments["key"] != "value" {
 			t.Error("Consumer arguments not preserved correctly")
 		}
+	}
+}
+
+func TestRegisterConsumer_EmptyTagUniqueness(t *testing.T) {
+	vh := createTestVHost()
+	conn := NewMockConnection("test-conn")
+
+	// Register multiple consumers with empty tags on the same channel
+	consumer1 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer2 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+	consumer3 := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+
+	// Register all consumers
+	err := vh.RegisterConsumer(consumer1)
+	if err != nil {
+		t.Fatalf("Failed to register consumer1: %v", err)
+	}
+
+	err = vh.RegisterConsumer(consumer2)
+	if err != nil {
+		t.Fatalf("Failed to register consumer2: %v", err)
+	}
+
+	err = vh.RegisterConsumer(consumer3)
+	if err != nil {
+		t.Fatalf("Failed to register consumer3: %v", err)
+	}
+
+	// All tags should be different
+	if consumer1.Tag == consumer2.Tag {
+		t.Errorf("Consumer1 and Consumer2 should have different tags: '%s' vs '%s'", consumer1.Tag, consumer2.Tag)
+	}
+
+	if consumer1.Tag == consumer3.Tag {
+		t.Errorf("Consumer1 and Consumer3 should have different tags: '%s' vs '%s'", consumer1.Tag, consumer3.Tag)
+	}
+
+	if consumer2.Tag == consumer3.Tag {
+		t.Errorf("Consumer2 and Consumer3 should have different tags: '%s' vs '%s'", consumer2.Tag, consumer3.Tag)
+	}
+
+	// All should be registered
+	if len(vh.Consumers) != 3 {
+		t.Errorf("Expected 3 consumers registered, got %d", len(vh.Consumers))
+	}
+
+	// Verify each consumer is accessible by its generated tag
+	key1 := ConsumerKey{Channel: 1, Tag: consumer1.Tag}
+	key2 := ConsumerKey{Channel: 1, Tag: consumer2.Tag}
+	key3 := ConsumerKey{Channel: 1, Tag: consumer3.Tag}
+
+	if _, exists := vh.Consumers[key1]; !exists {
+		t.Error("Consumer1 should be accessible by its generated tag")
+	}
+	if _, exists := vh.Consumers[key2]; !exists {
+		t.Error("Consumer2 should be accessible by its generated tag")
+	}
+	if _, exists := vh.Consumers[key3]; !exists {
+		t.Error("Consumer3 should be accessible by its generated tag")
+	}
+}
+
+func TestRegisterConsumer_EmptyTagRetryLimit(t *testing.T) {
+	// This test verifies that the retry mechanism has proper bounds
+	// We can't easily test the actual retry limit without mocking the random generator,
+	// but we can verify that normal operation works
+	vh := createTestVHost()
+	conn := NewMockConnection("test-conn")
+
+	// Create and register a consumer with empty tag
+	consumer := NewConsumer(conn, 1, "test-queue", "", &ConsumerProperties{NoAck: false})
+
+	err := vh.RegisterConsumer(consumer)
+	if err != nil {
+		t.Fatalf("Registration should succeed with retry mechanism: %v", err)
+	}
+
+	// Verify tag was generated
+	if consumer.Tag == "" {
+		t.Error("Tag should have been generated")
+	}
+
+	// Verify expected format
+	if !strings.HasPrefix(consumer.Tag, "amq.ctag-") {
+		t.Errorf("Generated tag should start with 'amq.ctag-', got: %s", consumer.Tag)
 	}
 }
 
