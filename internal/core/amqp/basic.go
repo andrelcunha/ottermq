@@ -290,35 +290,37 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(BASIC_QOS):
-		log.Printf("[DEBUG] Received BASIC_QOS frame \n")
+		log.Debug().Msg("Received BASIC_QOS frame \n")
 		return nil, fmt.Errorf(" basic.qos not implemented")
 
 	case uint16(BASIC_CONSUME):
-		log.Printf("[DEBUG] Received BASIC_CONSUME frame \n")
+		log.Debug().Msg("Received BASIC_CONSUME frame \n")
 		return parseBasicConsumeFrame(payload)
 
 	// case uint16(BASIC_ACK):
-	// 	log.Printf("[DEBUG] Received BASIC_ACK frame \n")
+	// 	log.Debug().Msg("Received BASIC_ACK frame \n")
 	// 	return parseBasicAckFrame(payload)
 
 	// case uint16(BASIC_REJECT):
-	// 	log.Printf("[DEBUG] Received BASIC_REJECT frame \n")
+	// 	log.Debug().Msg("Received BASIC_REJECT frame \n")
 	// 	return parseBasicRejectFrame(payload)
 
 	case uint16(BASIC_PUBLISH):
-		log.Printf("[DEBUG] Received BASIC_PUBLISH frame \n")
+		log.Debug().Msg("Received BASIC_PUBLISH frame \n")
 		return parseBasicPublishFrame(payload)
 
 	// case uint16(BASIC_RETURN):
-	// 	log.Printf("[DEBUG] Received BASIC_RETURN frame \n")
+	// 	log.Debug().Msg("Received BASIC_RETURN frame \n")
 	// 	return parseBasicReturnFrame(payload)
 
-	// case uint16(BASIC_DELIVER):
-	// 	log.Printf("[DEBUG] Received BASIC_DELIVER frame \n")
-	// 	return parseBasicDeliverFrame(payload)
+	case uint16(BASIC_DELIVER):
+		log.Debug().Msg("Received BASIC_DELIVER frame \n")
+		log.Warn().Msg("Server should not receive BASIC_DELIVER frames from clients")
+		// TODO: return the appropriate exception
+		return nil, fmt.Errorf("server should not receive BASIC_DELIVER frames from clients")
 
 	case uint16(BASIC_GET):
-		log.Printf("[DEBUG] Received BASIC_GET frame \n")
+		log.Debug().Msg("Received BASIC_GET frame \n")
 		return parseBasicGetFrame(payload)
 
 	default:
