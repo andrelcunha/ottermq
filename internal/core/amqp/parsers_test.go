@@ -24,7 +24,7 @@ func TestParseHeaderFrame(t *testing.T) {
 	_ = binary.Write(&payload, binary.BigEndian, uint16(0x8000))
 
 	// Content type (short string)
-	payload.Write(EncodeShortStr("text/plain"))
+	EncodeShortStr(&payload, "text/plain")
 
 	channel := uint16(1)
 	payloadSize := uint32(payload.Len())
@@ -121,16 +121,16 @@ func TestParseMethodFrame_ConnectionClass(t *testing.T) {
 		"version": "1.0.0",
 	}
 	encodedProps := EncodeTable(clientProps)
-	methodPayload.Write(EncodeLongStr(encodedProps))
+	EncodeLongStr(&methodPayload, encodedProps)
 
 	// Mechanism (short string)
-	methodPayload.Write(EncodeShortStr("PLAIN"))
+	EncodeShortStr(&methodPayload, "PLAIN")
 
 	// Response (long string)
-	methodPayload.Write(EncodeLongStr([]byte("\x00test\x00password")))
+	EncodeLongStr(&methodPayload, []byte("\x00test\x00password"))
 
 	// Locale (short string)
-	methodPayload.Write(EncodeShortStr("en_US"))
+	EncodeShortStr(&methodPayload, "en_US")
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
@@ -180,7 +180,7 @@ func TestParseMethodFrame_ChannelClass(t *testing.T) {
 	var methodPayload bytes.Buffer
 
 	// Reserved field (short string, empty)
-	methodPayload.Write(EncodeShortStr(""))
+	EncodeShortStr(&methodPayload, "")
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
@@ -216,7 +216,7 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Queue name (short string)
-	methodPayload.Write(EncodeShortStr("test-queue"))
+	EncodeShortStr(&methodPayload, "test-queue")
 
 	// Flags (bits packed in a byte)
 	// passive (bit 0), durable (bit 1), exclusive (bit 2), auto-delete (bit 3), no-wait (bit 4)
@@ -226,7 +226,7 @@ func TestParseMethodFrame_QueueClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
@@ -262,10 +262,10 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
-	methodPayload.Write(EncodeShortStr("test-exchange"))
+	EncodeShortStr(&methodPayload, "test-exchange")
 
 	// Type (short string)
-	methodPayload.Write(EncodeShortStr("direct"))
+	EncodeShortStr(&methodPayload, "direct")
 
 	// Flags (bits packed in a byte)
 	// passive, durable, auto-delete, internal, no-wait
@@ -275,7 +275,7 @@ func TestParseMethodFrame_ExchangeClass(t *testing.T) {
 	// Arguments (table)
 	args := map[string]any{}
 	encodedArgs := EncodeTable(args)
-	methodPayload.Write(EncodeLongStr(encodedArgs))
+	EncodeLongStr(&methodPayload, encodedArgs)
 
 	// Create full payload with class and method IDs
 	var payload bytes.Buffer
@@ -311,10 +311,10 @@ func TestParseMethodFrame_BasicClass(t *testing.T) {
 	_ = binary.Write(&methodPayload, binary.BigEndian, uint16(0))
 
 	// Exchange name (short string)
-	methodPayload.Write(EncodeShortStr(""))
+	EncodeShortStr(&methodPayload, "")
 
 	// Routing key (short string)
-	methodPayload.Write(EncodeShortStr("test-queue"))
+	EncodeShortStr(&methodPayload, "test-queue")
 
 	// Flags (bits: mandatory, immediate)
 	flags := byte(0x00)
@@ -409,7 +409,7 @@ func TestDecodeBasicHeaderFlags(t *testing.T) {
 func TestCreateContentPropertiesTable(t *testing.T) {
 	// Test with content type
 	var buf bytes.Buffer
-	buf.Write(EncodeShortStr("application/json"))
+	EncodeShortStr(&buf, "application/json")
 
 	flags := []string{"contentType"}
 	props, err := createContentPropertiesTable(flags, bytes.NewReader(buf.Bytes()))

@@ -71,7 +71,7 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 	}
 	encodedProperties := EncodeTable(serverProperties)
 
-	payloadBuf.Write(EncodeLongStr(encodedProperties))
+	EncodeLongStr(&payloadBuf, encodedProperties)
 
 	// Extract mechanisms
 	mechanismsRaw, ok := (*configurations)["mechanisms"]
@@ -82,7 +82,7 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 	if !ok || len(mechanismsSlice) == 0 {
 		log.Fatal().Msg("mechanisms is not a non-empty []string")
 	}
-	payloadBuf.Write(EncodeLongStr([]byte(mechanismsSlice[0])))
+	EncodeLongStr(&payloadBuf, []byte(mechanismsSlice[0]))
 
 	// Extract locales
 	localesRaw, ok := (*configurations)["locales"]
@@ -93,7 +93,7 @@ func createConnectionStartFrame(configurations *map[string]any) []byte {
 	if !ok || len(localesSlice) == 0 {
 		log.Fatal().Msg("locales is not a non-empty []string")
 	}
-	payloadBuf.Write(EncodeLongStr([]byte(localesSlice[0])))
+	EncodeLongStr(&payloadBuf, []byte(localesSlice[0]))
 
 	frame := formatMethodFrame(channelNum, classID, methodID, payloadBuf.Bytes())
 	log.Printf("[DEBUG] Sending CONNECTION_START frame: %v", frame)

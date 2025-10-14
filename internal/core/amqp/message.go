@@ -154,14 +154,14 @@ func formatMethodPayload(content ContentList) []byte {
 				payloadBuf.WriteByte(0)
 			}
 		case STRING_SHORT:
-			payloadBuf.Write(EncodeShortStr(kv.Value.(string)))
+			EncodeShortStr(&payloadBuf, kv.Value.(string))
 		case STRING_LONG:
-			payloadBuf.Write(EncodeLongStr(kv.Value.([]byte)))
+			EncodeLongStr(&payloadBuf, kv.Value.([]byte))
 		case TIMESTAMP:
 			_ = binary.Write(&payloadBuf, binary.BigEndian, kv.Value.(int64)) // Error ignored as bytes.Buffer.Write never fails
 		case TABLE:
 			encodedTable := EncodeTable(kv.Value.(map[string]any))
-			payloadBuf.Write(EncodeLongStr(encodedTable))
+			EncodeLongStr(&payloadBuf, encodedTable)
 		}
 	}
 	return payloadBuf.Bytes()
@@ -175,27 +175,27 @@ func formatHeader(frameType uint8, channel uint16, payloadSize uint32) []byte {
 	return header
 }
 
-func EncodeGetOkToContentList(msg *BasicGetOk) *ContentList {
+func EncodeGetOkToContentList(content *BasicGetOkContent) *ContentList {
 	KeyValuePairs := []KeyValue{
 		{ // delivery_tag
 			Key:   INT_LONG_LONG,
-			Value: msg.DeliveryTag,
+			Value: content.DeliveryTag,
 		},
 		{ // redelivered
 			Key:   BIT,
-			Value: msg.Redelivered,
+			Value: content.Redelivered,
 		},
 		{ // exchange
 			Key:   STRING_SHORT,
-			Value: msg.Exchange,
+			Value: content.Exchange,
 		},
 		{ // routing_key
 			Key:   STRING_SHORT,
-			Value: msg.RoutingKey,
+			Value: content.RoutingKey,
 		},
 		{ // message_count
 			Key:   INT_LONG,
-			Value: msg.MessageCount,
+			Value: content.MessageCount,
 		},
 	}
 	contentList := &ContentList{KeyValuePairs: KeyValuePairs}
