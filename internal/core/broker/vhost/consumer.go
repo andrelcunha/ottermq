@@ -2,10 +2,10 @@ package vhost
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,9 +37,6 @@ type ConsumerProperties struct {
 }
 
 func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, props *ConsumerProperties) *Consumer {
-	if consumerTag == "" {
-		consumerTag = uuid.New().String() // Verify if isn't it overkill -- maybe a small random string would be enough, like 8 chars
-	}
 	return &Consumer{
 		Tag:        consumerTag,
 		Channel:    channel,
@@ -52,7 +49,7 @@ func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, p
 func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	key := ConsumerKey{consumer.Channel, consumer.Tag}
+
 	// Check if queue exists
 	_, ok := vh.Queues[consumer.QueueName]
 	if !ok {
@@ -60,10 +57,28 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 		return fmt.Errorf("queue %s does not exist", consumer.QueueName)
 	}
 
-	// Check for duplicates
-	if _, exists := vh.Consumers[key]; exists {
-		// TODO: return a channel exception error
-		return fmt.Errorf("consumer with tag %s already exists on channel %d", key.Tag, key.Channel)
+	var key ConsumerKey
+	if consumer.Tag == "" {
+		const maxRetries = 1000
+		var retries int
+		for {
+			consumer.Tag = generateConsumerTag()
+			key = ConsumerKey{consumer.Channel, consumer.Tag}
+			if _, exists := vh.Consumers[key]; !exists {
+				break
+			}
+			retries++
+			if retries >= maxRetries {
+				return fmt.Errorf("failed to generate unique consumer tag after %d attempts", maxRetries)
+			}
+		}
+	} else {
+		key = ConsumerKey{consumer.Channel, consumer.Tag}
+		// Check for duplicates
+		if _, exists := vh.Consumers[key]; exists {
+			// TODO: return a channel exception error
+			return fmt.Errorf("consumer with tag %s already exists on channel %d", key.Tag, key.Channel)
+		}
 	}
 
 	// Check if exclusive consumer already exists for this queue
@@ -249,6 +264,18 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
 	// TODO: realize how to handle NoAck consumers and message acks
 	// For now, we assume all consumers are NoAck
 	// So we don't need to track unacknowledged messages
-
 	return nil
+}
+
+func generatePseudoRandomString(n int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func generateConsumerTag() string {
+	return "amq.ctag-" + generatePseudoRandomString(12)
 }
