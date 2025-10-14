@@ -41,7 +41,7 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		messageCount := uint32(queue.Len())
 		consumerCount := uint32(0)
 
-		frame := b.framer.CreateQueueDeclareFrame(request, queueName, messageCount, consumerCount)
+		frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send queue declare frame")
 		}

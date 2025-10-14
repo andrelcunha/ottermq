@@ -69,7 +69,7 @@ func (m *MockFramer) CreateBasicGetOkFrame(request *amqp.RequestMethodMessage, e
 func (m *MockFramer) CreateBasicConsumeOkFrame(request *amqp.RequestMethodMessage, consumerTag string) []byte {
 	return []byte("basic-consume-ok:" + consumerTag)
 }
-func (m *MockFramer) CreateQueueDeclareFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return []byte("queue-declare")
 }
 func (m *MockFramer) CreateQueueBindOkFrame(request *amqp.RequestMethodMessage) []byte {

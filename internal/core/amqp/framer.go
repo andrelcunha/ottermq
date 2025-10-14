@@ -20,7 +20,7 @@ type Framer interface {
 	CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte
 
 	// Queue Methods
-	CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
+	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
 	CreateQueueBindOkFrame(request *RequestMethodMessage) []byte
 	CreateQueueDeleteOkFrame(request *RequestMethodMessage, messageCount uint32) []byte
 
@@ -66,8 +66,8 @@ func (d *DefaultFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
 
 // Queue Methods
 
-func (d *DefaultFramer) CreateQueueDeclareFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
-	return createQueueDeclareFrame(request, queueName, messageCount, consumerCount)
+func (d *DefaultFramer) CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
+	return createQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
 }
 
 func (d *DefaultFramer) CreateQueueBindOkFrame(request *RequestMethodMessage) []byte {
