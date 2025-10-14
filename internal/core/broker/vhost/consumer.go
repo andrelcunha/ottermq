@@ -6,6 +6,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type ConsumerKey struct {
@@ -233,13 +234,15 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
 	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)
 
 	if err := vh.framer.SendFrame(consumer.Connection, deliverFrame); err != nil {
-
+		log.Error().Err(err).Msg("Failed to send deliver frame")
 		return err
 	}
 	if err := vh.framer.SendFrame(consumer.Connection, headerFrame); err != nil {
+		log.Error().Err(err).Msg("Failed to send header frame")
 		return err
 	}
 	if err := vh.framer.SendFrame(consumer.Connection, bodyFrame); err != nil {
+		log.Error().Err(err).Msg("Failed to send body frame")
 		return err
 	}
 
