@@ -15,11 +15,10 @@ type Framer interface {
 
 	// Basic Methods
 	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
-	CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte
-	CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte
-	CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte
+	CreateBasicGetEmptyFrame(channel uint16) []byte
+	CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte
+	CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte
 	CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte
-
 
 	// Queue Methods
 	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
@@ -104,16 +103,20 @@ func (d *DefaultFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exc
 	return createBasicDeliverFrame(channel, consumerTag, exchange, routingKey, deliveryTag, redelivered)
 }
 
-func (d *DefaultFramer) CreateBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
-	return createBasicConsumeOkFrame(request, consumerTag)
+func (d *DefaultFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
+	return createBasicConsumeOkFrame(channel, consumerTag)
 }
 
-func (d *DefaultFramer) CreateBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
-	return createBasicGetEmptyFrame(request)
+func (d *DefaultFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
+	return createBasicCancelOkFrame(channel, consumerTag)
 }
 
-func (d *DefaultFramer) CreateBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
-	return createBasicGetOkFrame(request, exchange, routingkey, msgCount)
+func (d *DefaultFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
+	return createBasicGetEmptyFrame(channel)
+}
+
+func (d *DefaultFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
+	return createBasicGetOkFrame(channel, exchange, routingkey, msgCount)
 }
 
 func (d *DefaultFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {

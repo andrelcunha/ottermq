@@ -74,7 +74,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			return nil, err
 		}
 		if msgCount == 0 {
-			frame := b.framer.CreateBasicGetEmptyFrame(request)
+			frame := b.framer.CreateBasicGetEmptyFrame(request.Channel)
 			if err := b.framer.SendFrame(conn, frame); err != nil {
 				log.Error().Err(err).Msg("Failed to send basic get empty frame")
 			}
@@ -84,7 +84,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		// Send Basic.GetOk + header + body
 		msg := vh.GetMessage(queue)
 
-		frame := b.framer.CreateBasicGetOkFrame(request, msg.Exchange, msg.RoutingKey, uint32(msgCount))
+		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount))
 		err = b.framer.SendFrame(conn, frame)
 		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 
@@ -181,7 +181,7 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	}
 
 	if !noWait {
-		frame := b.framer.CreateBasicConsumeOkFrame(request, consumerTag)
+		frame := b.framer.CreateBasicConsumeOkFrame(request.Channel, consumerTag)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send basic consume ok frame")
 			// Verify if should return error (as channel exception) or just log it

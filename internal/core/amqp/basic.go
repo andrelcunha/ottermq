@@ -66,7 +66,7 @@ type BasicProperties struct {
 	Reserved        string         // shortstr
 }
 
-func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
+func createBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
 	keyValuePairs := []KeyValue{
 		{
 			Key:   STRING_SHORT,
@@ -75,8 +75,8 @@ func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string
 	}
 
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_CONSUME_OK),
 		Content:  ContentList{KeyValuePairs: keyValuePairs},
 	}.FormatMethodFrame()
@@ -134,22 +134,22 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 	return frame
 }
 
-func createBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
+func createBasicGetEmptyFrame(channel uint16) []byte {
 	// Send Basic.GetEmpty
 	reserved1 := KeyValue{
 		Key:   STRING_SHORT,
 		Value: "",
 	}
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_GET_EMPTY),
 		Content:  ContentList{KeyValuePairs: []KeyValue{reserved1}},
 	}.FormatMethodFrame()
 	return frame
 }
 
-func createBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
+func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
 	msgGetOk := &BasicGetOkContent{
 		DeliveryTag:  1,
 		Redelivered:  false,
@@ -159,8 +159,8 @@ func createBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey s
 	}
 
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_GET_OK),
 		Content:  *EncodeGetOkToContentList(msgGetOk),
 	}.FormatMethodFrame()

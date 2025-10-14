@@ -60,13 +60,13 @@ func (m *MockFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
 func (m *MockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	return []byte("basic-deliver")
 }
-func (m *MockFramer) CreateBasicGetEmptyFrame(request *amqp.RequestMethodMessage) []byte {
+func (m *MockFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
 	return []byte("basic-get-empty")
 }
-func (m *MockFramer) CreateBasicGetOkFrame(request *amqp.RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
+func (m *MockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
 	return []byte("basic-get-ok")
 }
-func (m *MockFramer) CreateBasicConsumeOkFrame(request *amqp.RequestMethodMessage, consumerTag string) []byte {
+func (m *MockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
 	return []byte("basic-consume-ok:" + consumerTag)
 }
 func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
