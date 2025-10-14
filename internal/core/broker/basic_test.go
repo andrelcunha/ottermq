@@ -69,6 +69,9 @@ func (m *MockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey 
 func (m *MockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
 	return []byte("basic-consume-ok:" + consumerTag)
 }
+func (m *MockFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
+	return []byte("basic-cancel-ok:" + consumerTag)
+}
 func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return []byte("queue-declare")
 }
