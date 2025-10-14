@@ -65,7 +65,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 
 		}
 	case uint16(amqp.BASIC_GET):
-		getMsg := request.Content.(*amqp.BasicGetMessage)
+		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
 		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {

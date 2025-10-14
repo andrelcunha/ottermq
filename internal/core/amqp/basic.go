@@ -25,7 +25,7 @@ type BasicPublishContent struct {
 	Immediate  bool
 }
 
-type BasicGetMessage struct {
+type BasicGetMessageContent struct {
 	Reserved1 uint16
 	Queue     string
 	NoAck     bool
@@ -37,6 +37,11 @@ type BasicGetOkContent struct {
 	Exchange     string
 	RoutingKey   string
 	MessageCount uint32
+}
+
+type BasicAckMessageContent struct {
+	DeliveryTag uint64
+	Multiple    bool
 }
 
 type BasicProperties struct {
@@ -297,9 +302,9 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Debug().Msg("Received BASIC_CONSUME frame \n")
 		return parseBasicConsumeFrame(payload)
 
-	// case uint16(BASIC_ACK):
-	// 	log.Debug().Msg("Received BASIC_ACK frame \n")
-	// 	return parseBasicAckFrame(payload)
+	case uint16(BASIC_ACK):
+		log.Debug().Msg("Received BASIC_ACK frame \n")
+		return parseBasicAckFrame(payload)
 
 	// case uint16(BASIC_REJECT):
 	// 	log.Debug().Msg("Received BASIC_REJECT frame \n")
@@ -476,7 +481,7 @@ func parseBasicGetFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 	flags := DecodeFlags(octet, []string{"noAck"}, true)
 	noAck := flags["noAck"]
-	msg := &BasicGetMessage{
+	msg := &BasicGetMessageContent{
 		Reserved1: reserved1,
 		Queue:     queue,
 		NoAck:     noAck,
@@ -484,4 +489,32 @@ func parseBasicGetFrame(payload []byte) (*RequestMethodMessage, error) {
 	return &RequestMethodMessage{
 		Content: msg,
 	}, nil
+}
+
+func parseBasicAckFrame(payload []byte) (*RequestMethodMessage, error) {
+	// Expected fields:
+	// 8 deliveryTag (long long int),
+	// 1 multiple (bit - packed as octet)
+	if len(payload) < 9 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	deliveryTag, err := DecodeLongLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"multiple"}, true)
+	multiple := flags["multiple"]
+	content := &BasicAckMessageContent{
+		DeliveryTag: deliveryTag,
+		Multiple:    multiple,
+	}
+	return &RequestMethodMessage{
+		Content: content,
+	}, nil
+
 }
