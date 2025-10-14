@@ -18,6 +18,11 @@ type BasicConsumeContent struct {
 	Arguments   map[string]any
 }
 
+type BasicCancelContent struct {
+	ConsumerTag string
+	Nowait      bool
+}
+
 type BasicPublishContent struct {
 	Exchange   string
 	RoutingKey string
@@ -302,6 +307,16 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Debug().Msg("Received BASIC_CONSUME frame \n")
 		return parseBasicConsumeFrame(payload)
 
+	case uint16(BASIC_CANCEL):
+		log.Debug().Msg("Received BASIC_CANCEL frame \n")
+		return parseBasicCancelFrame(payload)
+
+	case uint16(BASIC_CANCEL_OK):
+		log.Debug().Msg("Received BASIC_CANCEL_OK frame \n")
+		log.Warn().Msg("Server should not receive BASIC_CANCEL_OK frames from clients")
+		return nil, fmt.Errorf("server should not receive BASIC_CANCEL_OK frames from clients")
+		// return parseBasicCancelOkFrame(payload)
+
 	case uint16(BASIC_ACK):
 		log.Debug().Msg("Received BASIC_ACK frame \n")
 		return parseBasicAckFrame(payload)
@@ -412,6 +427,36 @@ func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
 		Content: content,
 	}
 	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
+	return request, nil
+}
+
+func parseBasicCancelFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 3 bytes long
+	// 1+ (consumer-tag) => short str = 1 (length) + 1+ bytes -- i don't accept empty consumer tags
+	// 1 (flags) => octet = 1 byte
+	if len(payload) < 3 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	buf := bytes.NewReader(payload)
+	consumerTag, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode consumer tag: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"nowait"}, true)
+	nowait := flags["nowait"]
+
+	content := &BasicCancelContent{
+		ConsumerTag: consumerTag,
+		Nowait:      nowait,
+	}
+	request := &RequestMethodMessage{
+		Content: content,
+	}
 	return request, nil
 }
 
