@@ -707,7 +707,7 @@ func TestParseBasicCancelFrame_ValidPayload(t *testing.T) {
 		t.Errorf("Expected consumer tag 'test-consumer', got '%s'", content.ConsumerTag)
 	}
 
-	if content.Nowait {
+	if content.NoWait {
 		t.Error("Expected Nowait to be false")
 	}
 }
@@ -743,7 +743,7 @@ func TestParseBasicCancelFrame_WithNowaitFlag(t *testing.T) {
 		t.Errorf("Expected consumer tag 'consumer1', got '%s'", content.ConsumerTag)
 	}
 
-	if !content.Nowait {
+	if !content.NoWait {
 		t.Error("Expected Nowait to be true")
 	}
 }
@@ -799,7 +799,7 @@ func TestParseBasicCancelFrame_LongConsumerTag(t *testing.T) {
 		t.Errorf("Expected consumer tag length %d, got %d", len(consumerTag), len(content.ConsumerTag))
 	}
 
-	if !content.Nowait {
+	if !content.NoWait {
 		t.Error("Expected Nowait to be true")
 	}
 }
@@ -858,7 +858,7 @@ func TestParseBasicCancelFrame_SingleCharacterTag(t *testing.T) {
 		t.Errorf("Expected consumer tag 'x', got '%s'", content.ConsumerTag)
 	}
 
-	if content.Nowait {
+	if content.NoWait {
 		t.Error("Expected Nowait to be false")
 	}
 }

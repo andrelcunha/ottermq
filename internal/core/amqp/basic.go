@@ -20,7 +20,7 @@ type BasicConsumeContent struct {
 
 type BasicCancelContent struct {
 	ConsumerTag string
-	Nowait      bool
+	NoWait      bool
 }
 
 type BasicPublishContent struct {
@@ -452,7 +452,7 @@ func parseBasicCancelFrame(payload []byte) (*RequestMethodMessage, error) {
 
 	content := &BasicCancelContent{
 		ConsumerTag: consumerTag,
-		Nowait:      nowait,
+		NoWait:      nowait,
 	}
 	request := &RequestMethodMessage{
 		Content: content,
