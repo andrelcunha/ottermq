@@ -164,6 +164,7 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 			// This approach would be used in the other handlers as well
 			return nil, err
 		}
+		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.ConsumeOk frame")
 	}
 	return nil, nil
 }
