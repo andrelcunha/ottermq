@@ -26,11 +26,10 @@ type Queue struct {
 }
 
 type QueueProperties struct {
-	Passive    bool      `json:"passive"`
+	Passive    bool      `json:"passive"` // TODO: #126 remove Passive Property and instead implement it at DeclareQueue
 	Durable    bool      `json:"durable"`
 	AutoDelete bool      `json:"auto_delete"`
 	Exclusive  bool      `json:"exclusive"` // not implemented yet
-	NoWait     bool      `json:"no_wait"`   // not necessary to persist this. TODO: remove from persistence and here. Implementation at connection level
 	Arguments  QueueArgs `json:"arguments"`
 }
 
@@ -100,7 +99,6 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 			Durable:    false,
 			AutoDelete: false,
 			Exclusive:  false,
-			NoWait:     false,
 			Arguments:  make(map[string]any),
 		}
 	}
@@ -179,11 +177,10 @@ func (vh *VHost) DeleteQueue(name string) error {
 
 func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 	return persistence.QueueProperties{
-		Passive:    qp.Passive,
+		Passive:    qp.Passive, //TODO(#126) remove Passive from persistence
 		Durable:    qp.Durable,
 		AutoDelete: qp.AutoDelete,
 		Exclusive:  qp.Exclusive,
-		NoWait:     qp.NoWait,
 		Arguments:  qp.Arguments,
 	}
 }

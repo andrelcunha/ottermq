@@ -30,7 +30,6 @@ type QueueProperties struct {
 	Durable    bool           `json:"durable"`
 	Exclusive  bool           `json:"exclusive"`
 	AutoDelete bool           `json:"auto_delete"`
-	NoWait     bool           `json:"no_wait"` // Not needed in persistence*
 	Arguments  map[string]any `json:"arguments"`
 }
 

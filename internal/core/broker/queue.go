@@ -26,7 +26,6 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 			Durable:    content.Durable,
 			AutoDelete: content.AutoDelete,
 			Exclusive:  content.Exclusive,
-			NoWait:     content.NoWait,
 			Arguments:  content.Arguments,
 		})
 		if err != nil {
@@ -41,9 +40,11 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 		messageCount := uint32(queue.Len())
 		consumerCount := uint32(0)
 
-		frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
-		if err := b.framer.SendFrame(conn, frame); err != nil {
-			log.Error().Err(err).Msg("Failed to send queue declare frame")
+		if !content.NoWait {
+			frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
+			if err := b.framer.SendFrame(conn, frame); err != nil {
+				log.Error().Err(err).Msg("Failed to send queue declare frame")
+			}
 		}
 		return nil, nil
 

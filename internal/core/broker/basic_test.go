@@ -114,7 +114,6 @@ func createTestBroker() (*Broker, *MockFramer, net.Conn) {
 			Durable:    false,
 			AutoDelete: false,
 			Exclusive:  false,
-			NoWait:     false,
 			Arguments:  nil,
 		},
 	}

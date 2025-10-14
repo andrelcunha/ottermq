@@ -33,7 +33,6 @@ func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) e
 			Durable:    props.Durable,
 			Exclusive:  props.Exclusive,
 			AutoDelete: props.AutoDelete,
-			NoWait:     props.NoWait,
 			Arguments:  props.Arguments,
 		},
 	}
