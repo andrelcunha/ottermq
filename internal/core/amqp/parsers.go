@@ -185,7 +185,7 @@ func parseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*Chan
 	switch classID {
 
 	case uint16(BASIC):
-		log.Debug().Uint16("channel", channel).Msg("Received BASIC HEADER frame")
+		log.Trace().Uint16("channel", channel).Msg("Received BASIC HEADER frame")
 		request, err := parseBasicHeader(payload)
 		if err != nil {
 			return nil, err

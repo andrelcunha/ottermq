@@ -35,7 +35,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
 			b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
 			b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
-			log.Debug().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
+			log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
 			return nil, nil
 		}
 		if currentState.Body == nil && newState.Body != nil {
@@ -45,9 +45,9 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		}
 		log.Trace().Interface("state", currentState).Msg("Current state after all")
 		if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-			log.Debug().Interface("state", currentState).Msg("All fields must be filled")
+			log.Trace().Interface("state", currentState).Msg("All fields must be filled")
 			if len(currentState.Body) != int(currentState.BodySize) {
-				log.Debug().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
+				log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
 				// TODO: handle this error properly, maybe sending the correct channel exception
 				// vide amqp.constants.go Exceptions
 				return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
@@ -59,7 +59,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			props := currentState.HeaderFrame.Properties
 			_, err := vh.Publish(exchanege, routingKey, body, props)
 			if err == nil {
-				log.Debug().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
+				log.Trace().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 				b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			}
 			return nil, err
