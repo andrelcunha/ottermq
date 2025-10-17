@@ -44,7 +44,7 @@ type BasicGetOkContent struct {
 	MessageCount uint32
 }
 
-type BasicAckMessageContent struct {
+type BasicAckContent struct {
 	DeliveryTag uint64
 	Multiple    bool
 }
@@ -571,7 +571,7 @@ func parseBasicAckFrame(payload []byte) (*RequestMethodMessage, error) {
 	}
 	flags := DecodeFlags(octet, []string{"multiple"}, true)
 	multiple := flags["multiple"]
-	content := &BasicAckMessageContent{
+	content := &BasicAckContent{
 		DeliveryTag: deliveryTag,
 		Multiple:    multiple,
 	}
