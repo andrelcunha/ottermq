@@ -21,13 +21,15 @@ type ConnectionChannelKey struct {
 }
 
 type Consumer struct {
-	Tag         string
-	Channel     uint16
-	QueueName   string
-	Connection  net.Conn
-	DeliveryTag uint64 // will be incremented per delivery
-	Active      bool
-	Props       *ConsumerProperties
+	Tag             string
+	Channel         uint16
+	QueueName       string
+	Connection      net.Conn
+	DeliveryTag     uint64 // will be incremented per delivery
+	Active          bool
+	Props           *ConsumerProperties
+	UnackedMessages map[uint64]*amqp.Message // deliveryTag -> message
+	LastDeliveryTag uint64
 }
 
 type ConsumerProperties struct {
