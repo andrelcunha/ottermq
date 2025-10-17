@@ -18,6 +18,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicConsumeHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_CANCEL):
+		return b.basicCancelHandler(request, conn, vh)
 	case uint16(amqp.BASIC_PUBLISH):
 		channel := request.Channel
 		currentState := b.getCurrentState(conn, channel)
@@ -34,7 +35,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
 			b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
 			b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
-			log.Debug().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
+			log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
 			return nil, nil
 		}
 		if currentState.Body == nil && newState.Body != nil {
@@ -44,9 +45,9 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		}
 		log.Trace().Interface("state", currentState).Msg("Current state after all")
 		if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-			log.Debug().Interface("state", currentState).Msg("All fields must be filled")
+			log.Trace().Interface("state", currentState).Msg("All fields must be filled")
 			if len(currentState.Body) != int(currentState.BodySize) {
-				log.Debug().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
+				log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
 				// TODO: handle this error properly, maybe sending the correct channel exception
 				// vide amqp.constants.go Exceptions
 				return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
@@ -58,14 +59,14 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			props := currentState.HeaderFrame.Properties
 			_, err := vh.Publish(exchanege, routingKey, body, props)
 			if err == nil {
-				log.Debug().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
+				log.Trace().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
 				b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
 			}
 			return nil, err
 
 		}
 	case uint16(amqp.BASIC_GET):
-		getMsg := request.Content.(*amqp.BasicGetMessage)
+		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
 		msgCount, err := vh.GetMessageCount(queue)
 		if err != nil {
@@ -73,7 +74,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 			return nil, err
 		}
 		if msgCount == 0 {
-			frame := b.framer.CreateBasicGetEmptyFrame(request)
+			frame := b.framer.CreateBasicGetEmptyFrame(request.Channel)
 			if err := b.framer.SendFrame(conn, frame); err != nil {
 				log.Error().Err(err).Msg("Failed to send basic get empty frame")
 			}
@@ -83,7 +84,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		// Send Basic.GetOk + header + body
 		msg := vh.GetMessage(queue)
 
-		frame := b.framer.CreateBasicGetOkFrame(request, msg.Exchange, msg.RoutingKey, uint32(msgCount))
+		frame := b.framer.CreateBasicGetOkFrame(request.Channel, msg.Exchange, msg.RoutingKey, uint32(msgCount))
 		err = b.framer.SendFrame(conn, frame)
 		log.Debug().Str("queue", queue).Str("id", msg.ID).Msg("Sent message from queue")
 
@@ -111,13 +112,37 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return nil, nil
 
 	case uint16(amqp.BASIC_ACK):
-		return nil, fmt.Errorf("not implemented")
+		return b.basicAckHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_REJECT):
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
 	case uint16(amqp.BASIC_RECOVER):
 	default:
 		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
+}
+
+func (b *Broker) basicCancelHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicCancelContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic cancel content")
+	}
+
+	consumerTag := content.ConsumerTag
+	err := vh.CancelConsumer(request.Channel, consumerTag)
+	if err != nil {
+		log.Error().Err(err).Str("consumer_tag", consumerTag).Msg("Failed to cancel consumer")
+		return nil, err
+	}
+
+	if !content.NoWait {
+		frame := b.framer.CreateBasicCancelOkFrame(request.Channel, consumerTag)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send basic cancel ok frame")
+			return nil, err
+		}
+		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.CancelOk frame")
 	}
 	return nil, nil
 }
@@ -156,7 +181,7 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 	}
 
 	if !noWait {
-		frame := b.framer.CreateBasicConsumeOkFrame(request, consumerTag)
+		frame := b.framer.CreateBasicConsumeOkFrame(request.Channel, consumerTag)
 		if err := b.framer.SendFrame(conn, frame); err != nil {
 			log.Error().Err(err).Msg("Failed to send basic consume ok frame")
 			// Verify if should return error (as channel exception) or just log it
@@ -168,5 +193,19 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 		}
 		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.ConsumeOk frame")
 	}
+	return nil, nil
+}
+
+func (b *Broker) basicAckHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicAckContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic ack content")
+	}
+	err := vh.HandleBasicAck(conn, request.Channel, content.DeliveryTag, content.Multiple)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to acknowledge message")
+		return nil, err
+	}
+	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Acknowledged message")
 	return nil, nil
 }

@@ -74,15 +74,15 @@ func (b *Broker) handleConnection(conn net.Conn, connInfo *amqp.ConnectionInfo) 
 			}
 		} else {
 			if newState.HeaderFrame != nil {
-				log.Debug().Interface("header", newState.HeaderFrame).Msg("HeaderFrame")
+				log.Trace().Interface("header", newState.HeaderFrame).Msg("HeaderFrame")
 			} else if newState.Body != nil {
-				log.Debug().Interface("body", newState.Body).Msg("Body")
+				log.Trace().Interface("body", newState.Body).Msg("Body")
 			}
 			if previousState, exists := b.Connections[conn].Channels[channelNum]; exists {
 				newState.MethodFrame = previousState.MethodFrame
-				log.Debug().Interface("method_frame", previousState.MethodFrame).Msg("Recovered method frame")
+				log.Trace().Interface("method_frame", previousState.MethodFrame).Msg("Recovered method frame")
 			} else {
-				log.Debug().Uint16("channel", channelNum).Msg("Channel not found")
+				log.Trace().Uint16("channel", channelNum).Msg("Channel not found")
 				continue
 			}
 		}

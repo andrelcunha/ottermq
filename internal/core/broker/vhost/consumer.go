@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-
-	"github.com/andrelcunha/ottermq/internal/core/amqp"
-	"github.com/rs/zerolog/log"
 )
 
 type ConsumerKey struct {
@@ -21,13 +18,12 @@ type ConnectionChannelKey struct {
 }
 
 type Consumer struct {
-	Tag         string
-	Channel     uint16
-	QueueName   string
-	Connection  net.Conn
-	DeliveryTag uint64 // will be incremented per delivery
-	Active      bool
-	Props       *ConsumerProperties
+	Tag        string
+	Channel    uint16
+	QueueName  string
+	Connection net.Conn
+	Active     bool
+	Props      *ConsumerProperties
 }
 
 type ConsumerProperties struct {
@@ -172,9 +168,32 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 
 	channelKey := ConnectionChannelKey{connection, channel}
 	// Get copy of consumers to avoid modification during iteration
+	_ = cancelAllConsumers(vh, channelKey)
+
+	if ch := vh.ChannelDeliveries[channelKey]; ch != nil {
+		ch.mu.Lock()
+		// copy records to avoid modification during iteration
+		records := make([]*DeliveryRecord, 0, len(ch.Unacked))
+		for _, record := range ch.Unacked {
+			records = append(records, record)
+		}
+		ch.mu.Unlock()
+
+		// Requeue unacknowledged messages
+		for _, record := range records {
+			queue, exists := vh.Queues[record.QueueName]
+			if exists {
+				queue.Push(record.Message)
+			}
+		}
+		delete(vh.ChannelDeliveries, channelKey)
+	}
+}
+
+func cancelAllConsumers(vh *VHost, channelKey ConnectionChannelKey) bool {
 	consumersForChannel, exists := vh.ConsumersByChannel[channelKey]
 	if !exists {
-		return // No consumers on this channel
+		return true // No consumers on this channel
 	}
 
 	consumersCopy := make([]*Consumer, len(consumersForChannel))
@@ -188,6 +207,7 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 		vh.mu.Lock()
 	}
 	delete(vh.ConsumersByChannel, channelKey)
+	return false
 }
 
 func (vh *VHost) CleanupConnection(connection net.Conn) {
@@ -226,45 +246,6 @@ func (vh *VHost) GetActiveConsumersForQueue(queueName string) []*Consumer {
 		}
 	}
 	return activeConsumers
-}
-
-func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
-	// vh should not have access to framer
-	// nevertheless, i don't know how to get the framer without a circular dependency
-	if !consumer.Active {
-		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
-	}
-	consumer.DeliveryTag++
-	deliverFrame := vh.framer.CreateBasicDeliverFrame(
-		consumer.Channel,
-		consumer.Tag,
-		msg.Exchange,
-		msg.RoutingKey,
-		consumer.DeliveryTag,
-		false, // redelivered - TODO: implement redelivery logic
-	)
-
-	headerFrame := vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg)
-
-	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)
-
-	if err := vh.framer.SendFrame(consumer.Connection, deliverFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send deliver frame")
-		return err
-	}
-	if err := vh.framer.SendFrame(consumer.Connection, headerFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send header frame")
-		return err
-	}
-	if err := vh.framer.SendFrame(consumer.Connection, bodyFrame); err != nil {
-		log.Error().Err(err).Msg("Failed to send body frame")
-		return err
-	}
-
-	// TODO: realize how to handle NoAck consumers and message acks
-	// For now, we assume all consumers are NoAck
-	// So we don't need to track unacknowledged messages
-	return nil
 }
 
 func generatePseudoRandomString(n int) string {

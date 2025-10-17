@@ -676,4 +676,189 @@ func TestCreateBasicDeliverFrame_EdgeCases(t *testing.T) {
 	}
 }
 
-// Helper functions for min/max (if not available in your Go version)
+func TestParseBasicCancelFrame_ValidPayload(t *testing.T) {
+	// Create a payload with consumer tag "test-consumer" and nowait=false
+	var payload []byte
+
+	// Consumer tag: "test-consumer" (12 bytes + 1 length byte)
+	consumerTag := "test-consumer"
+	payload = append(payload, byte(len(consumerTag)))
+	payload = append(payload, []byte(consumerTag)...)
+
+	// Flags: nowait=false (bit 0 = 0)
+	payload = append(payload, 0x00)
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+
+	content, ok := result.Content.(*BasicCancelContent)
+	if !ok {
+		t.Fatalf("Expected BasicCancelContent, got %T", result.Content)
+	}
+
+	if content.ConsumerTag != "test-consumer" {
+		t.Errorf("Expected consumer tag 'test-consumer', got '%s'", content.ConsumerTag)
+	}
+
+	if content.NoWait {
+		t.Error("Expected Nowait to be false")
+	}
+}
+
+func TestParseBasicCancelFrame_WithNowaitFlag(t *testing.T) {
+	// Create a payload with consumer tag "consumer1" and nowait=true
+	var payload []byte
+
+	// Consumer tag: "consumer1"
+	consumerTag := "consumer1"
+	payload = append(payload, byte(len(consumerTag)))
+	payload = append(payload, []byte(consumerTag)...)
+
+	// Flags: nowait=true (bit 0 = 1)
+	payload = append(payload, 0x01)
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+
+	content, ok := result.Content.(*BasicCancelContent)
+	if !ok {
+		t.Fatalf("Expected BasicCancelContent, got %T", result.Content)
+	}
+
+	if content.ConsumerTag != "consumer1" {
+		t.Errorf("Expected consumer tag 'consumer1', got '%s'", content.ConsumerTag)
+	}
+
+	if !content.NoWait {
+		t.Error("Expected Nowait to be true")
+	}
+}
+
+func TestParseBasicCancelFrame_PayloadTooShort(t *testing.T) {
+	// Payload with only 2 bytes (minimum is 3)
+	payload := []byte{0x01, 0x41} // length=1, 'A'
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err == nil {
+		t.Error("Expected error for payload too short")
+	}
+
+	expectedError := "payload too short"
+	if err.Error() != expectedError {
+		t.Errorf("Expected error '%s', got '%s'", expectedError, err.Error())
+	}
+
+	if result != nil {
+		t.Error("Expected nil result")
+	}
+}
+
+func TestParseBasicCancelFrame_LongConsumerTag(t *testing.T) {
+	// Create payload with long consumer tag (255 chars - maximum for short string)
+	consumerTag := string(make([]byte, 255))
+	for i := range consumerTag {
+		consumerTag = consumerTag[:i] + "a" + consumerTag[i+1:]
+	}
+
+	var payload []byte
+	payload = append(payload, byte(len(consumerTag)))
+	payload = append(payload, []byte(consumerTag)...)
+	payload = append(payload, 0x01) // nowait=true
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+
+	content, ok := result.Content.(*BasicCancelContent)
+	if !ok {
+		t.Fatalf("Expected BasicCancelContent, got %T", result.Content)
+	}
+
+	if content.ConsumerTag != consumerTag {
+		t.Errorf("Expected consumer tag length %d, got %d", len(consumerTag), len(content.ConsumerTag))
+	}
+
+	if !content.NoWait {
+		t.Error("Expected Nowait to be true")
+	}
+}
+
+func TestParseBasicCancelFrame_MissingFlagsByte(t *testing.T) {
+	// Create payload missing the flags byte
+	var payload []byte
+
+	// Consumer tag: "test"
+	consumerTag := "test"
+	payload = append(payload, byte(len(consumerTag)))
+	payload = append(payload, []byte(consumerTag)...)
+	// Missing flags byte
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err == nil {
+		t.Error("Expected error for missing flags byte")
+	}
+
+	if !bytes.Contains([]byte(err.Error()), []byte("failed to read octet")) {
+		t.Errorf("Expected error about reading octet, got: %v", err)
+	}
+
+	if result != nil {
+		t.Error("Expected nil result")
+	}
+}
+
+func TestParseBasicCancelFrame_SingleCharacterTag(t *testing.T) {
+	// Test with minimum valid consumer tag (1 character)
+	var payload []byte
+
+	// Consumer tag: "x"
+	consumerTag := "x"
+	payload = append(payload, byte(len(consumerTag)))
+	payload = append(payload, []byte(consumerTag)...)
+	payload = append(payload, 0x00) // nowait=false
+
+	result, err := parseBasicCancelFrame(payload)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected result, got nil")
+	}
+
+	content, ok := result.Content.(*BasicCancelContent)
+	if !ok {
+		t.Fatalf("Expected BasicCancelContent, got %T", result.Content)
+	}
+
+	if content.ConsumerTag != "x" {
+		t.Errorf("Expected consumer tag 'x', got '%s'", content.ConsumerTag)
+	}
+
+	if content.NoWait {
+		t.Error("Expected Nowait to be false")
+	}
+}
