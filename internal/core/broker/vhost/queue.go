@@ -58,7 +58,10 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 				q.delivering = false
 				return
 			case msg := <-q.messages:
-				// Here we would deliver the message to consumers
+				q.mu.Lock()
+				q.count--
+				q.mu.Unlock()
+
 				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
 				consumers := vh.GetActiveConsumersForQueue(q.Name)
 				if len(consumers) > 0 {
