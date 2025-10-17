@@ -72,7 +72,7 @@ const rows = computed(() =>
   store.items.map(q => ({
     ...q,
     status: 'running',
-    unacked: (q.messages_unacknowledged || 0),
+    unacked: (q.unacked || 0),
     persisted: (q.messages_persistent || 0),
     total: (q.messages || 0)
   }))

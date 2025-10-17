@@ -118,12 +118,14 @@ func (a DefaultManagerApi) ListQueues() ([]models.QueueDTO, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for _, vh := range b.VHosts {
+		unacked := vh.GetUnackedMessageCountsAllQueues()
 		for _, queue := range vh.Queues {
 			queues = append(queues, models.QueueDTO{
 				VHostName: vh.Name,
 				VHostId:   vh.Id,
 				Name:      queue.Name,
 				Messages:  queue.Len(),
+				Unacked:   unacked[queue.Name],
 			})
 		}
 	}

@@ -52,6 +52,7 @@ type QueueDTO struct {
 	VHostId   string `json:"vhost_id"`
 	Name      string `json:"name"`
 	Messages  int    `json:"messages"`
+	Unacked   int    `json:"unacked"`
 }
 
 type BindingDTO struct {
