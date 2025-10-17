@@ -32,25 +32,23 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] `BASIC_GET` for pull-based consumption
   - [x] Message count reporting
 
-### 🚧 **In Progress**
+### � **Recently Completed**
 
-- [ ] Consumer management system refactoring
+- [x] Consumer management system refactoring
+- [x] **`BASIC_CONSUME`** - Start consuming messages from queue
+  - [x] Consumer tag generation and management
+  - [x] Consumer registration per channel
+  - [x] Integration with queue message delivery
+- [x] **`BASIC_DELIVER`** - Server-initiated message delivery
+  - [x] Push-based message delivery to consumers
+  - [x] Delivery tag generation and tracking
+- [x] **`BASIC_CANCEL`** - Cancel consumer subscription
+  - [x] Clean consumer shutdown
+  - [x] Resource cleanup on cancellation
+- [x] **`BASIC_CONSUME_OK`** / **`BASIC_CANCEL_OK`** - Response frames
 
 ### ❌ **Missing Critical Features**
 
-#### **Phase 1: Message Consumption (High Priority)**
-
-- [ ] **`BASIC_CONSUME`** - Start consuming messages from queue
-  - [ ] Consumer tag generation and management
-  - [ ] Consumer registration per channel
-  - [ ] Integration with queue message delivery
-- [ ] **`BASIC_DELIVER`** - Server-initiated message delivery
-  - [ ] Push-based message delivery to consumers
-  - [ ] Delivery tag generation and tracking
-- [ ] **`BASIC_CANCEL`** - Cancel consumer subscription
-  - [ ] Clean consumer shutdown
-  - [ ] Resource cleanup on cancellation
-- [ ] **`BASIC_CONSUME_OK`** / **`BASIC_CANCEL_OK`** - Response frames
 
 #### **Phase 2: Message Acknowledgments (High Priority)**
 
@@ -229,7 +227,7 @@ The highest priority is **Phase 1: Core Messaging**. Contributors should focus o
 ## Progress Tracking
 
 **Last Updated**: October 2025  
-**Current Focus**: Phase 1 - Consumer Management  
-**Next Milestone**: Working `BASIC_CONSUME` implementation
+**Current Focus**: Phase 2 - Reliable Delivery (Message Acknowledgments)  
+**Next Milestone**: `BASIC_ACK` and delivery tracking implementation
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.

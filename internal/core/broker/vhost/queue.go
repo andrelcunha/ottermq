@@ -74,6 +74,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 						vh.CancelConsumer(consumer.Channel, consumer.Tag)
 						// Requeue the message
 						// Requeue just if rejected and `requeue` is true
+						q.Push(msg)
 					}
 				}
 			}
@@ -211,18 +212,6 @@ func (q *Queue) Pop() *amqp.Message {
 	default:
 		log.Debug().Str("queue", q.Name).Msg("Queue is empty")
 		return nil
-	}
-}
-
-func (q *Queue) ReQueue(msg amqp.Message) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	select {
-	case q.messages <- msg:
-		q.count++
-		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Bytes("body", msg.Body).Msg("Pushed message to queue")
-	default:
-		log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Queue channel full, dropping message")
 	}
 }
 
