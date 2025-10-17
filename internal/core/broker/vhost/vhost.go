@@ -23,8 +23,9 @@ type VHost struct {
 	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
 	ConsumersByChannel map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
 	/*Delivery*/
-	activeDeliveries map[string]context.CancelFunc // queueName -> cancelFunc
-	framer           amqp.Framer
+	activeDeliveries  map[string]context.CancelFunc // queueName -> cancelFunc
+	framer            amqp.Framer
+	ChannelDeliveries map[ConnectionChannelKey]*ChannelDeliveryState
 }
 
 func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
@@ -41,6 +42,7 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		ConsumersByQueue:   make(map[string][]*Consumer),
 		ConsumersByChannel: make(map[ConnectionChannelKey][]*Consumer),
 		activeDeliveries:   make(map[string]context.CancelFunc),
+		ChannelDeliveries:  make(map[ConnectionChannelKey]*ChannelDeliveryState),
 	}
 	vh.createMandatoryStructure()
 	return vh
