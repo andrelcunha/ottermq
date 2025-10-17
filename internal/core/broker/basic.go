@@ -112,7 +112,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return nil, nil
 
 	case uint16(amqp.BASIC_ACK):
-		return nil, fmt.Errorf("not implemented")
+		return b.basicAckHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_REJECT):
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
@@ -193,5 +193,19 @@ func (b *Broker) basicConsumeHandler(request *amqp.RequestMethodMessage, conn ne
 		}
 		log.Debug().Str("consumer_tag", consumerTag).Msg("Sent Basic.ConsumeOk frame")
 	}
+	return nil, nil
+}
+
+func (b *Broker) basicAckHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicAckContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic ack content")
+	}
+	err := vh.HandleBasicAck(conn, request.Channel, content.DeliveryTag, content.Multiple)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to acknowledge message")
+		return nil, err
+	}
+	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Acknowledged message")
 	return nil, nil
 }
