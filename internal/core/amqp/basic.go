@@ -18,6 +18,11 @@ type BasicConsumeContent struct {
 	Arguments   map[string]any
 }
 
+type BasicCancelContent struct {
+	ConsumerTag string
+	NoWait      bool
+}
+
 type BasicPublishContent struct {
 	Exchange   string
 	RoutingKey string
@@ -61,7 +66,7 @@ type BasicProperties struct {
 	Reserved        string         // shortstr
 }
 
-func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string) []byte {
+func createBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
 	keyValuePairs := []KeyValue{
 		{
 			Key:   STRING_SHORT,
@@ -70,9 +75,26 @@ func createBasicConsumeOkFrame(request *RequestMethodMessage, consumerTag string
 	}
 
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_CONSUME_OK),
+		Content:  ContentList{KeyValuePairs: keyValuePairs},
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
+	keyValuePairs := []KeyValue{
+		{
+			Key:   STRING_SHORT,
+			Value: consumerTag,
+		},
+	}
+
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_CANCEL_OK),
 		Content:  ContentList{KeyValuePairs: keyValuePairs},
 	}.FormatMethodFrame()
 	return frame
@@ -112,22 +134,22 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 	return frame
 }
 
-func createBasicGetEmptyFrame(request *RequestMethodMessage) []byte {
+func createBasicGetEmptyFrame(channel uint16) []byte {
 	// Send Basic.GetEmpty
 	reserved1 := KeyValue{
 		Key:   STRING_SHORT,
 		Value: "",
 	}
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_GET_EMPTY),
 		Content:  ContentList{KeyValuePairs: []KeyValue{reserved1}},
 	}.FormatMethodFrame()
 	return frame
 }
 
-func createBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey string, msgCount uint32) []byte {
+func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
 	msgGetOk := &BasicGetOkContent{
 		DeliveryTag:  1,
 		Redelivered:  false,
@@ -137,8 +159,8 @@ func createBasicGetOkFrame(request *RequestMethodMessage, exchange, routingkey s
 	}
 
 	frame := ResponseMethodMessage{
-		Channel:  request.Channel,
-		ClassID:  request.ClassID,
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_GET_OK),
 		Content:  *EncodeGetOkToContentList(msgGetOk),
 	}.FormatMethodFrame()
@@ -302,6 +324,16 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Debug().Msg("Received BASIC_CONSUME frame \n")
 		return parseBasicConsumeFrame(payload)
 
+	case uint16(BASIC_CANCEL):
+		log.Debug().Msg("Received BASIC_CANCEL frame \n")
+		return parseBasicCancelFrame(payload)
+
+	case uint16(BASIC_CANCEL_OK):
+		log.Debug().Msg("Received BASIC_CANCEL_OK frame \n")
+		log.Warn().Msg("Server should not receive BASIC_CANCEL_OK frames from clients")
+		return nil, fmt.Errorf("server should not receive BASIC_CANCEL_OK frames from clients")
+		// return parseBasicCancelOkFrame(payload)
+
 	case uint16(BASIC_ACK):
 		log.Debug().Msg("Received BASIC_ACK frame \n")
 		return parseBasicAckFrame(payload)
@@ -412,6 +444,36 @@ func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
 		Content: content,
 	}
 	log.Printf("[DEBUG] BasicConsume fomated: %+v \n", content)
+	return request, nil
+}
+
+func parseBasicCancelFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 3 bytes long
+	// 1+ (consumer-tag) => short str = 1 (length) + 1+ bytes -- i don't accept empty consumer tags
+	// 1 (flags) => octet = 1 byte
+	if len(payload) < 3 {
+		return nil, fmt.Errorf("payload too short")
+	}
+
+	buf := bytes.NewReader(payload)
+	consumerTag, err := DecodeShortStr(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode consumer tag: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"nowait"}, true)
+	nowait := flags["nowait"]
+
+	content := &BasicCancelContent{
+		ConsumerTag: consumerTag,
+		NoWait:      nowait,
+	}
+	request := &RequestMethodMessage{
+		Content: content,
+	}
 	return request, nil
 }
 

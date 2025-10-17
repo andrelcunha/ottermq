@@ -140,6 +140,17 @@ func parseMethodFrame(channel uint16, payload []byte) (*ChannelState, error) {
 		log.Debug().Uint16("channel", channel).Msg("Received BASIC frame")
 		request, err := parseBasicMethod(methodID, methodPayload)
 		if err != nil {
+			// The raised exception (connection type):
+			// (501 - "frame error"),
+			// (502 - "syntax error"),
+			// (503 - "command invalid"),
+			// (504 - "channel error"), -- shall be handled at a higher level
+			// (505 - "unexpected frame"),
+			// (506 - "resource error"), -- shall be handled at a higher level
+			// (530 - "not allowed"), -- shall be handled at a higher level
+			// (540 - "not implemented"),
+			// (541 - "internal error"),
+			//
 			return nil, err
 		}
 		if request != nil {
@@ -174,7 +185,7 @@ func parseHeaderFrame(channel uint16, payloadSize uint32, payload []byte) (*Chan
 	switch classID {
 
 	case uint16(BASIC):
-		log.Debug().Uint16("channel", channel).Msg("Received BASIC HEADER frame")
+		log.Trace().Uint16("channel", channel).Msg("Received BASIC HEADER frame")
 		request, err := parseBasicHeader(payload)
 		if err != nil {
 			return nil, err
