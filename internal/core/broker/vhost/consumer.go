@@ -235,7 +235,7 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 		err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
 		vh.mu.Lock()
 		if err != nil {
-			fmt.Printf("Error cancelling consumer %s on channel %d: %v\n", consumer.Tag, consumer.Channel, err)
+			log.Error().Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
 		}
 	}
 }
