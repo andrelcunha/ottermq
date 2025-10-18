@@ -49,6 +49,11 @@ type BasicAckContent struct {
 	Multiple    bool
 }
 
+type BasicRejectContent struct {
+	DeliveryTag uint64
+	Requeue     bool
+}
+
 type BasicProperties struct {
 	ContentType     ContentType    // shortstr
 	ContentEncoding string         // shortstr
@@ -332,15 +337,14 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Debug().Msg("Received BASIC_CANCEL_OK frame \n")
 		log.Warn().Msg("Server should not receive BASIC_CANCEL_OK frames from clients")
 		return nil, fmt.Errorf("server should not receive BASIC_CANCEL_OK frames from clients")
-		// return parseBasicCancelOkFrame(payload)
 
 	case uint16(BASIC_ACK):
 		log.Debug().Msg("Received BASIC_ACK frame \n")
 		return parseBasicAckFrame(payload)
 
-	// case uint16(BASIC_REJECT):
-	// 	log.Debug().Msg("Received BASIC_REJECT frame \n")
-	// 	return parseBasicRejectFrame(payload)
+	case uint16(BASIC_REJECT):
+		log.Debug().Msg("Received BASIC_REJECT frame \n")
+		return parseBasicRejectFrame(payload)
 
 	case uint16(BASIC_PUBLISH):
 		log.Debug().Msg("Received BASIC_PUBLISH frame \n")
@@ -579,4 +583,31 @@ func parseBasicAckFrame(payload []byte) (*RequestMethodMessage, error) {
 		Content: content,
 	}, nil
 
+}
+
+func parseBasicRejectFrame(payload []byte) (*RequestMethodMessage, error) {
+	// Expected fields:
+	// 8 deliveryTag (long long int),
+	// 1 requeue (bit - packed as octet)
+	if len(payload) < 9 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	deliveryTag, err := DecodeLongLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"requeue"}, true)
+	requeue := flags["requeue"]
+	content := &BasicRejectContent{
+		DeliveryTag: deliveryTag,
+		Requeue:     requeue,
+	}
+	return &RequestMethodMessage{
+		Content: content,
+	}, nil
 }
