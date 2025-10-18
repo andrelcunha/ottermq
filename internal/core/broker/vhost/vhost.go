@@ -103,7 +103,7 @@ func (vh *VHost) loadPersistedState() {
 	// Load queues
 	queues, err := vh.persist.LoadAllQueues(vh.Name)
 	if err != nil {
-		panic("failed to load queues")
+		log.Error().Err(err).Msg("Failed to load queues from persistence")
 	}
 	for _, queue := range queues {
 		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize)
