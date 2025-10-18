@@ -52,6 +52,27 @@ var mandatoryExchanges = []MandatoryExchange{
 	{Name: MANDATORY_FANOUT, Type: FANOUT},
 }
 
+// NewExchange creates a new Exchange instance with the given name, type, and properties.
+func NewExchange(name string, typ ExchangeType, props *ExchangeProperties) *Exchange {
+	if props == nil {
+		props = &ExchangeProperties{
+			Passive:    false,
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		}
+	}
+	return &Exchange{
+		Name:     name,
+		Typ:      typ,
+		Queues:   make(map[string]*Queue),
+		Bindings: make(map[string][]*Queue),
+		Props:    props,
+	}
+}
+
 // Candidate to be on an ExchangeManager interface
 func ParseExchangeType(s string) (ExchangeType, error) {
 	switch s {
@@ -83,7 +104,7 @@ func (vh *VHost) createMandatoryExchanges() {
 	}
 }
 
-// CreateExchange creates a new exchange with the given name, type, and properties.
+// CreateExchange creates a new exchange with the given name, type, and properties and wires it into the vhost.
 func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangeProperties) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -98,24 +119,7 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 		}
 	}
 
-	if props == nil {
-		props = &ExchangeProperties{
-			Passive:    false,
-			Durable:    false,
-			AutoDelete: false,
-			Internal:   false,
-			NoWait:     false,
-			Arguments:  nil,
-		}
-	}
-	exchange := &Exchange{
-		Name:     name,
-		Typ:      typ,
-		Queues:   make(map[string]*Queue),
-		Bindings: make(map[string][]*Queue),
-		Props:    props,
-	}
-	vh.Exchanges[name] = exchange
+	vh.Exchanges[name] = NewExchange(name, typ, props)
 	// Handle durable property
 	if props.Durable {
 		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
