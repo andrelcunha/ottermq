@@ -46,3 +46,6 @@ func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]persistence.Mess
 func (d *DummyPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {
 	return nil
 }
+func (d *DummyPersistence) DeleteMessage(vhost, queue, msgId string) error {
+	return nil
+}

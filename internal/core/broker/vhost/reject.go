@@ -36,7 +36,7 @@ func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag ui
 		// TODO: implement dead-lettering
 		log.Debug().Msgf("Discarding message with delivery tag %d on channel %d\n", deliveryTag, channel)
 		if record.Persistent {
-			// TODO: persist discard if necessary
+			_ = vh.persist.DeleteMessage(vh.Name, record.QueueName, record.Message.ID)
 			log.Debug().Msgf("Message with delivery tag %d was persistent, consider persisting discard\n", deliveryTag)
 		}
 	}

@@ -30,6 +30,7 @@ type Persistence interface {
 	// Message operations (to be defined)
 	SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps MessageProperties) error
 	LoadMessages(vhostName, queueName string) ([]Message, error)
+	DeleteMessage(vhost, queue, msgId string) error
 
 	// Bulk recovery methods
 	LoadAllExchanges(vhost string) ([]ExchangeSnapshot, error)

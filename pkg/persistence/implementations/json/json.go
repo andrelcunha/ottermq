@@ -288,6 +288,29 @@ func (jp *JsonPersistence) LoadMessages(vhostName, queueName string) ([]persiste
 	return messages, nil
 }
 
+func (jp *JsonPersistence) DeleteMessage(vhost, queue, msgId string) error {
+	qData, err := jp.loadQueueFile(vhost, queue)
+	if err != nil {
+		return fmt.Errorf("queue not found: %v", err)
+	}
+
+	filtered := qData.Messages[:0]
+	removed := false
+	for _, msg := range qData.Messages {
+		if msg.ID == msgId {
+			removed = true
+			continue
+		}
+		filtered = append(filtered, msg)
+	}
+	if !removed {
+		return nil
+	}
+	qData.Messages = filtered
+
+	return jp.saveQueueFile(vhost, queue, qData)
+}
+
 func (jp *JsonPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
 	safeName := safeVHostName(vhost)
 	dir := filepath.Join(jp.dataDir, "vhosts", safeName, "exchanges")
