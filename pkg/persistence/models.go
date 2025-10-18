@@ -48,6 +48,19 @@ type BindingData struct {
 	Arguments  map[string]any `json:"arguments"`
 }
 
+type ExchangeSnapshot struct {
+	Name       string
+	Type       string
+	Properties ExchangeProperties
+	Bindings   []BindingData
+}
+
+type QueueSnapshot struct {
+	Name       string
+	Properties QueueProperties
+	Messages   []Message
+}
+
 // * Passive and NoWait are not needed in persistence
 // because they are only relevant during declaration time
 // Even though they are included here for completeness,
