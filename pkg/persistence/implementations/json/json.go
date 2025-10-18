@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
@@ -287,6 +288,83 @@ func (jp *JsonPersistence) LoadMessages(vhostName, queueName string) ([]persiste
 	return messages, nil
 }
 
+func (jp *JsonPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
+	safeName := safeVHostName(vhost)
+	dir := filepath.Join(jp.dataDir, "vhosts", safeName, "exchanges")
+
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []persistence.ExchangeSnapshot{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshots []persistence.ExchangeSnapshot
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".json")
+		exchangeType, props, err := jp.LoadExchangeMetadata(vhost, name)
+		if err != nil {
+			continue // Skip corrupt files
+		}
+		bindings, _ := jp.LoadExchangeBindings(vhost, name)
+
+		snapshots = append(snapshots, persistence.ExchangeSnapshot{
+			Name:       name,
+			Type:       exchangeType,
+			Properties: props,
+			Bindings:   bindings,
+		})
+	}
+	return snapshots, nil
+}
+
+func (jp *JsonPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
+	safeName := safeVHostName(vhost)
+	dir := filepath.Join(jp.dataDir, "vhosts", safeName, "queues")
+
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []persistence.QueueSnapshot{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshots []persistence.QueueSnapshot
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".json")
+		queueData, err := jp.loadQueueFile(vhost, name)
+		if err != nil {
+			continue // Skip corrupt files
+		}
+
+		var messages []persistence.Message
+		for _, msg := range queueData.Messages {
+			messages = append(messages, persistence.Message{
+				ID:         msg.ID,
+				Body:       msg.Body,
+				Properties: msg.Properties,
+			})
+		}
+
+		snapshots = append(snapshots, persistence.QueueSnapshot{
+			Name:       name,
+			Properties: queueData.Properties,
+			Messages:   messages,
+		})
+	}
+	return snapshots, nil
+}
+
+/* ---- Private methods ---- */
+
 // LoadQueue loads a single queue from a JSON file
 func (jp *JsonPersistence) loadQueueFile(vhost, name string) (*JsonQueueData, error) {
 	safeName := safeVHostName(vhost)
@@ -302,60 +380,6 @@ func (jp *JsonPersistence) loadQueueFile(vhost, name string) (*JsonQueueData, er
 	}
 	return &queueData, nil
 }
-
-/*
-// Message operations (basic implementation for JSON)
-func (jp *JsonPersistence) PublishMessage(vhost, queue, messageID string, body []byte, props persistence.MessageProperties) error {
-    // Load existing queue data
-    queueData, err := jp.loadQueueFile(vhost, queue)
-    if err != nil {
-        return fmt.Errorf("queue not found: %v", err)
-    }
-
-    // Add new message
-    newMessage := JsonMessageData{
-        ID:         messageID,
-        Body:       body,
-        Properties: props,
-    }
-
-    queueData.Messages = append(queueData.Messages, newMessage)
-
-    // Save updated queue
-    return jp.saveQueueFile(vhost, queue, queueData)
-}
-
-func (jp *JsonPersistence) ConsumeMessage(vhost, queue string) (messageID string, body []byte, props persistence.MessageProperties, error) {
-    // Load existing queue data
-    queueData, err := jp.loadQueueFile(vhost, queue)
-    if err != nil {
-        return "", nil, persistence.MessageProperties{}, fmt.Errorf("queue not found: %v", err)
-    }
-
-    // Check if queue has messages
-    if len(queueData.Messages) == 0 {
-        return "", nil, persistence.MessageProperties{}, fmt.Errorf("queue is empty")
-    }
-
-    // Get first message (FIFO)
-    message := queueData.Messages[0]
-    queueData.Messages = queueData.Messages[1:] // Remove from queue
-
-    // Save updated queue
-    if err := jp.saveQueueFile(vhost, queue, queueData); err != nil {
-        return "", nil, persistence.MessageProperties{}, err
-    }
-
-    return message.ID, message.Body, message.Properties, nil
-}
-
-func (jp *JsonPersistence) AckMessage(vhost, queue, messageID string) error {
-    // For JSON implementation, messages are already removed when consumed
-    // This is a no-op for the current implementation
-    // In a future version, we might track unacked messages separately
-    return nil
-}
-*/
 
 func (jp *JsonPersistence) saveQueueFile(vhost, queueName string, queueData *JsonQueueData) error {
 	safeName := safeVHostName(vhost)

@@ -28,6 +28,12 @@ func (d *DummyPersistence) LoadExchangeBindings(vhost, exchange string) ([]persi
 func (d *DummyPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
 	return nil
 }
+func (d *DummyPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
+	return nil, nil
+}
+func (d *DummyPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
+	return nil, nil
+}
 func (d *DummyPersistence) Initialize() error { return nil }
 func (d *DummyPersistence) Close() error      { return nil }
 
