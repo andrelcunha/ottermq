@@ -14,17 +14,11 @@ type JsonQueueData struct {
 	Messages   []JsonMessageData           `json:"messages"`
 }
 
-type JsonBindingData struct {
-	QueueName  string         `json:"queue_name"`
-	RoutingKey string         `json:"routing_key"`
-	Arguments  map[string]any `json:"arguments"`
-}
-
 type JsonExchangeData struct {
 	Name       string                         `json:"name"`
 	Type       string                         `json:"type"`
 	Properties persistence.ExchangeProperties `json:"properties"`
-	Bindings   []JsonBindingData              `json:"bindings"`
+	Bindings   []persistence.BindingData      `json:"bindings"`
 }
 
 type JsonVHostData struct {

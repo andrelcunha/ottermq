@@ -34,16 +34,17 @@ func (vh *VHost) BindQueue(exchangeName, queueName, routingKey string) error {
 			}
 		}
 		exchange.Bindings[routingKey] = append(exchange.Bindings[routingKey], queue)
+
 	case FANOUT:
 		exchange.Queues[queueName] = queue
 	}
 
-	// // Persist the state
-	// err := vh.saveBrokerState()
-	// if err != nil {
-	// 	log.Printf("Failed to save broker state: %v", err)
-	// }
-	// vh.publishBindingUpdate(exchangeName)
+	if exchange.Props.Durable && queue.Props.Durable {
+		err := vh.persist.SaveBindingState(vh.Name, exchangeName, queueName, routingKey, exchange.Props.Arguments)
+		if err != nil {
+			log.Printf("Failed to save binding state: %v", err)
+		}
+	}
 	return nil
 }
 

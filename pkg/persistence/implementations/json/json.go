@@ -21,6 +21,21 @@ func NewJsonPersistence(config *persistence.Config) (*JsonPersistence, error) {
 	return jp, jp.Initialize()
 }
 
+// equalArgs compares two argument maps by their JSON encoding to avoid type
+// discrepancies (e.g., int vs float64) after JSON round-trips.
+func equalArgs(a, b map[string]any) bool {
+	// Quick path
+	if a == nil && b == nil {
+		return true
+	}
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return string(ab) == string(bb)
+}
+
 func (jp *JsonPersistence) Initialize() error {
 	// Create the base data directory if it doesn't exist
 	if err := os.MkdirAll(jp.dataDir, 0755); err != nil {
@@ -128,6 +143,113 @@ func (jp *JsonPersistence) LoadQueueMetadata(vhost, name string) (props persiste
 		return persistence.QueueProperties{}, err
 	}
 	return queueData.Properties, nil
+}
+
+func (jp *JsonPersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
+	// For JSON persistence, bindings are part of exchange metadata
+	// So we can just load the exchange, update bindings, and save it back
+	exchangeType, props, err := jp.LoadExchangeMetadata(vhost, exchange)
+	if err != nil {
+		return fmt.Errorf("failed to load exchange for binding: %v", err)
+	}
+
+	existingBindings, err := jp.LoadExchangeBindings(vhost, exchange)
+	if err != nil {
+		return fmt.Errorf("failed to load existing bindings: %v", err)
+	}
+	exchangeData := JsonExchangeData{
+		Name:       exchange,
+		Type:       exchangeType,
+		Properties: props,
+		Bindings:   existingBindings,
+	}
+
+	bindingMetadata := persistence.BindingData{
+		QueueName:  queue,
+		RoutingKey: routingKey,
+		Arguments:  arguments,
+	}
+	// Deduplicate: avoid adding duplicate binding with same queue, routingKey, and arguments
+	duplicate := false
+	for _, b := range exchangeData.Bindings {
+		if b.QueueName == bindingMetadata.QueueName && b.RoutingKey == bindingMetadata.RoutingKey {
+			if equalArgs(b.Arguments, bindingMetadata.Arguments) {
+				duplicate = true
+				break
+			}
+		}
+	}
+	if !duplicate {
+		exchangeData.Bindings = append(exchangeData.Bindings, bindingMetadata)
+	}
+
+	// Ensure directory exists before writing
+	dir := filepath.Join(jp.dataDir, "vhosts", safeVHostName(vhost), "exchanges")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	file := filepath.Join(dir, exchange+".json")
+	data, err := json.MarshalIndent(exchangeData, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, data, 0644)
+}
+
+func (jp *JsonPersistence) LoadExchangeBindings(vhost string, exchange string) ([]persistence.BindingData, error) {
+	safeName := safeVHostName(vhost)
+	file := filepath.Join(jp.dataDir, "vhosts", safeName, "exchanges", exchange+".json")
+
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var exchangeData JsonExchangeData
+
+	if err := json.Unmarshal(data, &exchangeData); err != nil {
+		return nil, err
+	}
+	return exchangeData.Bindings, nil
+}
+
+// DeleteBindingState deletes a binding between an exchange and a queue
+func (jp *JsonPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+	exchangeType, props, err := jp.LoadExchangeMetadata(vhost, exchange)
+	if err != nil {
+		return fmt.Errorf("failed to load exchange for binding: %v", err)
+	}
+
+	existingBindings, err := jp.LoadExchangeBindings(vhost, exchange)
+	if err != nil {
+		return fmt.Errorf("failed to load existing bindings: %v", err)
+	}
+	// Filter out the binding to be deleted
+	var updatedBindings []persistence.BindingData
+	for _, b := range existingBindings {
+		if !(b.QueueName == queue && b.RoutingKey == routingKey) {
+			updatedBindings = append(updatedBindings, b)
+		}
+	}
+	// remove the binding from the exchange data
+	exchangeData := JsonExchangeData{
+		Name:       exchange,
+		Type:       exchangeType,
+		Properties: props,
+		Bindings:   updatedBindings,
+	}
+
+	// Ensure directory exists before writing (in case metadata was never saved)
+	dir := filepath.Join(jp.dataDir, "vhosts", safeVHostName(vhost), "exchanges")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	file := filepath.Join(dir, exchange+".json")
+	data, err := json.MarshalIndent(exchangeData, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, data, 0644)
 }
 
 func (jp *JsonPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {

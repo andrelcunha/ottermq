@@ -42,6 +42,12 @@ type ExchangeProperties struct {
 	Arguments  map[string]any `json:"arguments"`
 }
 
+type BindingData struct {
+	QueueName  string         `json:"queue_name"`
+	RoutingKey string         `json:"routing_key"`
+	Arguments  map[string]any `json:"arguments"`
+}
+
 // * Passive and NoWait are not needed in persistence
 // because they are only relevant during declaration time
 // Even though they are included here for completeness,

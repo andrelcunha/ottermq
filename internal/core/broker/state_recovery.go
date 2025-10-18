@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,8 +33,14 @@ func RecoverBrokerState(b *Broker) error {
 			exchangeType, props, err := b.persist.LoadExchangeMetadata(vhostName, exName)
 
 			if err == nil {
+				bindings, err := b.persist.LoadExchangeBindings(vhostName, exName)
+				if err != nil {
+					log.Error().Err(err).Str("exchange", exName).Msg("Failed to load exchange bindings")
+					bindings = []persistence.BindingData{}
+				}
+
 				// Create exchange in vhost using persistedEx
-				v.RecoverExchange(exName, exchangeType, props)
+				v.RecoverExchange(exName, exchangeType, props, bindings)
 			}
 		}
 		queuesDir := filepath.Join(vhostsDir, vhostName, "queues")

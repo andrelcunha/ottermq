@@ -19,7 +19,15 @@ func (d *DummyPersistence) LoadQueueMetadata(vhost, name string) (persistence.Qu
 	return persistence.QueueProperties{}, nil
 }
 func (d *DummyPersistence) DeleteQueueMetadata(vhost, name string) error { return nil }
-
+func (d *DummyPersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
+	return nil
+}
+func (d *DummyPersistence) LoadExchangeBindings(vhost, exchange string) ([]persistence.BindingData, error) {
+	return nil, nil
+}
+func (d *DummyPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+	return nil
+}
 func (d *DummyPersistence) Initialize() error { return nil }
 func (d *DummyPersistence) Close() error      { return nil }
 
