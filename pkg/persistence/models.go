@@ -26,7 +26,6 @@ type Message struct {
 
 // Basic queue/exchange properties - universal concepts
 type QueueProperties struct {
-	Passive    bool           `json:"passive"` // Not needed in persistence*
 	Durable    bool           `json:"durable"`
 	Exclusive  bool           `json:"exclusive"`
 	AutoDelete bool           `json:"auto_delete"`
@@ -34,11 +33,9 @@ type QueueProperties struct {
 }
 
 type ExchangeProperties struct {
-	Passive    bool           `json:"passive"` // Not needed in persistence*
 	Durable    bool           `json:"durable"`
 	AutoDelete bool           `json:"auto_delete"`
 	Internal   bool           `json:"internal"`
-	NoWait     bool           `json:"no_wait"` // Not needed in persistence*
 	Arguments  map[string]any `json:"arguments"`
 }
 

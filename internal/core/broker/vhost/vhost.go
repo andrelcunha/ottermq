@@ -10,6 +10,7 @@ import (
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type VHost struct {
@@ -140,7 +141,8 @@ func (vh *VHost) loadPersistedState() {
 	// Load exchanges
 	exchanges, err := vh.persist.LoadAllExchanges(vh.Name)
 	if err != nil {
-		panic("failed to load exchanges")
+		log.Error().Err(err).Msg("Failed to load exchanges from persistence")
+		return
 	}
 	for _, exchange := range exchanges {
 		typ := ExchangeType(exchange.Type)
@@ -151,7 +153,10 @@ func (vh *VHost) loadPersistedState() {
 		}
 		vh.Exchanges[exchange.Name] = NewExchange(exchange.Name, typ, props)
 		for _, bindingData := range exchange.Bindings {
-			vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey)
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey)
+			if err != nil {
+				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
+			}
 		}
 	}
 }

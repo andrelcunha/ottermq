@@ -12,11 +12,9 @@ func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangePro
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
 		Props: &ExchangeProperties{
-			Passive:    props.Passive,
 			Durable:    props.Durable,
 			AutoDelete: props.AutoDelete,
 			Internal:   props.Internal,
-			NoWait:     props.NoWait,
 			Arguments:  props.Arguments,
 		},
 	}
@@ -37,7 +35,6 @@ func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) e
 	q := &Queue{
 		Name: name,
 		Props: &QueueProperties{
-			Passive:    props.Passive,
 			Durable:    props.Durable,
 			Exclusive:  props.Exclusive,
 			AutoDelete: props.AutoDelete,

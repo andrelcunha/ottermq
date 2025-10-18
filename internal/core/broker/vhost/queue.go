@@ -26,7 +26,7 @@ type Queue struct {
 }
 
 type QueueProperties struct {
-	Passive    bool      `json:"passive"` // TODO: #126 remove Passive Property and instead implement it at DeclareQueue
+	Passive    bool      `json:"passive"`
 	Durable    bool      `json:"durable"`
 	AutoDelete bool      `json:"auto_delete"`
 	Exclusive  bool      `json:"exclusive"` // not implemented yet
@@ -71,7 +71,10 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 					// TODO: improve delivery strategy using basic.qos and manual ack
 					if err := vh.deliverToConsumer(consumer, msg); err != nil {
 						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
-						vh.CancelConsumer(consumer.Channel, consumer.Tag)
+						err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
+						if err != nil {
+							log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
+						}
 						// Requeue the message
 						// Requeue just if rejected and `requeue` is true
 						q.Push(msg)
@@ -93,23 +96,39 @@ func (q *Queue) stopDeliveryLoop() {
 func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
-	if queue, ok := vh.Queues[name]; ok {
-		log.Debug().Str("queue", name).Msg("Queue already exists")
-		return queue, nil
-	}
-	if props == nil {
-		props = &QueueProperties{
-			Passive:    false,
-			Durable:    false,
-			AutoDelete: false,
-			Exclusive:  false,
-			Arguments:  make(map[string]any),
+
+	// Passive declaration: error if queue doesn't exist
+	if props != nil && props.Passive {
+		if existing, ok := vh.Queues[name]; ok {
+			log.Debug().Str("queue", name).Msg("Passive declaration succeeded")
+			return existing, nil
 		}
+		return nil, fmt.Errorf("queue %s does not exist", name)
+	}
+
+	// Queue already exists: validate compatibility
+	if existing, ok := vh.Queues[name]; ok {
+		if existing.Props == nil || props == nil {
+			return nil, fmt.Errorf("queue %s already exists with incompatible properties", name)
+		}
+		if existing.Props.Durable != props.Durable ||
+			existing.Props.AutoDelete != props.AutoDelete ||
+			existing.Props.Exclusive != props.Exclusive ||
+			!equalArgs(existing.Props.Arguments, props.Arguments) {
+			return nil, fmt.Errorf("queue %s already exists with different properties", name)
+		}
+		log.Debug().Str("queue", name).Msg("Queue already exists with matching properties")
+		return existing, nil
+	}
+
+	// Create new queue
+	if props == nil {
+		props = NewQueueProperties()
 	}
 	queue := NewQueue(name, vh.queueBufferSize)
 	queue.Props = props
-
 	vh.Queues[name] = queue
+
 	if props.Durable {
 		if err := vh.persist.SaveQueueMetadata(vh.Name, name, props.ToPersistence()); err != nil {
 			log.Error().Err(err).Str("queue", name).Msg("Failed to save queue metadata")
@@ -117,8 +136,17 @@ func (vh *VHost) CreateQueue(name string, props *QueueProperties) (*Queue, error
 	}
 
 	log.Debug().Str("queue", name).Msg("Created queue")
-
 	return queue, nil
+}
+
+func NewQueueProperties() *QueueProperties {
+	return &QueueProperties{
+		Passive:    false,
+		Durable:    false,
+		AutoDelete: false,
+		Exclusive:  false,
+		Arguments:  make(map[string]any),
+	}
 }
 
 func (vh *VHost) DeleteQueue(name string) error {
@@ -181,7 +209,6 @@ func (vh *VHost) DeleteQueue(name string) error {
 
 func (qp *QueueProperties) ToPersistence() persistence.QueueProperties {
 	return persistence.QueueProperties{
-		Passive:    qp.Passive, //TODO(#126) remove Passive from persistence
 		Durable:    qp.Durable,
 		AutoDelete: qp.AutoDelete,
 		Exclusive:  qp.Exclusive,

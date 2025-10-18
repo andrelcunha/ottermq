@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ConsumerKey struct {
@@ -203,8 +205,12 @@ func cancelAllConsumers(vh *VHost, channelKey ConnectionChannelKey) bool {
 	for _, c := range consumersCopy {
 		// Unlock to call CancelConsumer (which also locks)
 		vh.mu.Unlock()
-		vh.CancelConsumer(c.Channel, c.Tag)
+		err := vh.CancelConsumer(c.Channel, c.Tag)
 		vh.mu.Lock()
+		if err != nil {
+			log.Error().Str("consumer", c.Tag).Msg("Error cancelling consumer")
+		}
+
 	}
 	delete(vh.ConsumersByChannel, channelKey)
 	return false
@@ -226,8 +232,11 @@ func (vh *VHost) CleanupConnection(connection net.Conn) {
 	for _, consumer := range consumersToRemove {
 		// Unlock to call CancelConsumer (which also locks)
 		vh.mu.Unlock()
-		vh.CancelConsumer(consumer.Channel, consumer.Tag)
+		err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
 		vh.mu.Lock()
+		if err != nil {
+			fmt.Printf("Error cancelling consumer %s on channel %d: %v\n", consumer.Tag, consumer.Channel, err)
+		}
 	}
 }
 

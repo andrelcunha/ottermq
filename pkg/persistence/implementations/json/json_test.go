@@ -39,7 +39,6 @@ func TestSaveLoadExchange(t *testing.T) {
 		Durable:    true,
 		AutoDelete: false,
 		Internal:   false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	exchange := &JsonExchangeData{
@@ -84,7 +83,6 @@ func TestSaveLoadQueue(t *testing.T) {
 	}
 	vhostName := "vhost/test"
 	props := persistence.QueueProperties{
-		Passive:    false,
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
@@ -130,7 +128,6 @@ func TestDeleteExchange(t *testing.T) {
 		Durable:    true,
 		AutoDelete: false,
 		Internal:   false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	exchange := &JsonExchangeData{
@@ -172,7 +169,6 @@ func TestDeleteQueue(t *testing.T) {
 	}
 	vhostName := "vhost/test"
 	props := persistence.QueueProperties{
-		Passive:    false,
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
