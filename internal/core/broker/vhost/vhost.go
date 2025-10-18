@@ -45,6 +45,10 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		ChannelDeliveries:  make(map[ConnectionChannelKey]*ChannelDeliveryState),
 	}
 	vh.createMandatoryStructure()
+	// Load persisted state
+	if persist != nil {
+		vh.loadPersistedState()
+	}
 	return vh
 }
 
@@ -88,4 +92,40 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	channelState.mu.Unlock()
 
 	return count
+}
+
+func (vh *VHost) loadPersistedState() {
+	if vh.persist == nil {
+		return
+	}
+
+	// Load exchanges
+	exchanges, err := vh.persist.LoadAllExchanges(vh.Name)
+	if err != nil {
+		panic("failed to load exchanges")
+	}
+	for _, exchange := range exchanges {
+		typ := ExchangeType(exchange.Type)
+		props := &ExchangeProperties{
+			Durable:    exchange.Properties.Durable,
+			AutoDelete: exchange.Properties.AutoDelete,
+			Arguments:  exchange.Properties.Arguments,
+		}
+		vh.Exchanges[exchange.Name] = NewExchange(exchange.Name, typ, props)
+	}
+
+	// Load queues
+	queues, err := vh.persist.LoadAllQueues(vh.Name)
+	if err != nil {
+		panic("failed to load queues")
+	}
+	for _, queue := range queues {
+		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize)
+		vh.Queues[queue.Name].Props = &QueueProperties{
+			Durable:    queue.Properties.Durable,
+			AutoDelete: queue.Properties.AutoDelete,
+			Exclusive:  queue.Properties.Exclusive,
+			Arguments:  queue.Properties.Arguments,
+		}
+	}
 }
