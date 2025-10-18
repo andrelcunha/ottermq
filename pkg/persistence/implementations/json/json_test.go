@@ -39,14 +39,13 @@ func TestSaveLoadExchange(t *testing.T) {
 		Durable:    true,
 		AutoDelete: false,
 		Internal:   false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	exchange := &JsonExchangeData{
 		Name:       "test-exchange",
 		Type:       "direct",
 		Properties: props,
-		Bindings:   []JsonBindingData{{QueueName: "q1", RoutingKey: "rk", Arguments: nil}},
+		Bindings:   []persistence.BindingData{{QueueName: "q1", RoutingKey: "rk", Arguments: nil}},
 	}
 	err = jsonPersistence.SaveExchangeMetadata(vhostName, exchange.Name, exchange.Type, exchange.Properties)
 	if err != nil {
@@ -84,7 +83,6 @@ func TestSaveLoadQueue(t *testing.T) {
 	}
 	vhostName := "vhost/test"
 	props := persistence.QueueProperties{
-		Passive:    false,
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
@@ -130,7 +128,6 @@ func TestDeleteExchange(t *testing.T) {
 		Durable:    true,
 		AutoDelete: false,
 		Internal:   false,
-		NoWait:     false,
 		Arguments:  nil,
 	}
 	exchange := &JsonExchangeData{
@@ -172,7 +169,6 @@ func TestDeleteQueue(t *testing.T) {
 	}
 	vhostName := "vhost/test"
 	props := persistence.QueueProperties{
-		Passive:    false,
 		Durable:    true,
 		Exclusive:  false,
 		AutoDelete: false,
@@ -292,5 +288,94 @@ func TestSaveLoadMessages(t *testing.T) {
 		if actual.Properties.ContentType != expected.Properties.ContentType {
 			t.Errorf("Message %d: expected content type %s, got %s", i, expected.Properties.ContentType, actual.Properties.ContentType)
 		}
+	}
+}
+
+func TestBindings_SaveLoad_Deduplicate_Delete(t *testing.T) {
+	tempDir := t.TempDir()
+	config := persistence.Config{Type: "json", DataDir: tempDir}
+	jsonPersistence, err := NewJsonPersistence(&config)
+	if err != nil {
+		t.Fatalf("Failed to create JSON persistence: %v", err)
+	}
+
+	vhostName := "/"
+	exchangeName := "ex-bindings"
+	exProps := persistence.ExchangeProperties{Durable: true}
+
+	// Save exchange metadata first
+	if err := jsonPersistence.SaveExchangeMetadata(vhostName, exchangeName, "direct", exProps); err != nil {
+		t.Fatalf("SaveExchangeMetadata failed: %v", err)
+	}
+
+	args := map[string]any{"x": 1}
+	// Save single binding
+	if err := jsonPersistence.SaveBindingState(vhostName, exchangeName, "q1", "rk1", args); err != nil {
+		t.Fatalf("SaveBindingState failed: %v", err)
+	}
+
+	// Load and verify
+	bindings, err := jsonPersistence.LoadExchangeBindings(vhostName, exchangeName)
+	if err != nil {
+		t.Fatalf("LoadExchangeBindings failed: %v", err)
+	}
+	if len(bindings) != 1 {
+		t.Fatalf("expected 1 binding, got %d", len(bindings))
+	}
+	if bindings[0].QueueName != "q1" || bindings[0].RoutingKey != "rk1" || !equalArgs(bindings[0].Arguments, args) {
+		t.Errorf("unexpected binding loaded: %+v", bindings[0])
+	}
+	// Saving the same binding again should deduplicate (no duplicates added)
+	if err := jsonPersistence.SaveBindingState(vhostName, exchangeName, "q1", "rk1", args); err != nil {
+		t.Fatalf("SaveBindingState duplicate failed: %v", err)
+	}
+	bindings, err = jsonPersistence.LoadExchangeBindings(vhostName, exchangeName)
+	if err != nil {
+		t.Fatalf("LoadExchangeBindings failed: %v", err)
+	}
+	if len(bindings) != 1 {
+		t.Fatalf("expected 1 binding after duplicate save, got %d", len(bindings))
+	}
+
+	// Add a second, distinct binding
+	if err := jsonPersistence.SaveBindingState(vhostName, exchangeName, "q2", "rk2", nil); err != nil {
+		t.Fatalf("SaveBindingState (second) failed: %v", err)
+	}
+	bindings, err = jsonPersistence.LoadExchangeBindings(vhostName, exchangeName)
+	if err != nil {
+		t.Fatalf("LoadExchangeBindings failed: %v", err)
+	}
+	if len(bindings) != 2 {
+		t.Fatalf("expected 2 bindings, got %d", len(bindings))
+	}
+
+	// Delete the second binding
+	if err := jsonPersistence.DeleteBindingState(vhostName, exchangeName, "q2", "rk2"); err != nil {
+		t.Fatalf("DeleteBindingState failed: %v", err)
+	}
+	bindings, err = jsonPersistence.LoadExchangeBindings(vhostName, exchangeName)
+	if err != nil {
+		t.Fatalf("LoadExchangeBindings failed: %v", err)
+	}
+	if len(bindings) != 1 {
+		t.Fatalf("expected 1 binding after delete, got %d", len(bindings))
+	}
+	if bindings[0].QueueName != "q1" || bindings[0].RoutingKey != "rk1" {
+		t.Errorf("unexpected remaining binding: %+v", bindings[0])
+	}
+}
+
+func TestBindings_SaveBindingRequiresExchange(t *testing.T) {
+	tempDir := t.TempDir()
+	config := persistence.Config{Type: "json", DataDir: tempDir}
+	jsonPersistence, err := NewJsonPersistence(&config)
+	if err != nil {
+		t.Fatalf("Failed to create JSON persistence: %v", err)
+	}
+
+	vhostName := "/"
+	// Intentionally do not save exchange metadata
+	if err := jsonPersistence.SaveBindingState(vhostName, "non-existent", "q1", "rk1", nil); err == nil {
+		t.Fatalf("expected error saving binding for missing exchange, got nil")
 	}
 }

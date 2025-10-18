@@ -115,6 +115,8 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicAckHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_REJECT):
+		return b.basicRejectHandler(request, conn, vh)
+
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
 	case uint16(amqp.BASIC_RECOVER):
 	default:
@@ -207,5 +209,19 @@ func (b *Broker) basicAckHandler(request *amqp.RequestMethodMessage, conn net.Co
 		return nil, err
 	}
 	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Acknowledged message")
+	return nil, nil
+}
+
+func (b *Broker) basicRejectHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicRejectContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic reject content")
+	}
+	err := vh.HandleBasicReject(conn, request.Channel, content.DeliveryTag, content.Requeue)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to reject message")
+		return nil, err
+	}
+	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
 	return nil, nil
 }

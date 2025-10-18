@@ -19,7 +19,21 @@ func (d *DummyPersistence) LoadQueueMetadata(vhost, name string) (persistence.Qu
 	return persistence.QueueProperties{}, nil
 }
 func (d *DummyPersistence) DeleteQueueMetadata(vhost, name string) error { return nil }
-
+func (d *DummyPersistence) SaveBindingState(vhost, exchange, queue, routingKey string, arguments map[string]any) error {
+	return nil
+}
+func (d *DummyPersistence) LoadExchangeBindings(vhost, exchange string) ([]persistence.BindingData, error) {
+	return nil, nil
+}
+func (d *DummyPersistence) DeleteBindingState(vhost, exchange, queue, routingKey string) error {
+	return nil
+}
+func (d *DummyPersistence) LoadAllExchanges(vhost string) ([]persistence.ExchangeSnapshot, error) {
+	return nil, nil
+}
+func (d *DummyPersistence) LoadAllQueues(vhost string) ([]persistence.QueueSnapshot, error) {
+	return nil, nil
+}
 func (d *DummyPersistence) Initialize() error { return nil }
 func (d *DummyPersistence) Close() error      { return nil }
 
@@ -30,5 +44,8 @@ func (d *DummyPersistence) LoadMessages(vhost, queue string) ([]persistence.Mess
 
 // SaveMessage
 func (d *DummyPersistence) SaveMessage(vhost, queue, msgId string, msgBody []byte, msgProps persistence.MessageProperties) error {
+	return nil
+}
+func (d *DummyPersistence) DeleteMessage(vhost, queue, msgId string) error {
 	return nil
 }

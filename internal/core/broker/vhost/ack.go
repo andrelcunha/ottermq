@@ -15,17 +15,30 @@ func (vh *VHost) HandleBasicAck(conn net.Conn, channel uint16, deliveryTag uint6
 		return fmt.Errorf("no channel delivery state for channel %d", channel)
 	}
 
-	ch.mu.Lock()
-	defer ch.mu.Unlock()
+	var toDelete []*DeliveryRecord
 
+	ch.mu.Lock()
 	if multiple {
 		for tag := range ch.Unacked {
 			if tag <= deliveryTag {
+				toDelete = append(toDelete, ch.Unacked[tag])
 				delete(ch.Unacked, tag)
 			}
 		}
 	} else {
-		delete(ch.Unacked, deliveryTag)
+		if rec, exists := ch.Unacked[deliveryTag]; exists {
+			toDelete = append(toDelete, rec)
+			delete(ch.Unacked, deliveryTag)
+		}
+	}
+	ch.mu.Unlock()
+
+	if vh.persist != nil {
+		for _, rec := range toDelete {
+			if rec.Persistent {
+				_ = vh.persist.DeleteMessage(vh.Name, rec.QueueName, rec.Message.ID)
+			}
+		}
 	}
 
 	return nil

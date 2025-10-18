@@ -4,11 +4,13 @@ import (
 	"context"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/persistdb"
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type VHost struct {
@@ -45,6 +47,10 @@ func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persist
 		ChannelDeliveries:  make(map[ConnectionChannelKey]*ChannelDeliveryState),
 	}
 	vh.createMandatoryStructure()
+	// Load persisted state
+	if persist != nil {
+		vh.loadPersistedState()
+	}
 	return vh
 }
 
@@ -88,4 +94,69 @@ func (vh *VHost) GetUnackedMessageCountByChannel(conn net.Conn, channel uint16) 
 	channelState.mu.Unlock()
 
 	return count
+}
+
+func (vh *VHost) loadPersistedState() {
+	if vh.persist == nil {
+		return
+	}
+	// Load queues
+	queues, err := vh.persist.LoadAllQueues(vh.Name)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load queues from persistence")
+	}
+	for _, queue := range queues {
+		vh.Queues[queue.Name] = NewQueue(queue.Name, vh.queueBufferSize)
+		vh.Queues[queue.Name].Props = &QueueProperties{
+			Durable:    queue.Properties.Durable,
+			AutoDelete: queue.Properties.AutoDelete,
+			Exclusive:  queue.Properties.Exclusive,
+			Arguments:  queue.Properties.Arguments,
+		}
+		// Load messages into the queue
+		for _, msgData := range queue.Messages {
+			msg := amqp.Message{
+				ID:   msgData.ID,
+				Body: msgData.Body,
+				Properties: amqp.BasicProperties{
+					ContentType:     amqp.ContentType(msgData.Properties.ContentType),
+					ContentEncoding: msgData.Properties.ContentEncoding,
+					Headers:         msgData.Properties.Headers,
+					DeliveryMode:    amqp.DeliveryMode(msgData.Properties.DeliveryMode),
+					Priority:        msgData.Properties.Priority,
+					CorrelationID:   msgData.Properties.CorrelationID,
+					ReplyTo:         msgData.Properties.ReplyTo,
+					Expiration:      msgData.Properties.Expiration,
+					MessageID:       msgData.Properties.MessageID,
+					Timestamp:       time.Unix(msgData.Properties.Timestamp, 0),
+					Type:            msgData.Properties.Type,
+					UserID:          msgData.Properties.UserID,
+					AppID:           msgData.Properties.AppID,
+				},
+			}
+			vh.Queues[queue.Name].Push(msg)
+		}
+	}
+
+	// Load exchanges
+	exchanges, err := vh.persist.LoadAllExchanges(vh.Name)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load exchanges from persistence")
+		return
+	}
+	for _, exchange := range exchanges {
+		typ := ExchangeType(exchange.Type)
+		props := &ExchangeProperties{
+			Durable:    exchange.Properties.Durable,
+			AutoDelete: exchange.Properties.AutoDelete,
+			Arguments:  exchange.Properties.Arguments,
+		}
+		vh.Exchanges[exchange.Name] = NewExchange(exchange.Name, typ, props)
+		for _, bindingData := range exchange.Bindings {
+			err := vh.BindQueue(exchange.Name, bindingData.QueueName, bindingData.RoutingKey)
+			if err != nil {
+				log.Error().Err(err).Str("exchange", exchange.Name).Msg("Error binding queue")
+			}
+		}
+	}
 }

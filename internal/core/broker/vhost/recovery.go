@@ -5,23 +5,29 @@ import (
 	"github.com/andrelcunha/ottermq/pkg/persistence"
 )
 
-func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties) {
+func (vh *VHost) RecoverExchange(name, typ string, props persistence.ExchangeProperties, bindings []persistence.BindingData) {
 	ex := &Exchange{
 		Name:     name,
 		Typ:      ExchangeType(typ),
 		Queues:   make(map[string]*Queue),
 		Bindings: make(map[string][]*Queue),
 		Props: &ExchangeProperties{
-			Passive:    props.Passive,
 			Durable:    props.Durable,
 			AutoDelete: props.AutoDelete,
 			Internal:   props.Internal,
-			NoWait:     props.NoWait,
 			Arguments:  props.Arguments,
 		},
 	}
+
+	for _, binding := range bindings {
+		queue, ok := vh.Queues[binding.QueueName]
+		if !ok {
+			continue
+		}
+		ex.Bindings[binding.RoutingKey] = append(ex.Bindings[binding.RoutingKey], queue)
+	}
+
 	vh.Exchanges[ex.Name] = ex
-	// TODO Recreate bindings
 }
 
 // RecoverQueue recreates a queue from its persisted state
@@ -29,7 +35,6 @@ func (vh *VHost) RecoverQueue(name string, props *persistence.QueueProperties) e
 	q := &Queue{
 		Name: name,
 		Props: &QueueProperties{
-			Passive:    props.Passive,
 			Durable:    props.Durable,
 			Exclusive:  props.Exclusive,
 			AutoDelete: props.AutoDelete,

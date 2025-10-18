@@ -1,6 +1,7 @@
 package vhost
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/andrelcunha/ottermq/pkg/persistence"
@@ -52,6 +53,27 @@ var mandatoryExchanges = []MandatoryExchange{
 	{Name: MANDATORY_FANOUT, Type: FANOUT},
 }
 
+// NewExchange creates a new Exchange instance with the given name, type, and properties.
+func NewExchange(name string, typ ExchangeType, props *ExchangeProperties) *Exchange {
+	if props == nil {
+		props = &ExchangeProperties{
+			Passive:    false,
+			Durable:    false,
+			AutoDelete: false,
+			Internal:   false,
+			NoWait:     false,
+			Arguments:  nil,
+		}
+	}
+	return &Exchange{
+		Name:     name,
+		Typ:      typ,
+		Queues:   make(map[string]*Queue),
+		Bindings: make(map[string][]*Queue),
+		Props:    props,
+	}
+}
+
 // Candidate to be on an ExchangeManager interface
 func ParseExchangeType(s string) (ExchangeType, error) {
 	switch s {
@@ -83,39 +105,41 @@ func (vh *VHost) createMandatoryExchanges() {
 	}
 }
 
-// CreateExchange creates a new exchange with the given name, type, and properties.
+// CreateExchange creates a new exchange with the given name, type, and properties and wires it into the vhost.
 func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangeProperties) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 	// Check if the exchange already exists
-	if _, ok := vh.Exchanges[name]; ok {
-		return fmt.Errorf("exchange %s already exists", name)
-	}
-	// Deal with passive property
-	if props != nil && props.Passive {
-		if _, ok := vh.Exchanges[name]; !ok {
-			return fmt.Errorf("exchange %s does not exist", name)
+	if existing, ok := vh.Exchanges[name]; ok {
+		// return fmt.Errorf("exchange %s already exists", name)
+		if props != nil && props.Passive {
+			return nil
 		}
+
+		if existing.Typ != typ {
+			return fmt.Errorf("exchange %s already exists with different type", name)
+		}
+
+		if existing.Props == nil || props == nil {
+			return fmt.Errorf("exchange %s already exists with incompatible properties", name)
+		}
+
+		if existing.Props.Durable != props.Durable ||
+			existing.Props.AutoDelete != props.AutoDelete ||
+			existing.Props.Internal != props.Internal ||
+			existing.Props.NoWait != props.NoWait ||
+			!equalArgs(existing.Props.Arguments, props.Arguments) {
+			return fmt.Errorf("exchange %s already exists with different properties", name)
+		}
+
+		log.Debug().Str("exchange", name).Msg("Exchange already exists with matching properties")
+		return nil
+	}
+	if props != nil && props.Passive {
+		return fmt.Errorf("exchange %s does not exist", name)
 	}
 
-	if props == nil {
-		props = &ExchangeProperties{
-			Passive:    false,
-			Durable:    false,
-			AutoDelete: false,
-			Internal:   false,
-			NoWait:     false,
-			Arguments:  nil,
-		}
-	}
-	exchange := &Exchange{
-		Name:     name,
-		Typ:      typ,
-		Queues:   make(map[string]*Queue),
-		Bindings: make(map[string][]*Queue),
-		Props:    props,
-	}
-	vh.Exchanges[name] = exchange
+	vh.Exchanges[name] = NewExchange(name, typ, props)
 	// Handle durable property
 	if props.Durable {
 		if err := vh.persist.SaveExchangeMetadata(vh.Name, name, string(typ), props.ToPersistence()); err != nil {
@@ -123,6 +147,19 @@ func (vh *VHost) CreateExchange(name string, typ ExchangeType, props *ExchangePr
 		}
 	}
 	return nil
+}
+
+func equalArgs(a, b map[string]any) bool {
+	// Quick path
+	if a == nil && b == nil {
+		return true
+	}
+	ab, err1 := json.Marshal(a)
+	bb, err2 := json.Marshal(b)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return string(ab) == string(bb)
 }
 
 // Internal helper: assumes vh.mu is already locked

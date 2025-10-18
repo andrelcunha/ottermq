@@ -156,7 +156,7 @@ func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
 				log.Error().Msg("Persistence layer is not initialized")
 				return fmt.Errorf("persistence layer is not initialized")
 			}
-			if err := vh.persist.SaveMessage(vh.Name, req.RoutingKey, req.MsgID, req.Body, req.MsgProps); err != nil {
+			if err := vh.persist.SaveMessage(vh.Name, req.Queue.Name, req.MsgID, req.Body, req.MsgProps); err != nil {
 				log.Error().Err(err).Msg("Failed to save message to file")
 				return err
 			}
