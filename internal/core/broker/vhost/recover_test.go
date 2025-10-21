@@ -323,6 +323,9 @@ func (m *mockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag strin
 func (m *mockFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
 	return []byte{}
 }
+func (m *mockFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
+	return []byte{}
+}
 func (m *mockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return []byte{}
 }
@@ -377,6 +380,9 @@ func (m *mockFramerFail) CreateBasicConsumeOkFrame(channel uint16, consumerTag s
 	return []byte{}
 }
 func (m *mockFramerFail) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
+	return []byte{}
+}
+func (m *mockFramerFail) CreateBasicRecoverOkFrame(channel uint16) []byte {
 	return []byte{}
 }
 func (m *mockFramerFail) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {

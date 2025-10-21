@@ -118,7 +118,11 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicRejectHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_RECOVER_ASYNC):
+		return b.basicRecoverHandler(request, conn, vh, true)
+
 	case uint16(amqp.BASIC_RECOVER):
+		return b.basicRecoverHandler(request, conn, vh, false)
+
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
@@ -223,5 +227,29 @@ func (b *Broker) basicRejectHandler(request *amqp.RequestMethodMessage, conn net
 		return nil, err
 	}
 	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
+	return nil, nil
+}
+
+func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost, async bool) (any, error) {
+	content, ok := request.Content.(*amqp.BasicRecoverContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic recover content")
+	}
+	err := vh.HandleBasicRecover(conn, request.Channel, content.Requeue)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to recover messages")
+		return nil, err
+	}
+	log.Debug().Msg("Recovered messages")
+	if async {
+		return nil, nil
+	}
+
+	frame := b.framer.CreateBasicRecoverOkFrame(request.Channel)
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send basic recover ok frame")
+		return nil, err
+	}
+	log.Debug().Msg("Sent Basic.RecoverOk frame")
 	return nil, nil
 }

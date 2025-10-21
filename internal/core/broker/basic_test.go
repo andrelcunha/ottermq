@@ -72,6 +72,9 @@ func (m *MockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag strin
 func (m *MockFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
 	return []byte("basic-cancel-ok:" + consumerTag)
 }
+func (m *MockFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
+	return []byte("basic-recover-ok")
+}
 func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
 	return []byte("queue-declare")
 }
