@@ -1,0 +1,15 @@
+title: OtterMQ
+description: High-performance AMQP 0.9.1 message broker with RabbitMQ compatibility
+# Built-in GitHub Pages theme
+theme: jekyll-theme-cayman
+
+# Site metadata
+url: https://ottermq.github.io/ottermq
+repository: ottermq/ottermq
+
+# Optional plugins supported by GitHub Pages
+plugins:
+  - jekyll-seo-tag
+
+# Kramdown is the default Markdown engine on GitHub Pages
+markdown: kramdown
