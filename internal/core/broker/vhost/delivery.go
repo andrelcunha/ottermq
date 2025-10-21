@@ -22,7 +22,7 @@ type ChannelDeliveryState struct {
 	Unacked         map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
 }
 
-func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
+func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
@@ -57,7 +57,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
 		msg.Exchange,
 		msg.RoutingKey,
 		tag,
-		false, // redelivered - TODO: implement redelivery logic
+		redelivered,
 	)
 	headerFrame := vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg)
 	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)

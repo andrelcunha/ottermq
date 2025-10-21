@@ -69,7 +69,7 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 					consumer := consumers[0]
 					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
 					// TODO: improve delivery strategy using basic.qos and manual ack
-					if err := vh.deliverToConsumer(consumer, msg); err != nil {
+					if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
 						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
 						err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
 						if err != nil {
