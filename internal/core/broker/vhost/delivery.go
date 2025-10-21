@@ -23,6 +23,10 @@ type ChannelDeliveryState struct {
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
+	if !redelivered {
+		redelivered = vh.shouldRedeliver(msg.ID)
+	}
+
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
@@ -90,6 +94,10 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		return err
 	}
 
+	if redelivered {
+		vh.clearRedeliveredMark(msg.ID)
+	}
+
 	// Persistence
 	if consumer.Props.NoAck && vh.persist != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
 		if err := vh.persist.DeleteMessage(vh.Name, consumer.QueueName, msg.ID); err != nil {
@@ -97,4 +105,17 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		}
 	}
 	return nil
+}
+
+func (vh *VHost) shouldRedeliver(msgID string) bool {
+	vh.redeliveredMu.Lock()
+	_, exists := vh.redeliveredMessages[msgID]
+	vh.redeliveredMu.Unlock()
+	return exists
+}
+
+func (vh *VHost) clearRedeliveredMark(msgID string) {
+	vh.redeliveredMu.Lock()
+	delete(vh.redeliveredMessages, msgID)
+	vh.redeliveredMu.Unlock()
 }
