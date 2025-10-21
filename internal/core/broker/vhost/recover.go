@@ -60,6 +60,7 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 					q := vh.Queues[record.QueueName]
 					vh.mu.Unlock()
 					if q != nil {
+						vh.markAsRedelivered(record.Message.ID)
 						q.Push(record.Message)
 					}
 				}
