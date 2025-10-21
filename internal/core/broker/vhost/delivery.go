@@ -94,15 +94,15 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 		return err
 	}
 
-	if redelivered {
-		vh.clearRedeliveredMark(msg.ID)
-	}
-
 	// Persistence
 	if consumer.Props.NoAck && vh.persist != nil && msg.Properties.DeliveryMode == amqp.PERSISTENT {
 		if err := vh.persist.DeleteMessage(vh.Name, consumer.QueueName, msg.ID); err != nil {
 			log.Error().Err(err).Msg("Failed to delete persisted message after delivery with no-ack")
 		}
+	}
+
+	if redelivered {
+		vh.clearRedeliveredMark(msg.ID)
 	}
 	return nil
 }
