@@ -9,9 +9,9 @@ This page tracks OtterMQ's support for AMQP 0.9.1 classes and methods. It is int
 Status levels:
 
 - **Implemented** ✅: Feature is available and tested
-- **Partial** ⏳: Some behavior is missing or differs from spec
-- **Planned** 📕: Not yet implemented but on the roadmap
-- **Not Supported** ❌: Out of scope or no plans yet
+- **Partial** ⚠️: Some behavior is missing or differs from spec
+- **Planned** ❌: Not yet implemented but on the roadmap
+- **Not Supported** ‼️: Out of scope or no plans yet
 
 ## Summary by Class
 
@@ -43,8 +43,8 @@ Status levels:
 |--------|:------:|------|
 | channel.open | ✅ | |
 | channel.open-ok | ✅ | |
-| channel.flow | 📕 | Flow control not yet implemented |
-| channel.flow-ok | 📕 | |
+| channel.flow | ❌ | Flow control not yet implemented |
+| channel.flow-ok | ❌ | |
 | channel.close | ✅ | |
 | channel.close-ok | ✅ | |
 
@@ -52,7 +52,7 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| exchange.declare | ⏳ | Supports `direct`/`fanout`; missing `topic` |
+| exchange.declare | ⚠️ | Supports `direct`/`fanout`; missing `topic` |
 | exchange.declare-ok | ✅ | |
 | exchange.delete | ✅ | |
 | exchange.delete-ok | ✅ | |
@@ -65,46 +65,46 @@ Status levels:
 | queue.declare-ok | ✅ | |
 | queue.bind | ✅ | |
 | queue.bind-ok | ✅ | |
-| queue.unbind | 📕 | |
-| queue.unbind-ok | 📕 | |
-| queue.purge | 📕 | |
-| queue.purge-ok | 📕 | |
-| queue.delete | ⏳ | missing `if-unused`/`if-empty`|
+| queue.unbind | ❌ | |
+| queue.unbind-ok | ❌ | |
+| queue.purge | ❌ | |
+| queue.purge-ok | ❌ | |
+| queue.delete | ⚠️ | missing `if-unused`/`if-empty`|
 | queue.delete-ok | ✅ | |
 
 ## basic
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| basic.qos | 📕 | Not yet implemented |
-| basic.qos-ok | 📕 | |
-| basic.consume | ⏳ | noLocal not supported (same as RabbitMQ) |
+| basic.qos | ❌ | Not yet implemented |
+| basic.qos-ok | ❌ | |
+| basic.consume | ⚠️ | noLocal not supported (same as RabbitMQ) |
 | basic.consume-ok | ✅ | |
 | basic.cancel | ✅ | |
 | basic.cancel-ok | ✅ | |
 | basic.publish | ✅ | |
-| basic.return | 📕 | Mandatory/immediate flags not fully handled |
+| basic.return | ❌ | Mandatory/immediate flags not fully handled |
 | basic.deliver | ✅ | |
 | basic.get | ✅ | Pull-based message retrieval |
 | basic.get-ok | ✅ | |
 | basic.get-empty | ✅ | |
 | basic.ack | ✅ | Supports multiple flag |
-| basic.reject | ⏳ | Requeue works; dead-lettering TODO |
+| basic.reject | ⚠️ | Requeue works; dead-lettering TODO |
 | basic.recover-async | ✅ | |
 | basic.recover | ✅ | |
 | basic.recover-ok | ✅ | |
-| basic.nack | 📕 | Not yet implemented |
+| basic.nack | ❌ | Not yet implemented |
 
 ## tx (Transactions)
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| tx.select | 📕 | Transaction support not yet implemented |
-| tx.select-ok | 📕 | |
-| tx.commit | 📕 | |
-| tx.commit-ok | 📕 | |
-| tx.rollback | 📕 | |
-| tx.rollback-ok | 📕 | |
+| tx.select | ❌ | Transaction support not yet implemented |
+| tx.select-ok | ❌ | |
+| tx.commit | ❌ | |
+| tx.commit-ok | ❌ | |
+| tx.rollback | ❌ | |
+| tx.rollback-ok | ❌ | |
 
 ---
 
@@ -112,4 +112,4 @@ Status levels:
 
 - Keep this table in sync with the implementation in `internal/core/amqp/*` and `internal/core/broker/*`.
 - When adding or changing behavior, update the status and add notes on limitations or differences from RabbitMQ behavior.
-- "Partial" (⏳) means one or more optional behaviors/properties are not yet implemented.
+- "Partial" (⚠️) means one or more optional behaviors/properties are not yet implemented.
