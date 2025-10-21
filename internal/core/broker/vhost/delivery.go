@@ -22,7 +22,11 @@ type ChannelDeliveryState struct {
 	Unacked         map[uint64]*DeliveryRecord // deliveryTag -> DeliveryRecord
 }
 
-func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
+func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
+	if !redelivered {
+		redelivered = vh.shouldRedeliver(msg.ID)
+	}
+
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
@@ -57,7 +61,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
 		msg.Exchange,
 		msg.RoutingKey,
 		tag,
-		false, // redelivered - TODO: implement redelivery logic
+		redelivered,
 	)
 	headerFrame := vh.framer.CreateHeaderFrame(consumer.Channel, uint16(amqp.BASIC), msg)
 	bodyFrame := vh.framer.CreateBodyFrame(consumer.Channel, msg.Body)
@@ -96,5 +100,22 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message) error {
 			log.Error().Err(err).Msg("Failed to delete persisted message after delivery with no-ack")
 		}
 	}
+
+	if redelivered {
+		vh.clearRedeliveredMark(msg.ID)
+	}
 	return nil
+}
+
+func (vh *VHost) shouldRedeliver(msgID string) bool {
+	vh.redeliveredMu.Lock()
+	_, exists := vh.redeliveredMessages[msgID]
+	vh.redeliveredMu.Unlock()
+	return exists
+}
+
+func (vh *VHost) clearRedeliveredMark(msgID string) {
+	vh.redeliveredMu.Lock()
+	delete(vh.redeliveredMessages, msgID)
+	vh.redeliveredMu.Unlock()
 }

@@ -14,37 +14,40 @@ import (
 )
 
 type VHost struct {
-	Name               string                     `json:"name"`
-	Id                 string                     `json:"id"`
-	Exchanges          map[string]*Exchange       `json:"exchanges"`
-	Queues             map[string]*Queue          `json:"queues"`
-	Users              map[string]*persistdb.User `json:"users"`
-	mu                 sync.Mutex                 `json:"-"`
-	queueBufferSize    int                        `json:"-"`
-	persist            persistence.Persistence
-	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
-	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
-	ConsumersByChannel map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
-	activeDeliveries   map[string]context.CancelFunc        // queueName -> cancelFunc
-	framer             amqp.Framer
-	ChannelDeliveries  map[ConnectionChannelKey]*ChannelDeliveryState
+	Name                string                     `json:"name"`
+	Id                  string                     `json:"id"`
+	Exchanges           map[string]*Exchange       `json:"exchanges"`
+	Queues              map[string]*Queue          `json:"queues"`
+	Users               map[string]*persistdb.User `json:"users"`
+	mu                  sync.Mutex                 `json:"-"`
+	queueBufferSize     int                        `json:"-"`
+	persist             persistence.Persistence
+	Consumers           map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
+	ConsumersByQueue    map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
+	ConsumersByChannel  map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
+	activeDeliveries    map[string]context.CancelFunc        // queueName -> cancelFunc
+	framer              amqp.Framer
+	ChannelDeliveries   map[ConnectionChannelKey]*ChannelDeliveryState
+	redeliveredMessages map[string]struct{} // message ID -> mark
+	redeliveredMu       sync.Mutex
 }
 
 func NewVhost(vhostName string, queueBufferSize int, persist persistence.Persistence) *VHost {
 	id := uuid.New().String()
 	vh := &VHost{
-		Name:               vhostName,
-		Id:                 id,
-		Exchanges:          make(map[string]*Exchange),
-		Queues:             make(map[string]*Queue),
-		Users:              make(map[string]*persistdb.User),
-		queueBufferSize:    queueBufferSize,
-		persist:            persist,
-		Consumers:          make(map[ConsumerKey]*Consumer),
-		ConsumersByQueue:   make(map[string][]*Consumer),
-		ConsumersByChannel: make(map[ConnectionChannelKey][]*Consumer),
-		activeDeliveries:   make(map[string]context.CancelFunc),
-		ChannelDeliveries:  make(map[ConnectionChannelKey]*ChannelDeliveryState),
+		Name:                vhostName,
+		Id:                  id,
+		Exchanges:           make(map[string]*Exchange),
+		Queues:              make(map[string]*Queue),
+		Users:               make(map[string]*persistdb.User),
+		queueBufferSize:     queueBufferSize,
+		persist:             persist,
+		Consumers:           make(map[ConsumerKey]*Consumer),
+		ConsumersByQueue:    make(map[string][]*Consumer),
+		ConsumersByChannel:  make(map[ConnectionChannelKey][]*Consumer),
+		activeDeliveries:    make(map[string]context.CancelFunc),
+		ChannelDeliveries:   make(map[ConnectionChannelKey]*ChannelDeliveryState),
+		redeliveredMessages: make(map[string]struct{}),
 	}
 	vh.createMandatoryStructure()
 	// Load persisted state

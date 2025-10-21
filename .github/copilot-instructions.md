@@ -104,3 +104,23 @@ Currently uses JSON file storage with plans for **Memento WAL Engine**:
 - **Events vs State**: Memento will use append-only event log vs JSON's state snapshots
 
 Focus on **protocol compliance**, **connection lifecycle management**, and **stateful message assembly** when working with AMQP components. UI changes require understanding the REST API contract defined in `web/handlers/api/`.
+
+## Documentation & GitHub Pages
+
+We maintain a GitHub Pages site to track protocol/class/method support, roadmap notes, and user-facing documentation.
+
+- Public URL: https://ottermq.github.io/ottermq/
+- Source directory: `/docs`
+- Deployment branch: `pages` (Pages is configured to use `/docs` as the site root)
+
+Contributor workflow for Pages updates:
+1. When adding or changing AMQP support (new classes/methods, flags, error codes), or altering behavior that affects compatibility, update the relevant docs under `/docs` to reflect the new status.
+2. Commit documentation changes alongside code when reasonable, or in a follow-up PR before release.
+3. Open a PR targeting the `pages` branch (or cherry-pick docs commits to `pages`) so the site is deployed after merge.
+4. After merge, verify the site renders correctly and reflects the change at the public URL.
+
+PR checklist for protocol changes:
+- [ ] Updated `/docs` status matrices/tables for affected AMQP classes and methods
+- [ ] Added/updated notes on limitations, TODOs, or partial compliance
+- [ ] Cross-referenced the related code areas (`internal/core/amqp/*`, `internal/core/broker/*`) where applicable
+- [ ] If API or UI behavior changed, ensured Swagger docs (`make docs`) and any UI docs are updated

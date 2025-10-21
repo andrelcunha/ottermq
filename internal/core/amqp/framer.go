@@ -19,6 +19,7 @@ type Framer interface {
 	CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte
 	CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte
 	CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte
+	CreateBasicRecoverOkFrame(channel uint16) []byte
 
 	// Queue Methods
 	CreateQueueDeclareOkFrame(request *RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte
@@ -117,6 +118,10 @@ func (d *DefaultFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
 
 func (d *DefaultFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
 	return createBasicGetOkFrame(channel, exchange, routingkey, msgCount)
+}
+
+func (d *DefaultFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
+	return createBasicRecoverOkFrame(channel)
 }
 
 func (d *DefaultFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {

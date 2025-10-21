@@ -54,6 +54,11 @@ type BasicRejectContent struct {
 	Requeue     bool
 }
 
+type BasicRecoverContent struct {
+	Requeue bool
+	Async   bool
+}
+
 type BasicProperties struct {
 	ContentType     ContentType    // shortstr
 	ContentEncoding string         // shortstr
@@ -135,6 +140,16 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 		ClassID:  uint16(BASIC),
 		MethodID: uint16(BASIC_DELIVER),
 		Content:  content,
+	}.FormatMethodFrame()
+	return frame
+}
+
+func createBasicRecoverOkFrame(channel uint16) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_RECOVER_OK),
+		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }
@@ -338,21 +353,13 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Warn().Msg("Server should not receive BASIC_CANCEL_OK frames from clients")
 		return nil, fmt.Errorf("server should not receive BASIC_CANCEL_OK frames from clients")
 
-	case uint16(BASIC_ACK):
-		log.Debug().Msg("Received BASIC_ACK frame \n")
-		return parseBasicAckFrame(payload)
-
-	case uint16(BASIC_REJECT):
-		log.Debug().Msg("Received BASIC_REJECT frame \n")
-		return parseBasicRejectFrame(payload)
-
 	case uint16(BASIC_PUBLISH):
 		log.Debug().Msg("Received BASIC_PUBLISH frame \n")
 		return parseBasicPublishFrame(payload)
 
-	// case uint16(BASIC_RETURN):
-	// 	log.Debug().Msg("Received BASIC_RETURN frame \n")
-	// 	return parseBasicReturnFrame(payload)
+	case uint16(BASIC_RETURN):
+		log.Debug().Msg("Received BASIC_RETURN frame \n")
+		return nil, fmt.Errorf(" basic.return not implemented")
 
 	case uint16(BASIC_DELIVER):
 		log.Debug().Msg("Received BASIC_DELIVER frame \n")
@@ -363,6 +370,22 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	case uint16(BASIC_GET):
 		log.Debug().Msg("Received BASIC_GET frame \n")
 		return parseBasicGetFrame(payload)
+
+	case uint16(BASIC_ACK):
+		log.Debug().Msg("Received BASIC_ACK frame \n")
+		return parseBasicAckFrame(payload)
+
+	case uint16(BASIC_REJECT):
+		log.Debug().Msg("Received BASIC_REJECT frame \n")
+		return parseBasicRejectFrame(payload)
+
+	case uint16(BASIC_RECOVER_ASYNC):
+		log.Debug().Msg("Received BASIC_RECOVER_ASYNC frame \n")
+		return parseBasicRecoverAsyncFrame(payload)
+
+	case uint16(BASIC_RECOVER):
+		log.Debug().Msg("Received BASIC_RECOVER frame \n")
+		return parseBasicRecoverFrame(payload)
 
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
@@ -606,6 +629,40 @@ func parseBasicRejectFrame(payload []byte) (*RequestMethodMessage, error) {
 	content := &BasicRejectContent{
 		DeliveryTag: deliveryTag,
 		Requeue:     requeue,
+	}
+	return &RequestMethodMessage{
+		Content: content,
+	}, nil
+}
+
+func parseBasicRecoverAsyncFrame(payload []byte) (*RequestMethodMessage, error) {
+	request, err := parseBasicRecoverFrame(payload)
+	if err != nil {
+		return nil, err
+	}
+	if content, ok := request.Content.(*BasicRecoverContent); ok && content != nil {
+		content.Async = true
+	}
+	return request, nil
+}
+
+func parseBasicRecoverFrame(payload []byte) (*RequestMethodMessage, error) {
+	// Expected fields:
+	// 1 requeue (bit - packed as octet)
+	if len(payload) < 9 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"requeue"}, true)
+	requeue := flags["requeue"]
+	content := &BasicRecoverContent{
+		Requeue: requeue,
+		Async:   false,
 	}
 	return &RequestMethodMessage{
 		Content: content,
