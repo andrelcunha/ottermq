@@ -6,6 +6,7 @@ import (
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,6 +20,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 
 	case uint16(amqp.BASIC_CANCEL):
 		return b.basicCancelHandler(request, conn, vh)
+
 	case uint16(amqp.BASIC_PUBLISH):
 		channel := request.Channel
 		currentState := b.getCurrentState(conn, channel)
@@ -251,5 +253,33 @@ func (b *Broker) basicRecoverHandler(request *amqp.RequestMethodMessage, conn ne
 		return nil, err
 	}
 	log.Debug().Msg("Sent Basic.RecoverOk frame")
+	return nil, nil
+}
+
+func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey string, msg *amqp.Message) (any, error) {
+	// TODO: implement basic.return
+	frame := b.framer.CreateBasicReturnFrame(channel, 312, "No route", exchange, routingKey)
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send basic return frame")
+		return nil, err
+	}
+	log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("Sent Basic.Return frame")
+
+	responseContent := amqp.ResponseContent{
+		Channel: channel,
+		ClassID: uint16(amqp.BASIC),
+		Weight:  0,
+		Message: *msg,
+	}
+	// Header
+	frame = responseContent.FormatHeaderFrame()
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send header frame")
+	}
+	// Body
+	frame = responseContent.FormatBodyFrame()
+	if err := b.framer.SendFrame(conn, frame); err != nil {
+		log.Error().Err(err).Msg("Failed to send body frame")
+	}
 	return nil, nil
 }
