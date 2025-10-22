@@ -21,7 +21,7 @@ Status levels:
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
 | exchange | 80% | direct/fanout declare implemented; missing topic |
 | queue | 55% | declare/bind implemented; unbind/purge/delete planned |
-| basic | 83% | Most methods implemented; nack and qos missing |
+| basic | 88% | Most methods implemented; nack and qos missing |
 | tx | 0% | |
 
 ## connection
@@ -93,7 +93,7 @@ Status levels:
 | basic.recover-async | ✅ | |
 | basic.recover | ✅ | |
 | basic.recover-ok | ✅ | |
-| basic.nack | ❌ | Not yet implemented |
+| basic.nack | ✅ | *not part of amqp 0-9-1 specs  |
 
 ## tx (Transactions)
 
