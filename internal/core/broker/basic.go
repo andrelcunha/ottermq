@@ -82,6 +82,9 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	case uint16(amqp.BASIC_RECOVER):
 		return b.basicRecoverHandler(request, conn, vh, false)
 
+	case uint16(amqp.BASIC_NACK):
+		return b.basicNackHandler(request, conn, vh)
+
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
@@ -140,7 +143,7 @@ func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn,
 			Exchange:   exchange,
 			RoutingKey: routingKey,
 		}
-		
+
 		if !hasRouting {
 			if mandatory {
 				// Return message to the publisher
@@ -314,5 +317,19 @@ func (b *Broker) BasicReturn(conn net.Conn, channel uint16, exchange, routingKey
 	if err := b.framer.SendFrame(conn, frame); err != nil {
 		log.Error().Err(err).Msg("Failed to send body frame")
 	}
+	return nil, nil
+}
+
+func (b *Broker) basicNackHandler(request *amqp.RequestMethodMessage, conn net.Conn, vh *vhost.VHost) (any, error) {
+	content, ok := request.Content.(*amqp.BasicNackContent)
+	if !ok || content == nil {
+		return nil, fmt.Errorf("invalid basic nack content")
+	}
+	err := vh.HandleBasicNack(conn, request.Channel, content.DeliveryTag, content.Multiple, content.Requeue)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to reject message")
+		return nil, err
+	}
+	log.Debug().Uint64("delivery_tag", content.DeliveryTag).Msg("Rejected message")
 	return nil, nil
 }
