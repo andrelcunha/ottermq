@@ -43,7 +43,7 @@ func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint
 
 	if requeue {
 		for _, record := range recordsToNack {
-			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", deliveryTag, channel)
+			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
 			vh.markAsRedelivered(record.Message.ID)
 			vh.mu.Lock()
 			queue := vh.Queues[record.QueueName]

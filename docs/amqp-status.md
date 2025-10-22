@@ -93,7 +93,7 @@ Status levels:
 | basic.recover-async | ✅ | |
 | basic.recover | ✅ | |
 | basic.recover-ok | ✅ | |
-| basic.nack | ✅ | *not part of amqp 0-9-1 specs  |
+| basic.nack | ✅ | *not part of amqp 0-9-1 specs |
 
 ## tx (Transactions)
 
