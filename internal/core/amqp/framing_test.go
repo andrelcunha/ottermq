@@ -487,3 +487,132 @@ func TestFormatMethodPayload(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateBasicReturnFrame(t *testing.T) {
+	framer := &DefaultFramer{}
+	channel := uint16(1)
+	replyCode := uint16(312) // NO_ROUTE
+	replyText := "No route"
+	exchange := "test-exchange"
+	routingKey := "test.key"
+
+	frame := framer.CreateBasicReturnFrame(channel, replyCode, replyText, exchange, routingKey)
+
+	if len(frame) < 8 {
+		t.Fatalf("Frame too short: %d bytes", len(frame))
+	}
+
+	// Verify frame header
+	if frame[0] != byte(TYPE_METHOD) {
+		t.Errorf("Expected frame type METHOD (%d), got %d", TYPE_METHOD, frame[0])
+	}
+
+	// Verify channel
+	frameChannel := binary.BigEndian.Uint16(frame[1:3])
+	if frameChannel != channel {
+		t.Errorf("Expected channel %d, got %d", channel, frameChannel)
+	}
+
+	// Verify payload size
+	payloadSize := binary.BigEndian.Uint32(frame[3:7])
+	expectedMinSize := uint32(4 + 2 + len(replyText) + 1 + len(exchange) + 1 + len(routingKey)) // classID + methodID + replyCode + strings
+	if payloadSize < expectedMinSize {
+		t.Errorf("Expected payload size >= %d, got %d", expectedMinSize, payloadSize)
+	}
+
+	// Parse payload
+	payload := frame[7 : 7+payloadSize]
+
+	// Verify class ID (BASIC = 60)
+	classID := binary.BigEndian.Uint16(payload[0:2])
+	if classID != uint16(BASIC) {
+		t.Errorf("Expected class ID %d (BASIC), got %d", uint16(BASIC), classID)
+	}
+
+	// Verify method ID (BASIC_RETURN = 50)
+	methodID := binary.BigEndian.Uint16(payload[2:4])
+	if methodID != uint16(BASIC_RETURN) {
+		t.Errorf("Expected method ID %d (BASIC_RETURN), got %d", uint16(BASIC_RETURN), methodID)
+	}
+
+	// Verify reply code
+	parsedReplyCode := binary.BigEndian.Uint16(payload[4:6])
+	if parsedReplyCode != replyCode {
+		t.Errorf("Expected reply code %d, got %d", replyCode, parsedReplyCode)
+	}
+
+	// Verify reply text (short string: 1 byte length + text)
+	replyTextLen := uint8(payload[6])
+	if replyTextLen != uint8(len(replyText)) {
+		t.Errorf("Expected reply text length %d, got %d", len(replyText), replyTextLen)
+	}
+	parsedReplyText := string(payload[7 : 7+replyTextLen])
+	if parsedReplyText != replyText {
+		t.Errorf("Expected reply text '%s', got '%s'", replyText, parsedReplyText)
+	}
+
+	// Verify frame end marker
+	if frame[len(frame)-1] != byte(FRAME_END) {
+		t.Errorf("Expected frame end marker %d, got %d", FRAME_END, frame[len(frame)-1])
+	}
+}
+
+func TestCreateBasicReturnFrame_EmptyStrings(t *testing.T) {
+	framer := &DefaultFramer{}
+	channel := uint16(2)
+	replyCode := uint16(312)
+
+	frame := framer.CreateBasicReturnFrame(channel, replyCode, "", "", "")
+
+	if len(frame) < 8 {
+		t.Fatalf("Frame too short: %d bytes", len(frame))
+	}
+
+	// Verify it doesn't panic and creates a valid frame
+	if frame[0] != byte(TYPE_METHOD) {
+		t.Errorf("Expected frame type METHOD, got %d", frame[0])
+	}
+
+	frameChannel := binary.BigEndian.Uint16(frame[1:3])
+	if frameChannel != channel {
+		t.Errorf("Expected channel %d, got %d", channel, frameChannel)
+	}
+
+	// Verify frame end marker
+	if frame[len(frame)-1] != byte(FRAME_END) {
+		t.Errorf("Expected frame end marker %d, got %d", FRAME_END, frame[len(frame)-1])
+	}
+}
+
+func TestCreateBasicReturnFrame_LongStrings(t *testing.T) {
+	framer := &DefaultFramer{}
+	channel := uint16(3)
+	replyCode := uint16(312)
+	
+	// Create strings at the edge of short string limit (255 bytes)
+	longText := string(make([]byte, 255))
+	for i := range longText {
+		longText = longText[:i] + "x" + longText[i+1:]
+	}
+
+	frame := framer.CreateBasicReturnFrame(channel, replyCode, longText, longText, longText)
+
+	if len(frame) < 8 {
+		t.Fatalf("Frame too short: %d bytes", len(frame))
+	}
+
+	// Verify frame structure is valid
+	if frame[0] != byte(TYPE_METHOD) {
+		t.Errorf("Expected frame type METHOD, got %d", frame[0])
+	}
+
+	payloadSize := binary.BigEndian.Uint32(frame[3:7])
+	if payloadSize == 0 {
+		t.Error("Payload size should not be 0")
+	}
+
+	// Verify frame end marker
+	if frame[len(frame)-1] != byte(FRAME_END) {
+		t.Errorf("Expected frame end marker %d, got %d", FRAME_END, frame[len(frame)-1])
+	}
+}

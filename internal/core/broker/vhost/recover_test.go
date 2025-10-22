@@ -304,6 +304,9 @@ func (m *mockFramer) ParseFrame(frame []byte) (any, error)    { return nil, nil 
 func (m *mockFramer) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*amqp.ConnectionInfo, error) {
 	return nil, nil
 }
+func (m *mockFramer) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
+	return []byte{}
+}
 func (m *mockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	return []byte{}
 }
@@ -362,6 +365,9 @@ func (m *mockFramerFail) ReadFrame(conn net.Conn) ([]byte, error) { return nil, 
 func (m *mockFramerFail) ParseFrame(frame []byte) (any, error)    { return nil, nil }
 func (m *mockFramerFail) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*amqp.ConnectionInfo, error) {
 	return nil, nil
+}
+func (m *mockFramerFail) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
+	return []byte{}
 }
 func (m *mockFramerFail) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	return []byte{}

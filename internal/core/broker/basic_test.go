@@ -56,7 +56,9 @@ func (m *MockFramer) CreateHeaderFrame(channel, classID uint16, msg amqp.Message
 func (m *MockFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
 	return []byte("body-frame")
 }
-
+func (m *MockFramer) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
+	return []byte("basic-return")
+}
 func (m *MockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	return []byte("basic-deliver")
 }
@@ -113,15 +115,13 @@ func createTestBroker() (*Broker, *MockFramer, net.Conn) {
 
 	// Create test vhost with a test queue
 	vh := vhost.NewVhost("test-vhost", 1000, &dummy.DummyPersistence{})
-	vh.Queues["test-queue"] = &vhost.Queue{
-		Name: "test-queue",
-		Props: &vhost.QueueProperties{
-			Passive:    false,
-			Durable:    false,
-			AutoDelete: false,
-			Exclusive:  false,
-			Arguments:  nil,
-		},
+	vh.Queues["test-queue"] = vhost.NewQueue("test-queue", 100)
+	vh.Queues["test-queue"].Props = &vhost.QueueProperties{
+		Passive:    false,
+		Durable:    false,
+		AutoDelete: false,
+		Exclusive:  false,
+		Arguments:  nil,
 	}
 	broker.VHosts["test-vhost"] = vh
 
@@ -497,6 +497,240 @@ func TestBasicConsumeHandler_WithArguments(t *testing.T) {
 				t.Errorf("Expected argument '%s' value %v, got %v", key, expectedValue, actualValue)
 			}
 		}
+	}
+}
+
+func TestBasicReturn_SuccessfulReturn(t *testing.T) {
+	broker, mockFramer, conn := createTestBroker()
+
+	msg := &amqp.Message{
+		ID:   "test-msg-id",
+		Body: []byte("test message body"),
+		Properties: amqp.BasicProperties{
+			ContentType:  "text/plain",
+			DeliveryMode: amqp.PERSISTENT,
+			MessageID:    "msg-123",
+		},
+		Exchange:   "test-exchange",
+		RoutingKey: "test.key",
+	}
+
+	_, err := broker.BasicReturn(conn, 1, "test-exchange", "test.key", msg)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	// Should send 3 frames: basic.return + header + body
+	if len(mockFramer.sentFrames) != 3 {
+		t.Errorf("Expected 3 frames (return + header + body), got %d", len(mockFramer.sentFrames))
+	}
+
+	// Verify basic.return frame was sent first
+	if len(mockFramer.sentFrames) > 0 && string(mockFramer.sentFrames[0]) != "basic-return" {
+		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.sentFrames[0]))
+	}
+}
+
+func TestBasicReturn_FrameSendError(t *testing.T) {
+	broker, mockFramer, conn := createTestBroker()
+
+	// Make SendFrame fail by closing the connection first
+	conn.(*MockConnection).closed = true
+
+	msg := &amqp.Message{
+		ID:         "test-msg-id",
+		Body:       []byte("test message"),
+		Properties: amqp.BasicProperties{},
+		Exchange:   "test-exchange",
+		RoutingKey: "test.key",
+	}
+
+	_, err := broker.BasicReturn(conn, 1, "test-exchange", "test.key", msg)
+
+	// Should still return nil despite send errors (logged but not propagated)
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	// Should have attempted to send frames
+	if len(mockFramer.sentFrames) == 0 {
+		t.Error("Expected at least one frame send attempt")
+	}
+}
+
+func TestBasicPublishHandler_WithMandatoryFlag_NoRouting(t *testing.T) {
+	broker, mockFramer, conn := createTestBroker()
+	vh := broker.VHosts["test-vhost"]
+
+	// Create an exchange without bindings
+	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
+		Name:     "no-route-ex",
+		Typ:      vhost.DIRECT,
+		Bindings: make(map[string][]*vhost.Queue),
+		Props:    &vhost.ExchangeProperties{Internal: false},
+	}
+
+	// Setup channel state with publish request
+	channelState := broker.Connections[conn].Channels[1]
+	channelState.MethodFrame = &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  60,
+		MethodID: uint16(amqp.BASIC_PUBLISH),
+		Content: &amqp.BasicPublishContent{
+			Exchange:   "no-route-ex",
+			RoutingKey: "unbound.key",
+			Mandatory:  true, // Message should be returned
+			Immediate:  false,
+		},
+	}
+	channelState.HeaderFrame = &amqp.HeaderFrame{
+		Channel:  1,
+		ClassID:  60,
+		BodySize: 12,
+		Properties: &amqp.BasicProperties{
+			ContentType:  "text/plain",
+			DeliveryMode: amqp.NON_PERSISTENT,
+		},
+	}
+	channelState.Body = []byte("test message")
+	channelState.BodySize = 12
+
+	// Call the handler
+	result, err := broker.basicPublishHandler(channelState, conn, vh)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("Expected nil result, got: %v", result)
+	}
+
+	// Should send basic.return + header + body (3 frames)
+	if len(mockFramer.sentFrames) != 3 {
+		t.Errorf("Expected 3 frames for basic.return, got %d", len(mockFramer.sentFrames))
+	}
+
+	if string(mockFramer.sentFrames[0]) != "basic-return" {
+		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.sentFrames[0]))
+	}
+}
+
+func TestBasicPublishHandler_WithMandatoryFlag_WithRouting(t *testing.T) {
+	broker, mockFramer, conn := createTestBroker()
+	vh := broker.VHosts["test-vhost"]
+
+	// Create an exchange with binding
+	queue := vh.Queues["test-queue"]
+	vh.Exchanges["routed-ex"] = &vhost.Exchange{
+		Name: "routed-ex",
+		Typ:  vhost.DIRECT,
+		Bindings: map[string][]*vhost.Queue{
+			"routed.key": {queue},
+		},
+		Props: &vhost.ExchangeProperties{Internal: false},
+	}
+
+	// Setup channel state with publish request
+	channelState := broker.Connections[conn].Channels[1]
+	channelState.MethodFrame = &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  60,
+		MethodID: uint16(amqp.BASIC_PUBLISH),
+		Content: &amqp.BasicPublishContent{
+			Exchange:   "routed-ex",
+			RoutingKey: "routed.key",
+			Mandatory:  true, // Message should NOT be returned (has routing)
+			Immediate:  false,
+		},
+	}
+	channelState.HeaderFrame = &amqp.HeaderFrame{
+		Channel:  1,
+		ClassID:  60,
+		BodySize: 12,
+		Properties: &amqp.BasicProperties{
+			ContentType:  "text/plain",
+			DeliveryMode: amqp.NON_PERSISTENT,
+		},
+	}
+	channelState.Body = []byte("test message")
+	channelState.BodySize = 12
+
+	// Call the handler
+	result, err := broker.basicPublishHandler(channelState, conn, vh)
+
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("Expected nil result, got: %v", result)
+	}
+
+	// Should NOT send basic.return since message has routing
+	if len(mockFramer.sentFrames) != 0 {
+		t.Errorf("Expected 0 frames (no return), got %d", len(mockFramer.sentFrames))
+	}
+
+	// Verify message was queued
+	if queue.Len() != 1 {
+		t.Errorf("Expected 1 message in queue, got %d", queue.Len())
+	}
+}
+
+func TestBasicPublishHandler_WithoutMandatoryFlag_NoRouting(t *testing.T) {
+	broker, mockFramer, conn := createTestBroker()
+	vh := broker.VHosts["test-vhost"]
+
+	// Create an exchange without bindings
+	vh.Exchanges["no-route-ex"] = &vhost.Exchange{
+		Name:     "no-route-ex",
+		Typ:      vhost.DIRECT,
+		Bindings: make(map[string][]*vhost.Queue),
+		Props:    &vhost.ExchangeProperties{Internal: false},
+	}
+
+	// Setup channel state with publish request
+	channelState := broker.Connections[conn].Channels[1]
+	channelState.MethodFrame = &amqp.RequestMethodMessage{
+		Channel:  1,
+		ClassID:  60,
+		MethodID: uint16(amqp.BASIC_PUBLISH),
+		Content: &amqp.BasicPublishContent{
+			Exchange:   "no-route-ex",
+			RoutingKey: "unbound.key",
+			Mandatory:  false, // Message should be silently dropped
+			Immediate:  false,
+		},
+	}
+	channelState.HeaderFrame = &amqp.HeaderFrame{
+		Channel:  1,
+		ClassID:  60,
+		BodySize: 12,
+		Properties: &amqp.BasicProperties{
+			ContentType:  "text/plain",
+			DeliveryMode: amqp.NON_PERSISTENT,
+		},
+	}
+	channelState.Body = []byte("test message")
+	channelState.BodySize = 12
+
+	// Call the handler
+	result, err := broker.basicPublishHandler(channelState, conn, vh)
+
+	// Should succeed but silently drop the message
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("Expected nil result, got: %v", result)
+	}
+
+	// Should NOT send basic.return since mandatory=false
+	if len(mockFramer.sentFrames) != 0 {
+		t.Errorf("Expected 0 frames (message silently dropped), got %d", len(mockFramer.sentFrames))
 	}
 }
 

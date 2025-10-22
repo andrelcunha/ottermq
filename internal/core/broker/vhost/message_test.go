@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/google/uuid"
 )
 
 func TestPublishToInternalExchange(t *testing.T) {
@@ -20,8 +21,12 @@ func TestPublishToInternalExchange(t *testing.T) {
 		Props: &ExchangeProperties{Internal: true},
 	}
 
+	msg := &amqp.Message{
+		Body:       []byte("test"),
+		Properties: amqp.BasicProperties{},
+	}
 	// Try to publish to the internal exchange
-	_, err := vh.Publish(exchangeName, "rk", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "rk", msg)
 	if err == nil {
 		t.Errorf("Expected error when publishing to internal exchange, got nil")
 	}
@@ -36,8 +41,12 @@ func TestPublishToNonExistentExchange(t *testing.T) {
 		Queues:    make(map[string]*Queue),
 	}
 
+	msg := &amqp.Message{
+		Body:       []byte("test"),
+		Properties: amqp.BasicProperties{},
+	}
 	// Try to publish to non-existent exchange
-	_, err := vh.Publish("non-existent", "rk", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish("non-existent", "rk", msg)
 	if err == nil {
 		t.Errorf("Expected error when publishing to non-existent exchange, got nil")
 	}
@@ -72,8 +81,14 @@ func TestPublishToDirectExchangeWithBinding(t *testing.T) {
 		},
 	}
 
+	msg := &amqp.Message{
+		ID:         uuid.New().String(),
+		Body:       []byte("test message"),
+		Properties: amqp.BasicProperties{},
+	}
+
 	// Publish message
-	msgID, err := vh.Publish(exchangeName, routingKey, []byte("test message"), &amqp.BasicProperties{})
+	msgID, err := vh.Publish(exchangeName, routingKey, msg)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -101,9 +116,12 @@ func TestPublishToDirectExchangeWithoutBinding(t *testing.T) {
 		Props:    &ExchangeProperties{Internal: false},
 		Bindings: make(map[string][]*Queue),
 	}
-
+	msg := &amqp.Message{
+		Body:       []byte("test"),
+		Properties: amqp.BasicProperties{},
+	}
 	// Try to publish with unbound routing key
-	_, err := vh.Publish(exchangeName, "unbound.key", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "unbound.key", msg)
 	if err == nil {
 		t.Errorf("Expected error when publishing to unbound routing key, got nil")
 	}
@@ -142,8 +160,13 @@ func TestPublishToFanoutExchange(t *testing.T) {
 		},
 	}
 
+	msg := &amqp.Message{
+		ID:         uuid.New().String(),
+		Body:       []byte("fanout message"),
+		Properties: amqp.BasicProperties{},
+	}
 	// Publish message
-	msgID, err := vh.Publish(exchangeName, "any.key", []byte("fanout message"), &amqp.BasicProperties{})
+	msgID, err := vh.Publish(exchangeName, "any.key", msg)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -173,13 +196,156 @@ func TestPublishToUnsupportedExchangeType(t *testing.T) {
 		Typ:   TOPIC, // Not yet implemented
 		Props: &ExchangeProperties{Internal: false},
 	}
-
+	msg := &amqp.Message{
+		Body:       []byte("test"),
+		Properties: amqp.BasicProperties{},
+	}
 	// Try to publish
-	_, err := vh.Publish(exchangeName, "test.key", []byte("test"), &amqp.BasicProperties{})
+	_, err := vh.Publish(exchangeName, "test.key", msg)
 	if err == nil {
 		t.Errorf("Expected error for unsupported exchange type, got nil")
 	}
 	if err != nil && err.Error() != "topic exchange not yet implemented" {
 		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestHasRoutingForMessage_NonExistentExchange(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	if vh.HasRoutingForMessage("non-existent", "any.key") {
+		t.Error("Expected false for non-existent exchange")
+	}
+}
+
+func TestHasRoutingForMessage_DirectExchange_WithBinding(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+		Queues:    make(map[string]*Queue),
+	}
+
+	queue := &Queue{Name: "test-queue"}
+	vh.Queues["test-queue"] = queue
+
+	vh.Exchanges["direct-ex"] = &Exchange{
+		Name: "direct-ex",
+		Typ:  DIRECT,
+		Bindings: map[string][]*Queue{
+			"test.key": {queue},
+		},
+	}
+
+	if !vh.HasRoutingForMessage("direct-ex", "test.key") {
+		t.Error("Expected true for direct exchange with matching routing key")
+	}
+}
+
+func TestHasRoutingForMessage_DirectExchange_WithoutBinding(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	vh.Exchanges["direct-ex"] = &Exchange{
+		Name:     "direct-ex",
+		Typ:      DIRECT,
+		Bindings: make(map[string][]*Queue),
+	}
+
+	if vh.HasRoutingForMessage("direct-ex", "unbound.key") {
+		t.Error("Expected false for direct exchange without matching routing key")
+	}
+}
+
+func TestHasRoutingForMessage_DirectExchange_EmptyQueueList(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	vh.Exchanges["direct-ex"] = &Exchange{
+		Name: "direct-ex",
+		Typ:  DIRECT,
+		Bindings: map[string][]*Queue{
+			"test.key": {}, // Empty queue list
+		},
+	}
+
+	if vh.HasRoutingForMessage("direct-ex", "test.key") {
+		t.Error("Expected false when routing key exists but has no queues")
+	}
+}
+
+func TestHasRoutingForMessage_FanoutExchange_WithQueues(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+		Queues:    make(map[string]*Queue),
+	}
+
+	queue1 := &Queue{Name: "queue1"}
+	queue2 := &Queue{Name: "queue2"}
+
+	vh.Exchanges["fanout-ex"] = &Exchange{
+		Name: "fanout-ex",
+		Typ:  FANOUT,
+		Queues: map[string]*Queue{
+			"queue1": queue1,
+			"queue2": queue2,
+		},
+	}
+
+	// Fanout ignores routing key, so any key should work
+	if !vh.HasRoutingForMessage("fanout-ex", "any.key") {
+		t.Error("Expected true for fanout exchange with bound queues")
+	}
+	if !vh.HasRoutingForMessage("fanout-ex", "another.key") {
+		t.Error("Expected true for fanout exchange regardless of routing key")
+	}
+}
+
+func TestHasRoutingForMessage_FanoutExchange_WithoutQueues(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	vh.Exchanges["fanout-ex"] = &Exchange{
+		Name:   "fanout-ex",
+		Typ:    FANOUT,
+		Queues: make(map[string]*Queue),
+	}
+
+	if vh.HasRoutingForMessage("fanout-ex", "any.key") {
+		t.Error("Expected false for fanout exchange without bound queues")
+	}
+}
+
+func TestHasRoutingForMessage_TopicExchange(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	vh.Exchanges["topic-ex"] = &Exchange{
+		Name: "topic-ex",
+		Typ:  TOPIC,
+	}
+
+	// Topic routing not yet implemented
+	if vh.HasRoutingForMessage("topic-ex", "test.key") {
+		t.Error("Expected false for topic exchange (not yet implemented)")
+	}
+}
+
+func TestHasRoutingForMessage_UnknownExchangeType(t *testing.T) {
+	vh := &VHost{
+		Exchanges: make(map[string]*Exchange),
+	}
+
+	vh.Exchanges["unknown-ex"] = &Exchange{
+		Name: "unknown-ex",
+		Typ:  "unknown-type", // Invalid exchange type
+	}
+
+	if vh.HasRoutingForMessage("unknown-ex", "test.key") {
+		t.Error("Expected false for unknown exchange type")
 	}
 }
