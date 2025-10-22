@@ -61,6 +61,12 @@ type BasicRejectContent struct {
 	Requeue     bool
 }
 
+type BasicNackContent struct {
+	DeliveryTag uint64
+	Multiple    bool
+	Requeue     bool
+}
+
 type BasicRecoverContent struct {
 	Requeue bool
 	Async   bool
@@ -427,6 +433,10 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 		log.Debug().Msg("Received BASIC_RECOVER frame \n")
 		return parseBasicRecoverFrame(payload)
 
+	case uint16(BASIC_NACK):
+		log.Debug().Msg("Received BASIC_NACK frame \n")
+		return parseBasicNackFrame(payload)
+
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
@@ -703,6 +713,36 @@ func parseBasicRecoverFrame(payload []byte) (*RequestMethodMessage, error) {
 	content := &BasicRecoverContent{
 		Requeue: requeue,
 		Async:   false,
+	}
+	return &RequestMethodMessage{
+		Content: content,
+	}, nil
+}
+
+func parseBasicNackFrame(payload []byte) (*RequestMethodMessage, error) {
+	// Expected fields:
+	// 8 deliveryTag (long long int),
+	// flags:  (bit - packed as octet)
+	// multiple + requeue
+	if len(payload) < 10 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	deliveryTag, err := DecodeLongLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode deliveryTag: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"multiple", "requeue"}, true)
+	multiple := flags["multiple"]
+	requeue := flags["requeue"]
+	content := &BasicNackContent{
+		DeliveryTag: deliveryTag,
+		Multiple:    multiple,
+		Requeue:     requeue,
 	}
 	return &RequestMethodMessage{
 		Content: content,

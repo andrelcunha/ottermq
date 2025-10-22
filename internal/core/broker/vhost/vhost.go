@@ -14,20 +14,28 @@ import (
 )
 
 type VHost struct {
-	Name                string                     `json:"name"`
-	Id                  string                     `json:"id"`
-	Exchanges           map[string]*Exchange       `json:"exchanges"`
-	Queues              map[string]*Queue          `json:"queues"`
-	Users               map[string]*persistdb.User `json:"users"`
-	mu                  sync.Mutex                 `json:"-"`
-	queueBufferSize     int                        `json:"-"`
-	persist             persistence.Persistence
-	Consumers           map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
-	ConsumersByQueue    map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
-	ConsumersByChannel  map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
-	activeDeliveries    map[string]context.CancelFunc        // queueName -> cancelFunc
-	framer              amqp.Framer
-	ChannelDeliveries   map[ConnectionChannelKey]*ChannelDeliveryState
+	Name               string                     `json:"name"`
+	Id                 string                     `json:"id"`
+	Exchanges          map[string]*Exchange       `json:"exchanges"`
+	Queues             map[string]*Queue          `json:"queues"`
+	Users              map[string]*persistdb.User `json:"users"`
+	mu                 sync.Mutex                 `json:"-"`
+	queueBufferSize    int                        `json:"-"`
+	persist            persistence.Persistence
+	Consumers          map[ConsumerKey]*Consumer            `json:"consumers"`          // <- Primary registry
+	ConsumersByQueue   map[string][]*Consumer               `json:"consumers_by_queue"` // <- Delivery Index
+	ConsumersByChannel map[ConnectionChannelKey][]*Consumer // Index consumers by connection+channel
+	activeDeliveries   map[string]context.CancelFunc        // queueName -> cancelFunc
+	framer             amqp.Framer
+	ChannelDeliveries  map[ConnectionChannelKey]*ChannelDeliveryState
+
+	// redeliveredMessages marks message IDs that must be delivered with
+	// Basic.Deliver.redelivered = true on their next successful delivery.
+	// We set this when we requeue previously delivered messages (e.g., Basic.Recover(requeue),
+	// Basic.Nack/Reject with requeue, or after a delivery failure). Because requeue puts the
+	// message back into the queue (losing per-channel unacked metadata), we need this
+	// out-of-band memory to preserve AMQP redelivery semantics. The flag is cleared on the
+	// next successful delivery.
 	redeliveredMessages map[string]struct{} // message ID -> mark
 	redeliveredMu       sync.Mutex
 }

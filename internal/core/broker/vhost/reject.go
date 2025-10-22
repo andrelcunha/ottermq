@@ -8,6 +8,10 @@ import (
 )
 
 func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag uint64, requeue bool) error {
+	return vh.HandleBasicNack(conn, channel, deliveryTag, false, requeue)
+}
+
+func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint64, multiple, requeue bool) error {
 	key := ConnectionChannelKey{conn, channel}
 
 	vh.mu.Lock()
@@ -18,26 +22,43 @@ func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag ui
 	}
 
 	ch.mu.Lock()
-	record, exists := ch.Unacked[deliveryTag]
-	if exists {
-		delete(ch.Unacked, deliveryTag)
-	}
-	ch.mu.Unlock()
-
-	if requeue {
-		log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", deliveryTag, channel)
-		vh.mu.Lock()
-		queue := vh.Queues[record.QueueName]
-		vh.mu.Unlock()
-		if queue != nil {
-			queue.Push(record.Message)
+	recordsToNack := make([]*DeliveryRecord, 0)
+	if multiple {
+		for tag, record := range ch.Unacked {
+			if tag <= deliveryTag {
+				recordsToNack = append(recordsToNack, record)
+				delete(ch.Unacked, tag)
+			}
 		}
 	} else {
-		// TODO: implement dead-lettering
-		log.Debug().Msgf("Discarding message with delivery tag %d on channel %d\n", deliveryTag, channel)
+		if record, exists := ch.Unacked[deliveryTag]; exists {
+			recordsToNack = append(recordsToNack, record)
+			delete(ch.Unacked, deliveryTag)
+		}
+	}
+	ch.mu.Unlock()
+	if len(recordsToNack) == 0 {
+		return nil
+	}
+
+	if requeue {
+		for _, record := range recordsToNack {
+			log.Debug().Msgf("Requeuing message with delivery tag %d on channel %d\n", record.DeliveryTag, channel)
+			vh.markAsRedelivered(record.Message.ID)
+			vh.mu.Lock()
+			queue := vh.Queues[record.QueueName]
+			vh.mu.Unlock()
+			if queue != nil {
+				queue.Push(record.Message)
+			}
+		}
+		return nil
+	}
+	// TODO: implement dead-lettering
+	for _, record := range recordsToNack {
+		log.Debug().Uint64("delivery_tag", record.DeliveryTag).Uint16("channel", channel).Msg("Nack: discarding message")
 		if record.Persistent {
 			_ = vh.persist.DeleteMessage(vh.Name, record.QueueName, record.Message.ID)
-			log.Debug().Msgf("Message with delivery tag %d was persistent, consider persisting discard\n", deliveryTag)
 		}
 	}
 	return nil
