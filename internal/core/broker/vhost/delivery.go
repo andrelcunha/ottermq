@@ -23,10 +23,10 @@ type ChannelDeliveryState struct {
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
+	// If caller didn't force redelivered, consult the mark set during requeue/recover.
 	if !redelivered {
 		redelivered = vh.shouldRedeliver(msg.ID)
 	}
-
 	if !consumer.Active {
 		return fmt.Errorf("consumer %s on channel %d is not active", consumer.Tag, consumer.Channel)
 	}
@@ -102,6 +102,7 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 	}
 
 	if redelivered {
+		// Clear the one-shot mark so subsequent deliveries default to non-redelivered.
 		vh.clearRedeliveredMark(msg.ID)
 	}
 	return nil

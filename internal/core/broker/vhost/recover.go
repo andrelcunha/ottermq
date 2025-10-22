@@ -81,6 +81,8 @@ func (vh *VHost) HandleBasicRecover(conn net.Conn, channel uint16, requeue bool)
 }
 
 func (vh *VHost) markAsRedelivered(msgID string) {
+	// Mark message so the next Basic.Deliver will set redelivered=true.
+	// Cleared in deliverToConsumer after a successful delivery (one-shot).
 	vh.redeliveredMu.Lock()
 	vh.redeliveredMessages[msgID] = struct{}{}
 	vh.redeliveredMu.Unlock()
