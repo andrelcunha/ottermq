@@ -22,51 +22,8 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 		return b.basicCancelHandler(request, conn, vh)
 
 	case uint16(amqp.BASIC_PUBLISH):
-		channel := request.Channel
-		currentState := b.getCurrentState(conn, channel)
-		if currentState == nil {
-			return nil, fmt.Errorf("channel not found")
-		}
-		if currentState.MethodFrame != request { // request is "newState.MethodFrame"
-			b.Connections[conn].Channels[channel].MethodFrame = request
-			log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
-			return nil, nil
-		}
-		// if the class and method are not the same as the current state,
-		// it means that it stated the new publish request
-		if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
-			b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
-			b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
-			log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
-			return nil, nil
-		}
-		if currentState.Body == nil && newState.Body != nil {
-			log.Trace().Int("body_len", len(newState.Body)).Uint64("expected", currentState.BodySize).Msg("Updating body")
-			// Append the new body to the current body
-			b.Connections[conn].Channels[channel].Body = newState.Body
-		}
-		log.Trace().Interface("state", currentState).Msg("Current state after all")
-		if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
-			log.Trace().Interface("state", currentState).Msg("All fields must be filled")
-			if len(currentState.Body) != int(currentState.BodySize) {
-				log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
-				// TODO: handle this error properly, maybe sending the correct channel exception
-				// vide amqp.constants.go Exceptions
-				return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
-			}
-			publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishContent)
-			exchanege := publishRequest.Exchange
-			routingKey := publishRequest.RoutingKey
-			body := currentState.Body
-			props := currentState.HeaderFrame.Properties
-			_, err := vh.Publish(exchanege, routingKey, body, props)
-			if err == nil {
-				log.Trace().Str("exchange", exchanege).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
-				b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
-			}
-			return nil, err
+		return b.basicPublishHandler(newState, conn, vh)
 
-		}
 	case uint16(amqp.BASIC_GET):
 		getMsg := request.Content.(*amqp.BasicGetMessageContent)
 		queue := getMsg.Queue
@@ -127,6 +84,82 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 
 	default:
 		return nil, fmt.Errorf("unsupported command")
+	}
+	return nil, nil
+}
+
+func (b *Broker) basicPublishHandler(newState *amqp.ChannelState, conn net.Conn, vh *vhost.VHost) (any, error) {
+	request := newState.MethodFrame
+	channel := request.Channel
+	currentState := b.getCurrentState(conn, channel)
+	if currentState == nil {
+		return nil, fmt.Errorf("channel not found")
+	}
+	if currentState.MethodFrame != request { // request is "newState.MethodFrame"
+		b.Connections[conn].Channels[channel].MethodFrame = request
+		log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update method")
+		return nil, nil
+	}
+	// if the class and method are not the same as the current state,
+	// it means that it stated the new publish request
+	if currentState.HeaderFrame == nil && newState.HeaderFrame != nil {
+		b.Connections[conn].Channels[channel].HeaderFrame = newState.HeaderFrame
+		b.Connections[conn].Channels[channel].BodySize = newState.HeaderFrame.BodySize
+		log.Trace().Interface("state", b.getCurrentState(conn, channel)).Msg("Current state after update header")
+		return nil, nil
+	}
+	if currentState.Body == nil && newState.Body != nil {
+		log.Trace().Int("body_len", len(newState.Body)).Uint64("expected", currentState.BodySize).Msg("Updating body")
+		// Append the new body to the current body
+		b.Connections[conn].Channels[channel].Body = newState.Body
+	}
+	log.Trace().Interface("state", currentState).Msg("Current state after all")
+	if currentState.MethodFrame.Content != nil && currentState.HeaderFrame != nil && currentState.BodySize > 0 && currentState.Body != nil {
+		log.Trace().Interface("state", currentState).Msg("All fields must be filled")
+		if len(currentState.Body) != int(currentState.BodySize) {
+			log.Trace().Int("body_len", len(currentState.Body)).Uint64("expected", currentState.BodySize).Msg("Body size is not correct")
+			// TODO: handle this error properly, maybe sending the correct channel exception
+			// vide amqp.constants.go Exceptions
+			return nil, fmt.Errorf("body size is not correct: %d != %d", len(currentState.Body), currentState.BodySize)
+		}
+		publishRequest := currentState.MethodFrame.Content.(*amqp.BasicPublishContent)
+		exchange := publishRequest.Exchange
+		routingKey := publishRequest.RoutingKey
+		mandatory := publishRequest.Mandatory
+		// immediate := publishRequest.Immediate // immediate is deprecated and should be ignored
+
+		body := currentState.Body
+		props := currentState.HeaderFrame.Properties
+		hasRouting := vh.HasRoutingForMessage(exchange, routingKey)
+
+		msgID := uuid.New().String()
+		msg := &amqp.Message{
+			ID:         msgID,
+			Body:       body,
+			Properties: *props,
+			Exchange:   exchange,
+			RoutingKey: routingKey,
+		}
+		
+		if !hasRouting {
+			if mandatory {
+				// Return message to the publisher
+				log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, returned to publisher")
+				return b.BasicReturn(conn, channel, exchange, routingKey, msg)
+			}
+			// No routing and not mandatory - silently drop the message
+			log.Debug().Str("exchange", exchange).Str("routing_key", routingKey).Msg("No route for message, silently dropped (not mandatory)")
+			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+			return nil, nil
+		}
+
+		_, err := vh.Publish(exchange, routingKey, msg)
+		if err == nil {
+			log.Trace().Str("exchange", exchange).Str("routing_key", routingKey).Str("body", string(body)).Msg("Published message")
+			b.Connections[conn].Channels[channel] = &amqp.ChannelState{}
+		}
+		return nil, err
+
 	}
 	return nil, nil
 }

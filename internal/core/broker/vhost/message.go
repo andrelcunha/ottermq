@@ -3,7 +3,6 @@ package vhost
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
@@ -21,7 +20,7 @@ type SaveMessageRequest struct {
 
 // TODO: create a higher level abstraction of amqp.Message, exposing the content, requeued count, etc
 
-func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *amqp.BasicProperties) (string, error) {
+func (vh *VHost) Publish(exchangeName, routingKey string, msg *amqp.Message) (string, error) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
 
@@ -37,36 +36,28 @@ func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *am
 		return "", fmt.Errorf("cannot publish to internal exchange %s", exchangeName)
 	}
 
-	msgID := uuid.New().String()
-	msg := amqp.Message{
-		ID:         msgID,
-		Body:       body,
-		Properties: *props,
-		Exchange:   exchangeName,
-		RoutingKey: routingKey,
-	}
-	log.Trace().Str("id", msgID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(body)).Interface("properties", props).Msg("Publishing message")
+	log.Trace().Str("id", msg.ID).Str("exchange", exchangeName).Str("routing_key", routingKey).Str("body", string(msg.Body)).Interface("properties", msg.Properties).Msg("Publishing message")
 
 	var timestamp int64
-	if props.Timestamp.IsZero() {
+	if msg.Properties.Timestamp.IsZero() {
 		timestamp = 0
 	} else {
-		timestamp = props.Timestamp.Unix()
+		timestamp = msg.Properties.Timestamp.Unix()
 	}
 	msgProps := persistence.MessageProperties{
-		ContentType:     string(props.ContentType),
-		ContentEncoding: props.ContentEncoding,
-		Headers:         props.Headers,
-		DeliveryMode:    uint8(props.DeliveryMode),
-		Priority:        props.Priority,
-		CorrelationID:   props.CorrelationID,
-		ReplyTo:         props.ReplyTo,
-		Expiration:      props.Expiration,
-		MessageID:       props.MessageID,
+		ContentType:     string(msg.Properties.ContentType),
+		ContentEncoding: msg.Properties.ContentEncoding,
+		Headers:         msg.Properties.Headers,
+		DeliveryMode:    uint8(msg.Properties.DeliveryMode),
+		Priority:        msg.Properties.Priority,
+		CorrelationID:   msg.Properties.CorrelationID,
+		ReplyTo:         msg.Properties.ReplyTo,
+		Expiration:      msg.Properties.Expiration,
+		MessageID:       msg.Properties.MessageID,
 		Timestamp:       timestamp,
-		Type:            props.Type,
-		UserID:          props.UserID,
-		AppID:           props.AppID,
+		Type:            msg.Properties.Type,
+		UserID:          msg.Properties.UserID,
+		AppID:           msg.Properties.AppID,
 	}
 	switch exchange.Typ {
 	case DIRECT:
@@ -77,37 +68,37 @@ func (vh *VHost) Publish(exchangeName, routingKey string, body []byte, props *am
 		}
 		for _, queue := range queues {
 			err := vh.saveMessageIfDurable(SaveMessageRequest{
-				Props:      props,
+				Props:      &msg.Properties,
 				Queue:      queue,
 				RoutingKey: routingKey,
-				MsgID:      msgID,
-				Body:       body,
+				MsgID:      msg.ID,
+				Body:       msg.Body,
 				MsgProps:   msgProps,
 			})
 			if err != nil {
 				return "", err
 			}
 
-			queue.Push(msg)
+			queue.Push(*msg)
 		}
-		return msgID, nil
+		return msg.ID, nil
 
 	case FANOUT:
 		for _, queue := range exchange.Queues {
 			err := vh.saveMessageIfDurable(SaveMessageRequest{
-				Props:      props,
+				Props:      &msg.Properties,
 				Queue:      queue,
 				RoutingKey: routingKey,
-				MsgID:      msgID,
-				Body:       body,
+				MsgID:      msg.ID,
+				Body:       msg.Body,
 				MsgProps:   msgProps,
 			})
 			if err != nil {
 				return "", err
 			}
-			queue.Push(msg)
+			queue.Push(*msg)
 		}
-		return msgID, nil
+		return msg.ID, nil
 	case TOPIC:
 		// TODO: Implement topic exchange routing
 		return "", fmt.Errorf("topic exchange not yet implemented")
@@ -163,4 +154,29 @@ func (vh *VHost) saveMessageIfDurable(req SaveMessageRequest) error {
 		}
 	}
 	return nil
+}
+
+func (vh *VHost) HasRoutingForMessage(exchangeName, routingKey string) bool {
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
+
+	exchange, ok := vh.Exchanges[exchangeName]
+	if !ok {
+		return false
+	}
+
+	switch exchange.Typ {
+	case DIRECT:
+		// For direct exchanges, check if there are bindings for the specific routing key
+		queues, ok := exchange.Bindings[routingKey]
+		return ok && len(queues) > 0
+	case FANOUT:
+		// For fanout exchanges, check if there are any bound queues
+		return len(exchange.Queues) > 0
+	case TOPIC:
+		// TODO: Implement topic routing check (needs pattern matching)
+		return false
+	default:
+		return false
+	}
 }
