@@ -103,6 +103,7 @@ const (
 	BASIC_RECOVER_ASYNC BasicMethod = 100
 	BASIC_RECOVER       BasicMethod = 110
 	BASIC_RECOVER_OK    BasicMethod = 111
+	BASIC_NACK          BasicMethod = 120
 )
 
 type TxMethod int
