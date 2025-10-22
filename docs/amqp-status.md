@@ -21,7 +21,7 @@ Status levels:
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
 | exchange | 80% | direct/fanout declare implemented; missing topic |
 | queue | 55% | declare/bind implemented; unbind/purge/delete planned |
-| basic | 72% | Most methods implemented; nack and qos missing |
+| basic | 83% | Most methods implemented; nack and qos missing |
 | tx | 0% | |
 
 ## connection
@@ -78,12 +78,12 @@ Status levels:
 |--------|:------:|------|
 | basic.qos | ❌ | Not yet implemented |
 | basic.qos-ok | ❌ | |
-| basic.consume | ⚠️ | noLocal not supported (same as RabbitMQ) |
+| basic.consume | ✅ | ‼️`noLocal` not supported (same as RabbitMQ)  |
 | basic.consume-ok | ✅ | |
 | basic.cancel | ✅ | |
 | basic.cancel-ok | ✅ | |
 | basic.publish | ✅ | |
-| basic.return | ❌ | Mandatory/immediate flags not fully handled |
+| basic.return | ✅ | ‼️`immediate` flag is deprecated and will not be implemented |
 | basic.deliver | ✅ | |
 | basic.get | ✅ | Pull-based message retrieval |
 | basic.get-ok | ✅ | |
