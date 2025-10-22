@@ -30,6 +30,13 @@ type BasicPublishContent struct {
 	Immediate  bool
 }
 
+type BasicReturnContent struct {
+	ReplyCode  uint16
+	ReplyText  string
+	Exchange   string
+	RoutingKey string
+}
+
 type BasicGetMessageContent struct {
 	Reserved1 uint16
 	Queue     string
@@ -110,6 +117,37 @@ func createBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
 	return frame
 }
 
+// createBasicReturnFrame creates a Basic.Return (50) frame for the given message.
+func createBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
+	KeyValuePairs := []KeyValue{
+		{ // reply_code
+			Key:   INT_SHORT,
+			Value: replyCode,
+		},
+		{ // reply_text
+			Key:   STRING_SHORT,
+			Value: replyText,
+		},
+		{ // exchange
+			Key:   STRING_SHORT,
+			Value: exchange,
+		},
+		{ // routing_key
+			Key:   STRING_SHORT,
+			Value: routingKey,
+		},
+	}
+	contentList := &ContentList{KeyValuePairs: KeyValuePairs}
+
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_RETURN),
+		Content:  *contentList,
+	}.FormatMethodFrame()
+	return frame
+}
+
 // createBasicDeliverFrame creates a Basic.Deliver (60) frame for the given message and delivery tag.
 func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
 	consumerTagKv := KeyValue{
@@ -144,16 +182,26 @@ func createBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey s
 	return frame
 }
 
-func createBasicRecoverOkFrame(channel uint16) []byte {
+// createBasicGetOkFrame creates a Basic.GetOk (71) frame.
+func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
+	msgGetOk := &BasicGetOkContent{
+		DeliveryTag:  1,
+		Redelivered:  false,
+		Exchange:     exchange,
+		RoutingKey:   routingkey,
+		MessageCount: msgCount,
+	}
+
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(BASIC),
-		MethodID: uint16(BASIC_RECOVER_OK),
-		Content:  ContentList{},
+		MethodID: uint16(BASIC_GET_OK),
+		Content:  *EncodeGetOkToContentList(msgGetOk),
 	}.FormatMethodFrame()
 	return frame
 }
 
+// createBasicGetEmptyFrame creates a Basic.GetEmpty (72) frame.
 func createBasicGetEmptyFrame(channel uint16) []byte {
 	// Send Basic.GetEmpty
 	reserved1 := KeyValue{
@@ -169,20 +217,13 @@ func createBasicGetEmptyFrame(channel uint16) []byte {
 	return frame
 }
 
-func createBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
-	msgGetOk := &BasicGetOkContent{
-		DeliveryTag:  1,
-		Redelivered:  false,
-		Exchange:     exchange,
-		RoutingKey:   routingkey,
-		MessageCount: msgCount,
-	}
-
+// createBasicRecoverOkFrame creates a Basic.RecoverOk (100) frame.
+func createBasicRecoverOkFrame(channel uint16) []byte {
 	frame := ResponseMethodMessage{
 		Channel:  channel,
 		ClassID:  uint16(BASIC),
-		MethodID: uint16(BASIC_GET_OK),
-		Content:  *EncodeGetOkToContentList(msgGetOk),
+		MethodID: uint16(BASIC_RECOVER_OK),
+		Content:  ContentList{},
 	}.FormatMethodFrame()
 	return frame
 }
@@ -332,8 +373,7 @@ func parseBasicHeader(headerPayload []byte) (*HeaderFrame, error) {
 	return header, nil
 }
 
-// REGION Basic_Methods
-
+/* REGION Basic Helpers */
 func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(BASIC_QOS):
