@@ -6,6 +6,103 @@ import (
 	"testing"
 )
 
+func TestParseBasicQosFrame(t *testing.T) {
+	tests := []struct {
+		name                  string
+		payload               []byte
+		expectedPrefetchSize  uint32
+		expectedPrefetchCount uint16
+		expectedGlobal        bool
+		shouldError           bool
+		errorMsg              string
+	}{
+		{
+			name: "Valid basic qos with 0 prefetch, 0 consumer and global false",
+			payload: buildBasicQosPayload(t, BasicQosContent{
+				PrefetchSize:  0,
+				PrefetchCount: 0,
+				Global:        false,
+			}),
+			expectedPrefetchSize:  0,
+			expectedPrefetchCount: 0,
+			expectedGlobal:        false,
+			shouldError:           false,
+		},
+		{
+			name:        "Invalid basic qos with short payload",
+			payload:     []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+			shouldError: true,
+			errorMsg:    "payload too short",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Call the function under test
+			result, err := parseBasicQosFrame(tt.payload)
+
+			// Validate the results
+			if tt.shouldError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+					return
+				}
+				if err.Error() != tt.errorMsg {
+					t.Errorf("Expected error message '%s' but got '%s'", tt.errorMsg, err.Error())
+					return
+				}
+				return
+			}
+
+			if result == nil {
+				t.Errorf("Expected no error but got one")
+				return
+			}
+			content, ok := result.Content.(*BasicQosContent)
+			if !ok {
+				t.Errorf("Expected content of type *BasicQosContent but got %T", result.Content)
+				return
+			}
+			if content.PrefetchSize != tt.expectedPrefetchSize {
+				t.Errorf("Expected prefetch_size %d but got %d", tt.expectedPrefetchSize, content.PrefetchSize)
+			}
+			if content.PrefetchCount != tt.expectedPrefetchCount {
+				t.Errorf("Expected prefetch_count %d but got %d", tt.expectedPrefetchCount, content.PrefetchCount)
+			}
+			if content.Global != tt.expectedGlobal {
+				t.Errorf("Expected global %v but got %v", tt.expectedGlobal, content.Global)
+			}
+
+		})
+	}
+
+}
+
+// Helper function to build BASIC_QOS payload
+func buildBasicQosPayload(t *testing.T, params BasicQosContent) []byte {
+	var buf bytes.Buffer
+
+	// prefetch_size (long)
+	if err := binary.Write(&buf, binary.BigEndian, params.PrefetchSize); err != nil {
+		t.Fatalf("Failed to write prefetch_size: %v", err)
+	}
+
+	// prefetch_count (short)
+	if err := binary.Write(&buf, binary.BigEndian, params.PrefetchCount); err != nil {
+		t.Fatalf("Failed to write prefetch_count: %v", err)
+	}
+
+	// global (bit)
+	flags := map[string]bool{
+		"global": params.Global,
+	}
+	var globalBit byte = EncodeFlags(flags, []string{"global"}, true)
+	if err := buf.WriteByte(globalBit); err != nil {
+		t.Fatalf("Failed to write global: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
 func TestParseBasicConsumeFrame(t *testing.T) {
 	tests := []struct {
 		name              string
