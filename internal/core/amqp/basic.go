@@ -8,6 +8,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type BasicQosContent struct {
+	PrefetchSize  uint32
+	PrefetchCount uint16
+	Global        bool
+}
+
 type BasicConsumeContent struct {
 	Queue       string
 	ConsumerTag string
@@ -87,6 +93,16 @@ type BasicProperties struct {
 	UserID          string         // shortstr
 	AppID           string         // shortstr
 	Reserved        string         // shortstr
+}
+
+func createBasicQosOkFrame(channel uint16) []byte {
+	frame := ResponseMethodMessage{
+		Channel:  channel,
+		ClassID:  uint16(BASIC),
+		MethodID: uint16(BASIC_QOS_OK),
+		Content:  ContentList{},
+	}.FormatMethodFrame()
+	return frame
 }
 
 func createBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
@@ -384,7 +400,7 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	switch methodID {
 	case uint16(BASIC_QOS):
 		log.Debug().Msg("Received BASIC_QOS frame \n")
-		return nil, fmt.Errorf(" basic.qos not implemented")
+		return parseBasicQosFrame(payload)
 
 	case uint16(BASIC_CONSUME):
 		log.Debug().Msg("Received BASIC_CONSUME frame \n")
@@ -440,6 +456,41 @@ func parseBasicMethod(methodID uint16, payload []byte) (any, error) {
 	default:
 		return nil, fmt.Errorf("unknown method ID: %d", methodID)
 	}
+}
+
+func parseBasicQosFrame(payload []byte) (*RequestMethodMessage, error) {
+	// the payload must be at least 7 bytes long
+	// 4 (prefetch size) => long = 4 bytes
+	// 2 (prefetch count) => short = 2 bytes
+	// 1 (flags) => octet = 1 byte
+	if len(payload) < 7 {
+		return nil, fmt.Errorf("payload too short")
+	}
+	buf := bytes.NewReader(payload)
+	prefetchSize, err := DecodeLongInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode prefetch size: %v", err)
+	}
+	prefetchCount, err := DecodeShortInt(buf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode prefetch count: %v", err)
+	}
+	octet, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read octet: %v", err)
+	}
+	flags := DecodeFlags(octet, []string{"global"}, true)
+	global := flags["global"]
+	content := &BasicQosContent{
+		PrefetchSize:  prefetchSize,
+		PrefetchCount: prefetchCount,
+		Global:        global,
+	}
+	request := &RequestMethodMessage{
+		Content: content,
+	}
+	log.Printf("[DEBUG] BasicQos fomated: %+v \n", content)
+	return request, nil
 }
 
 func parseBasicConsumeFrame(payload []byte) (*RequestMethodMessage, error) {
