@@ -95,19 +95,21 @@ func (b *Broker) basicQoSHandler(request *amqp.RequestMethodMessage, conn net.Co
 	// Do nothing for now, just log the request and send the basic.QosOk
 	content, ok := request.Content.(*amqp.BasicQosContent)
 	if !ok || content == nil {
-		return nil, fmt.Errorf("invalid basic cancel content")
+		return nil, fmt.Errorf("invalid basic.qos content")
 	}
 
 	prefetchSize := content.PrefetchSize // should be 0, if raize channel error 540 - not implemented
 	if prefetchSize != 0 {
-		log.Warn().Uint16("error code", 540).Msgf("not implemented - this server does not support prefetch size > 0")
+		errCode := uint16(540)
+		log.Warn().Uint16("error code", errCode).Msgf("not implemented - this server does not support prefetch size > 0")
 	}
 
 	prefetchCount := content.PrefetchCount
 	global := content.Global
 
-	// TODO: implement the QoS handler on VHost layer
-	log.Warn().Msgf("Received basic.Qos {Prefetch: %d, Global: %t} -- NOT IMPLEMENTED", prefetchCount, global)
+	if err := vh.HandleBasicQos(conn, request.Channel, prefetchCount, global); err != nil {
+		log.Error().Err(err).Msg("Failed to handle basic.qos")
+	}
 
 	frame := b.framer.CreateBasicQosOkFrame(request.Channel)
 	if err := b.framer.SendFrame(conn, frame); err != nil {
