@@ -1,11 +1,11 @@
 package vhost
 
 import (
-	"context"
 	"net"
 	"testing"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
+	"github.com/andrelcunha/ottermq/internal/testutil"
 )
 
 func TestHandleBasicRecover_RequeueTrue(t *testing.T) {
@@ -98,7 +98,7 @@ func TestHandleBasicRecover_RequeueFalse_ConsumerExists(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Setup mock framer that always succeeds
-	vh.framer = &mockFramer{}
+	vh.framer = &testutil.MockFramer{}
 
 	// Setup channel delivery state with unacked message
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
@@ -223,7 +223,7 @@ func TestHandleBasicRecover_RequeueFalse_DeliveryFails(t *testing.T) {
 	vh.mu.Unlock()
 
 	// Setup mock framer that FAILS
-	vh.framer = &mockFramerFail{}
+	vh.framer = &testutil.MockFramer{SendError: &net.OpError{Op: "write", Err: net.ErrClosed}}
 
 	// Setup channel delivery state with unacked message
 	ch := &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
@@ -294,128 +294,4 @@ func TestRedeliveredMarkLifecycle(t *testing.T) {
 	if vh.shouldRedeliver("msg1") {
 		t.Error("msg1 should not be marked after clearing")
 	}
-}
-
-// Mock framer that succeeds
-type mockFramer struct{}
-
-func (m *mockFramer) ReadFrame(conn net.Conn) ([]byte, error) { return nil, nil }
-func (m *mockFramer) ParseFrame(frame []byte) (any, error)    { return nil, nil }
-func (m *mockFramer) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*amqp.ConnectionInfo, error) {
-	return nil, nil
-}
-func (m *mockFramer) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateHeaderFrame(channel, classID uint16, msg amqp.Message) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBodyFrame(channel uint16, body []byte) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBasicGetEmptyFrame(channel uint16) []byte { return []byte{} }
-func (m *mockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateQueueBindOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateQueueDeleteOkFrame(request *amqp.RequestMethodMessage, messageCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateExchangeDeclareFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateExchangeDeleteFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateChannelOpenOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateChannelCloseOkFrame(channel uint16) []byte { return []byte{} }
-func (m *mockFramer) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return []byte{}
-}
-func (m *mockFramer) SendFrame(conn net.Conn, frame []byte) error {
-	return nil // Success
-}
-
-// Mock framer that fails
-type mockFramerFail struct{}
-
-func (m *mockFramerFail) ReadFrame(conn net.Conn) ([]byte, error) { return nil, nil }
-func (m *mockFramerFail) ParseFrame(frame []byte) (any, error)    { return nil, nil }
-func (m *mockFramerFail) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*amqp.ConnectionInfo, error) {
-	return nil, nil
-}
-func (m *mockFramerFail) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateHeaderFrame(channel, classID uint16, msg amqp.Message) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBodyFrame(channel uint16, body []byte) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBasicGetEmptyFrame(channel uint16) []byte { return []byte{} }
-func (m *mockFramerFail) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateBasicRecoverOkFrame(channel uint16) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateQueueBindOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateQueueDeleteOkFrame(request *amqp.RequestMethodMessage, messageCount uint32) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateExchangeDeclareFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateExchangeDeleteFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateChannelOpenOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateChannelCloseOkFrame(channel uint16) []byte { return []byte{} }
-func (m *mockFramerFail) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return []byte{}
-}
-func (m *mockFramerFail) SendFrame(conn net.Conn, frame []byte) error {
-	return &net.OpError{Op: "write", Err: net.ErrClosed}
 }

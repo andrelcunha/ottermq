@@ -1,13 +1,13 @@
 package broker
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/andrelcunha/ottermq/internal/core/amqp"
 	"github.com/andrelcunha/ottermq/internal/core/broker/vhost"
+	"github.com/andrelcunha/ottermq/internal/testutil"
 	"github.com/andrelcunha/ottermq/pkg/persistence/implementations/dummy"
 )
 
@@ -36,77 +36,8 @@ type MockAddr struct {
 func (m *MockAddr) Network() string { return m.network }
 func (m *MockAddr) String() string  { return m.address }
 
-// MockFramer implements amqp.Framer for testing
-type MockFramer struct {
-	sentFrames [][]byte
-}
-
-func (m *MockFramer) ReadFrame(conn net.Conn) ([]byte, error) { return nil, nil }
-func (m *MockFramer) SendFrame(conn net.Conn, frame []byte) error {
-	m.sentFrames = append(m.sentFrames, frame)
-	return nil
-}
-func (m *MockFramer) Handshake(configurations *map[string]any, conn net.Conn, connCtxt context.Context) (*amqp.ConnectionInfo, error) {
-	return nil, nil
-}
-func (m *MockFramer) ParseFrame(frame []byte) (any, error) { return nil, nil }
-func (m *MockFramer) CreateHeaderFrame(channel, classID uint16, msg amqp.Message) []byte {
-	return []byte("header-frame")
-}
-func (m *MockFramer) CreateBodyFrame(channel uint16, content []byte) []byte {
-	return []byte("body-frame")
-}
-func (m *MockFramer) CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte {
-	return []byte("basic-return")
-}
-func (m *MockFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {
-	return []byte("basic-deliver")
-}
-func (m *MockFramer) CreateBasicGetEmptyFrame(channel uint16) []byte {
-	return []byte("basic-get-empty")
-}
-func (m *MockFramer) CreateBasicGetOkFrame(channel uint16, exchange, routingkey string, msgCount uint32) []byte {
-	return []byte("basic-get-ok")
-}
-func (m *MockFramer) CreateBasicConsumeOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte("basic-consume-ok:" + consumerTag)
-}
-func (m *MockFramer) CreateBasicCancelOkFrame(channel uint16, consumerTag string) []byte {
-	return []byte("basic-cancel-ok:" + consumerTag)
-}
-func (m *MockFramer) CreateBasicRecoverOkFrame(channel uint16) []byte {
-	return []byte("basic-recover-ok")
-}
-func (m *MockFramer) CreateQueueDeclareOkFrame(request *amqp.RequestMethodMessage, queueName string, messageCount, consumerCount uint32) []byte {
-	return []byte("queue-declare")
-}
-func (m *MockFramer) CreateQueueBindOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte("queue-bind-ok")
-}
-func (m *MockFramer) CreateQueueDeleteOkFrame(request *amqp.RequestMethodMessage, messageCount uint32) []byte {
-	return []byte("queue-delete-ok")
-}
-func (m *MockFramer) CreateExchangeDeclareFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte("exchange-declare")
-}
-func (m *MockFramer) CreateExchangeDeleteFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte("exchange-delete")
-}
-func (m *MockFramer) CreateChannelOpenOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte("channel-open-ok")
-}
-func (m *MockFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
-	return []byte("channel-close-ok")
-}
-func (m *MockFramer) CreateConnectionCloseOkFrame(request *amqp.RequestMethodMessage) []byte {
-	return []byte("connection-close-ok")
-}
-func (m *MockFramer) CreateCloseFrame(channel, replyCode, classID, methodID, closeClassID, closeClassMethod uint16, replyText string) []byte {
-	return []byte("close")
-}
-
-func createTestBroker() (*Broker, *MockFramer, net.Conn) {
-	mockFramer := &MockFramer{}
+func createTestBroker() (*Broker, *testutil.MockFramer, net.Conn) {
+	mockFramer := &testutil.MockFramer{}
 	broker := &Broker{
 		framer:      mockFramer,
 		Connections: make(map[net.Conn]*amqp.ConnectionInfo),
@@ -189,12 +120,12 @@ func TestBasicConsumeHandler_ValidConsumer(t *testing.T) {
 	}
 
 	// Check that CONSUME_OK frame was sent
-	if len(mockFramer.sentFrames) != 1 {
-		t.Errorf("Expected 1 frame to be sent, got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 1 {
+		t.Errorf("Expected 1 frame to be sent, got %d", len(mockFramer.SentFrames))
 	} else {
 		expectedFrame := "basic-consume-ok:test-consumer"
-		if string(mockFramer.sentFrames[0]) != expectedFrame {
-			t.Errorf("Expected frame '%s', got '%s'", expectedFrame, string(mockFramer.sentFrames[0]))
+		if string(mockFramer.SentFrames[0]) != expectedFrame {
+			t.Errorf("Expected frame '%s', got '%s'", expectedFrame, string(mockFramer.SentFrames[0]))
 		}
 	}
 
@@ -425,8 +356,8 @@ func TestBasicConsumeHandler_NoWaitFlag(t *testing.T) {
 	}
 
 	// Check that no frame was sent (due to NoWait flag)
-	if len(mockFramer.sentFrames) != 0 {
-		t.Errorf("Expected 0 frames to be sent due to NoWait flag, got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 0 {
+		t.Errorf("Expected 0 frames to be sent due to NoWait flag, got %d", len(mockFramer.SentFrames))
 	}
 
 	// But consumer should still be registered
@@ -522,13 +453,13 @@ func TestBasicReturn_SuccessfulReturn(t *testing.T) {
 	}
 
 	// Should send 3 frames: basic.return + header + body
-	if len(mockFramer.sentFrames) != 3 {
-		t.Errorf("Expected 3 frames (return + header + body), got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 3 {
+		t.Errorf("Expected 3 frames (return + header + body), got %d", len(mockFramer.SentFrames))
 	}
 
 	// Verify basic.return frame was sent first
-	if len(mockFramer.sentFrames) > 0 && string(mockFramer.sentFrames[0]) != "basic-return" {
-		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.sentFrames[0]))
+	if len(mockFramer.SentFrames) > 0 && string(mockFramer.SentFrames[0]) != "basic-return" {
+		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.SentFrames[0]))
 	}
 }
 
@@ -554,7 +485,7 @@ func TestBasicReturn_FrameSendError(t *testing.T) {
 	}
 
 	// Should have attempted to send frames
-	if len(mockFramer.sentFrames) == 0 {
+	if len(mockFramer.SentFrames) == 0 {
 		t.Error("Expected at least one frame send attempt")
 	}
 }
@@ -608,12 +539,12 @@ func TestBasicPublishHandler_WithMandatoryFlag_NoRouting(t *testing.T) {
 	}
 
 	// Should send basic.return + header + body (3 frames)
-	if len(mockFramer.sentFrames) != 3 {
-		t.Errorf("Expected 3 frames for basic.return, got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 3 {
+		t.Errorf("Expected 3 frames for basic.return, got %d", len(mockFramer.SentFrames))
 	}
 
-	if string(mockFramer.sentFrames[0]) != "basic-return" {
-		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.sentFrames[0]))
+	if string(mockFramer.SentFrames[0]) != "basic-return" {
+		t.Errorf("Expected first frame to be 'basic-return', got '%s'", string(mockFramer.SentFrames[0]))
 	}
 }
 
@@ -669,8 +600,8 @@ func TestBasicPublishHandler_WithMandatoryFlag_WithRouting(t *testing.T) {
 	}
 
 	// Should NOT send basic.return since message has routing
-	if len(mockFramer.sentFrames) != 0 {
-		t.Errorf("Expected 0 frames (no return), got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 0 {
+		t.Errorf("Expected 0 frames (no return), got %d", len(mockFramer.SentFrames))
 	}
 
 	// Verify message was queued
@@ -729,8 +660,8 @@ func TestBasicPublishHandler_WithoutMandatoryFlag_NoRouting(t *testing.T) {
 	}
 
 	// Should NOT send basic.return since mandatory=false
-	if len(mockFramer.sentFrames) != 0 {
-		t.Errorf("Expected 0 frames (message silently dropped), got %d", len(mockFramer.sentFrames))
+	if len(mockFramer.SentFrames) != 0 {
+		t.Errorf("Expected 0 frames (message silently dropped), got %d", len(mockFramer.SentFrames))
 	}
 }
 
