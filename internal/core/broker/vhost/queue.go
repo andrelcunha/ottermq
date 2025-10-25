@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -64,11 +65,23 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 
 				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
 				consumers := vh.GetActiveConsumersForQueue(q.Name)
-				if len(consumers) > 0 {
-					// Simple round-robin delivery
-					consumer := consumers[0]
-					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
-					// TODO: improve delivery strategy using basic.qos and manual ack
+				notDeliverable := true
+				// if there are no consumers, requeue the message and wait
+				if len(consumers) == 0 {
+					log.Debug().Str("queue", q.Name).Msg("No active consumers for queue, requeuing message")
+					q.Push(msg)
+					time.Sleep(100 * time.Millisecond) // avoid busy loop
+					continue
+				}
+				for notDeliverable {
+					// Round-robin delivery + QoS check
+					consumer := q.roundRobinConsumer(consumers, vh)
+					if vh.shouldThrottle(consumer, vh.getChannelDeliveryState(consumer.Connection, consumer.Channel)) {
+						log.Debug().Str("consumer", consumer.Tag).Msg("Throttling delivery to consumer due to QoS limits")
+						continue
+					}
+
+					notDeliverable = false
 					if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
 						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
 						err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
@@ -83,6 +96,13 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 			}
 		}
 	}()
+}
+
+func (q *Queue) roundRobinConsumer(consumers []*Consumer, vh *VHost) *Consumer {
+	// Simple round-robin delivery
+	consumer := consumers[0]
+	vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
+	return consumer
 }
 
 func (q *Queue) stopDeliveryLoop() {

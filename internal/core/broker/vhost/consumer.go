@@ -20,12 +20,13 @@ type ConnectionChannelKey struct {
 }
 
 type Consumer struct {
-	Tag        string
-	Channel    uint16
-	QueueName  string
-	Connection net.Conn
-	Active     bool
-	Props      *ConsumerProperties
+	Tag           string
+	Channel       uint16
+	QueueName     string
+	Connection    net.Conn
+	Active        bool
+	PrefetchCount uint16 // 0 means unlimited
+	Props         *ConsumerProperties
 }
 
 type ConsumerProperties struct {
@@ -47,6 +48,14 @@ func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, p
 func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
+	// Apply consumer prefetch if it was set via QoS(global = false)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	if state, exists := vh.ChannelDeliveries[channelKey]; exists {
+		if !state.PrefetchGlobal && state.NextPrefetchCount > 0 {
+			consumer.PrefetchCount = state.NextPrefetchCount
+		}
+	}
 
 	// Check if queue exists
 	_, ok := vh.Queues[consumer.QueueName]
@@ -108,7 +117,6 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 		consumer,
 	)
 	// Index for channel (connection-scoped)
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
 	if _, exists := vh.ConsumersByChannel[channelKey]; !exists {
 		vh.ConsumersByChannel[channelKey] = []*Consumer{}
 	}
