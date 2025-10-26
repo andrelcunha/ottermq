@@ -100,6 +100,8 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 
 func (q *Queue) roundRobinConsumer(consumers []*Consumer, vh *VHost) *Consumer {
 	// Simple round-robin delivery
+	vh.mu.Lock()
+	defer vh.mu.Unlock()
 	consumer := consumers[0]
 	vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
 	return consumer
