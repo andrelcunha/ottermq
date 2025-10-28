@@ -76,8 +76,8 @@ Status levels:
 
 | Method | Status | Notes |
 |--------|:------:|------|
-| basic.qos | ❌ | Not yet implemented |
-| basic.qos-ok | ❌ | |
+| basic.qos | ✅ | Not yet implemented |
+| basic.qos-ok | ✅ | |
 | basic.consume | ✅ | ‼️`noLocal` not supported (same as RabbitMQ)  |
 | basic.consume-ok | ✅ | |
 | basic.cancel | ✅ | |
