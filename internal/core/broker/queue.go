@@ -12,41 +12,7 @@ import (
 func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, conn net.Conn) (any, error) {
 	switch request.MethodID {
 	case uint16(amqp.QUEUE_DECLARE):
-		log.Debug().Interface("request", request).Msg("Received queue declare request")
-		content, ok := request.Content.(*amqp.QueueDeclareMessage)
-		if !ok {
-			log.Error().Msg("Invalid content type for ExchangeDeclareMessage")
-			return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
-		}
-		log.Debug().Interface("content", content).Msg("Content")
-		queueName := content.QueueName
-
-		queue, err := vh.CreateQueue(queueName, &vhost.QueueProperties{
-			Passive:    content.Passive,
-			Durable:    content.Durable,
-			AutoDelete: content.AutoDelete,
-			Exclusive:  content.Exclusive,
-			Arguments:  content.Arguments,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		err = vh.BindToDefaultExchange(queueName)
-		if err != nil {
-			log.Debug().Err(err).Msg("Error binding to default exchange")
-			return nil, err
-		}
-		messageCount := uint32(queue.Len())
-		consumerCount := uint32(0)
-
-		if !content.NoWait {
-			frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
-			if err := b.framer.SendFrame(conn, frame); err != nil {
-				log.Error().Err(err).Msg("Failed to send queue declare frame")
-			}
-		}
-		return nil, nil
+		return queueDeclareHandler(request, vh, b, conn)
 
 	case uint16(amqp.QUEUE_BIND):
 		log.Debug().Interface("request", request).Msg("Received queue bind request")
@@ -122,4 +88,42 @@ func (b *Broker) queueHandler(request *amqp.RequestMethodMessage, vh *vhost.VHos
 	default:
 		return nil, fmt.Errorf("unsupported command")
 	}
+}
+
+func queueDeclareHandler(request *amqp.RequestMethodMessage, vh *vhost.VHost, b *Broker, conn net.Conn) (any, error) {
+	log.Debug().Interface("request", request).Msg("Received queue declare request")
+	content, ok := request.Content.(*amqp.QueueDeclareMessage)
+	if !ok {
+		log.Error().Msg("Invalid content type for ExchangeDeclareMessage")
+		return nil, fmt.Errorf("invalid content type for ExchangeDeclareMessage")
+	}
+	log.Debug().Interface("content", content).Msg("Content")
+	queueName := content.QueueName
+
+	queue, err := vh.CreateQueue(queueName, &vhost.QueueProperties{
+		Passive:    content.Passive,
+		Durable:    content.Durable,
+		AutoDelete: content.AutoDelete,
+		Exclusive:  content.Exclusive,
+		Arguments:  content.Arguments,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = vh.BindToDefaultExchange(queueName)
+	if err != nil {
+		log.Debug().Err(err).Msg("Error binding to default exchange")
+		return nil, err
+	}
+	messageCount := uint32(queue.Len())
+	consumerCount := uint32(0)
+
+	if !content.NoWait {
+		frame := b.framer.CreateQueueDeclareOkFrame(request, queueName, messageCount, consumerCount)
+		if err := b.framer.SendFrame(conn, frame); err != nil {
+			log.Error().Err(err).Msg("Failed to send queue declare frame")
+		}
+	}
+	return nil, nil
 }
