@@ -8,32 +8,14 @@ import (
 )
 
 func (vh *VHost) HandleBasicAck(conn net.Conn, channel uint16, deliveryTag uint64, multiple bool) error {
-	key := ConnectionChannelKey{conn, channel}
-
-	vh.mu.Lock()
-	ch := vh.ChannelDeliveries[key]
-	vh.mu.Unlock()
-	if ch == nil {
-		return fmt.Errorf("no channel delivery state for channel %d", channel)
+	toDelete, err := vh.popUnackedRecords(conn, channel, deliveryTag, multiple)
+	if err != nil {
+		return err
 	}
 
-	var toDelete []*DeliveryRecord
-
-	ch.mu.Lock()
-	if multiple {
-		for tag := range ch.Unacked {
-			if tag <= deliveryTag {
-				toDelete = append(toDelete, ch.Unacked[tag])
-				delete(ch.Unacked, tag)
-			}
-		}
-	} else {
-		if rec, exists := ch.Unacked[deliveryTag]; exists {
-			toDelete = append(toDelete, rec)
-			delete(ch.Unacked, deliveryTag)
-		}
+	if len(toDelete) == 0 {
+		return nil
 	}
-	ch.mu.Unlock()
 
 	if vh.persist != nil {
 		for _, rec := range toDelete {
@@ -46,36 +28,45 @@ func (vh *VHost) HandleBasicAck(conn net.Conn, channel uint16, deliveryTag uint6
 	return nil
 }
 
-func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag uint64, requeue bool) error {
-	return vh.HandleBasicNack(conn, channel, deliveryTag, false, requeue)
-}
-
-func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint64, multiple, requeue bool) error {
+func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag uint64, multiple bool) ([]*DeliveryRecord, error) {
 	key := ConnectionChannelKey{conn, channel}
 
 	vh.mu.Lock()
 	ch := vh.ChannelDeliveries[key]
 	vh.mu.Unlock()
 	if ch == nil {
-		return fmt.Errorf("no channel delivery state for channel %d", channel)
+		return nil, fmt.Errorf("no channel delivery state for channel %d", channel)
 	}
 
+	removed := make([]*DeliveryRecord, 0)
+
 	ch.mu.Lock()
-	recordsToNack := make([]*DeliveryRecord, 0)
 	if multiple {
 		for tag, record := range ch.Unacked {
 			if tag <= deliveryTag {
-				recordsToNack = append(recordsToNack, record)
+				removed = append(removed, record)
 				delete(ch.Unacked, tag)
 			}
 		}
 	} else {
 		if record, exists := ch.Unacked[deliveryTag]; exists {
-			recordsToNack = append(recordsToNack, record)
+			removed = append(removed, record)
 			delete(ch.Unacked, deliveryTag)
 		}
 	}
 	ch.mu.Unlock()
+	return removed, nil
+}
+
+func (vh *VHost) HandleBasicReject(conn net.Conn, channel uint16, deliveryTag uint64, requeue bool) error {
+	return vh.HandleBasicNack(conn, channel, deliveryTag, false, requeue)
+}
+
+func (vh *VHost) HandleBasicNack(conn net.Conn, channel uint16, deliveryTag uint64, multiple, requeue bool) error {
+	recordsToNack, err := vh.popUnackedRecords(conn, channel, deliveryTag, multiple)
+	if err != nil {
+		return err
+	}
 	if len(recordsToNack) == 0 {
 		return nil
 	}
