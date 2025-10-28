@@ -751,7 +751,7 @@ func parseBasicRecoverFrame(payload []byte) (*RequestMethodMessage, error) {
 	// Expected fields:
 	// 1 requeue (bit - packed as octet)
 	if len(payload) < 9 {
-		return nil, fmt.Errorf("payload too short")
+		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
 
@@ -775,8 +775,8 @@ func parseBasicNackFrame(payload []byte) (*RequestMethodMessage, error) {
 	// 8 deliveryTag (long long int),
 	// flags:  (bit - packed as octet)
 	// multiple + requeue
-	if len(payload) < 10 {
-		return nil, fmt.Errorf("payload too short")
+	if len(payload) < 9 {
+		return nil, fmt.Errorf("payload too short: payload length %d", len(payload))
 	}
 	buf := bytes.NewReader(payload)
 	deliveryTag, err := DecodeLongLongInt(buf)
