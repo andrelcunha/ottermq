@@ -207,14 +207,14 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 	// Get copy of consumers to avoid modification during iteration
 	_ = cancelAllConsumers(vh, channelKey)
 
-	if ch := vh.ChannelDeliveries[channelKey]; ch != nil {
-		ch.mu.Lock()
+	if state := vh.ChannelDeliveries[channelKey]; state != nil {
+		state.mu.Lock()
 		// copy records to avoid modification during iteration
-		records := make([]*DeliveryRecord, 0, len(ch.Unacked))
-		for _, record := range ch.Unacked {
+		records := make([]*DeliveryRecord, 0, len(state.Unacked))
+		for _, record := range state.Unacked {
 			records = append(records, record)
 		}
-		ch.mu.Unlock()
+		state.mu.Unlock()
 
 		// Requeue unacknowledged messages
 		for _, record := range records {

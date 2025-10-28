@@ -16,6 +16,7 @@ func (b *Broker) basicHandler(newState *amqp.ChannelState, vh *vhost.VHost, conn
 	switch request.MethodID {
 	case uint16(amqp.BASIC_QOS):
 		return b.basicQoSHandler(request, conn, vh)
+
 	case uint16(amqp.BASIC_CONSUME):
 		return b.basicConsumeHandler(request, conn, vh)
 
