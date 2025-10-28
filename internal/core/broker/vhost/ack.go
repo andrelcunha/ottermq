@@ -54,6 +54,12 @@ func (vh *VHost) popUnackedRecords(conn net.Conn, channel uint16, deliveryTag ui
 			delete(ch.Unacked, deliveryTag)
 		}
 	}
+	// Notify any waiters that unacked state has changed
+	select {
+	case ch.unackedChanged <- struct{}{}:
+	default:
+	}
+
 	ch.mu.Unlock()
 	return removed, nil
 }
@@ -102,7 +108,8 @@ func (vh *VHost) HandleBasicQos(conn net.Conn, channel uint16, prefetchCount uin
 	// fetch the channel delivery state if global is true
 	if state == nil {
 		state = &ChannelDeliveryState{
-			Unacked: make(map[uint64]*DeliveryRecord),
+			Unacked:        make(map[uint64]*DeliveryRecord),
+			unackedChanged: make(chan struct{}, 1),
 		}
 		vh.ChannelDeliveries[key] = state
 	}
