@@ -216,6 +216,10 @@ func NewQueueProperties() *QueueProperties {
 func (vh *VHost) DeleteQueue(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+	return vh.deleteQueueUnlocked(name)
+}
+
+func (vh *VHost) deleteQueueUnlocked(name string) error {
 	queue, exists := vh.Queues[name]
 	if !exists {
 		return fmt.Errorf("queue %s not found", name)
@@ -260,14 +264,14 @@ func (vh *VHost) DeleteQueue(name string) error {
 	delete(vh.Queues, name)
 
 	log.Debug().Str("queue", name).Msg("Deleted queue")
-	// Call persistence layer to delete the queue
+
+	// Persistence cleanup
 	if queue.Props.Durable {
 		if err := vh.persist.DeleteQueueMetadata(vh.Name, name); err != nil {
 			log.Error().Err(err).Str("queue", name).Msg("Failed to delete queue from persistence")
 			return err
 		}
 	}
-	// vh.publishQueueUpdate()
 	return nil
 }
 
