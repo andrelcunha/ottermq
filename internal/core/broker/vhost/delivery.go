@@ -24,6 +24,7 @@ type ChannelDeliveryState struct {
 	GlobalPrefetchCount uint16
 	NextPrefetchCount   uint16 // to be applied on the next consumer start
 	PrefetchGlobal      bool
+	unackedChanged      chan struct{}
 }
 
 func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redelivered bool) error {
@@ -38,7 +39,10 @@ func (vh *VHost) deliverToConsumer(consumer *Consumer, msg amqp.Message, redeliv
 	vh.mu.Lock()
 	ch := vh.ChannelDeliveries[channelKey]
 	if ch == nil {
-		ch = &ChannelDeliveryState{Unacked: make(map[uint64]*DeliveryRecord)}
+		ch = &ChannelDeliveryState{
+			Unacked:        make(map[uint64]*DeliveryRecord),
+			unackedChanged: make(chan struct{}, 1),
+		}
 		vh.ChannelDeliveries[channelKey] = ch
 	}
 	vh.mu.Unlock()
