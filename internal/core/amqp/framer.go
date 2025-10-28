@@ -14,6 +14,7 @@ type Framer interface {
 	CreateBodyFrame(channel uint16, content []byte) []byte
 
 	// Basic Methods
+	CreateBasicQosOkFrame(channel uint16) []byte
 	CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte
 	CreateBasicReturnFrame(channel uint16, replyCode uint16, replyText, exchange, routingKey string) []byte
 	CreateBasicGetEmptyFrame(channel uint16) []byte
@@ -99,6 +100,10 @@ func (d *DefaultFramer) CreateConnectionCloseOkFrame(request *RequestMethodMessa
 
 func (d *DefaultFramer) CreateChannelCloseOkFrame(channel uint16) []byte {
 	return createChannelCloseOkFrame(channel)
+}
+
+func (d *DefaultFramer) CreateBasicQosOkFrame(channel uint16) []byte {
+	return createBasicQosOkFrame(channel)
 }
 
 func (d *DefaultFramer) CreateBasicDeliverFrame(channel uint16, consumerTag, exchange, routingKey string, deliveryTag uint64, redelivered bool) []byte {

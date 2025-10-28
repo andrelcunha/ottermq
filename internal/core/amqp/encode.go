@@ -80,3 +80,18 @@ func EncodeSecurityPlain(buf *bytes.Buffer, securityStr string) []byte {
 	buf.WriteString(encodedStr)
 	return buf.Bytes()
 }
+
+// EncodeFlags encodes a map of boolean flags into a single byte
+func EncodeFlags(flags map[string]bool, flagNames []string, lsbFirst bool) byte {
+	var octet byte = 0
+	for i, name := range flagNames {
+		if flags[name] {
+			if lsbFirst {
+				octet |= 1 << i
+			} else {
+				octet |= 1 << (7 - i)
+			}
+		}
+	}
+	return octet
+}

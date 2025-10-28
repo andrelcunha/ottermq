@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -64,21 +65,84 @@ func (q *Queue) startDeliveryLoop(vh *VHost) {
 
 				log.Debug().Str("queue", q.Name).Str("id", msg.ID).Msg("Delivering message to consumers")
 				consumers := vh.GetActiveConsumersForQueue(q.Name)
-				if len(consumers) > 0 {
-					// Simple round-robin delivery
-					consumer := consumers[0]
-					vh.ConsumersByQueue[q.Name] = append(consumers[1:], consumer)
-					// TODO: improve delivery strategy using basic.qos and manual ack
-					if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
-						log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
-						err := vh.CancelConsumer(consumer.Channel, consumer.Tag)
-						if err != nil {
-							log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
+
+				// No consumers available, requeue and wait
+				if len(consumers) == 0 {
+					log.Debug().Str("queue", q.Name).Msg("No consumers available, requeuing message")
+					q.Push(msg)
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
+
+				delivered := false
+				maxRounds := 100 // Prevent infinite loop
+				rounds := 0
+
+				for !delivered && rounds < maxRounds {
+					rounds++
+					allThrottled := true
+
+					// Try each consumer once per round
+					for i := 0; i < len(consumers); i++ {
+						consumer := consumers[i]
+						state := vh.getChannelDeliveryState(consumer.Connection, consumer.Channel)
+
+						if vh.shouldThrottle(consumer, state) {
+							continue // Try next consumer
 						}
-						// Requeue the message
-						// Requeue just if rejected and `requeue` is true
-						q.Push(msg)
+
+						// Found available consumer
+						allThrottled = false
+						if err := vh.deliverToConsumer(consumer, msg, false); err != nil {
+							log.Error().Err(err).Str("consumer", consumer.Tag).Msg("Delivery failed, removing consumer")
+							if cancelErr := vh.CancelConsumer(consumer.Channel, consumer.Tag); cancelErr != nil {
+								log.Error().Err(cancelErr).Str("consumer", consumer.Tag).Msg("Error cancelling consumer")
+							}
+							// Refresh consumer list and retry
+							consumers = vh.GetActiveConsumersForQueue(q.Name)
+							if len(consumers) == 0 {
+								q.Push(msg)
+								delivered = true // Exit loop
+							}
+							break // Retry with new consumer list
+						}
+						delivered = true
+						break // Successfully delivered
 					}
+
+					if allThrottled && !delivered {
+						// All consumers are throttled, wait for signal or timeout
+						// Try to get a signal from any consumer's channel
+						var anyState *ChannelDeliveryState
+						for _, c := range consumers {
+							if s := vh.getChannelDeliveryState(c.Connection, c.Channel); s != nil {
+								anyState = s
+								break
+							}
+						}
+
+						if anyState != nil {
+							select {
+							case <-anyState.unackedChanged:
+								// A slot opened up, retry immediately
+								continue
+							case <-time.After(1 * time.Second):
+								// Timeout, will retry or give up based on maxRounds
+								continue
+							case <-q.deliveryCtx.Done():
+								return
+							}
+						} else {
+							// No state available, just sleep briefly
+							time.Sleep(100 * time.Millisecond)
+						}
+					}
+				}
+
+				// If we exhausted retries, requeue the message
+				if !delivered {
+					log.Warn().Str("queue", q.Name).Int("rounds", rounds).Msg("Could not deliver after max rounds, requeuing")
+					q.Push(msg)
 				}
 			}
 		}
@@ -152,6 +216,10 @@ func NewQueueProperties() *QueueProperties {
 func (vh *VHost) DeleteQueue(name string) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+	return vh.deleteQueueUnlocked(name)
+}
+
+func (vh *VHost) deleteQueueUnlocked(name string) error {
 	queue, exists := vh.Queues[name]
 	if !exists {
 		return fmt.Errorf("queue %s not found", name)
@@ -196,14 +264,14 @@ func (vh *VHost) DeleteQueue(name string) error {
 	delete(vh.Queues, name)
 
 	log.Debug().Str("queue", name).Msg("Deleted queue")
-	// Call persistence layer to delete the queue
+
+	// Persistence cleanup
 	if queue.Props.Durable {
 		if err := vh.persist.DeleteQueueMetadata(vh.Name, name); err != nil {
 			log.Error().Err(err).Str("queue", name).Msg("Failed to delete queue from persistence")
 			return err
 		}
 	}
-	// vh.publishQueueUpdate()
 	return nil
 }
 

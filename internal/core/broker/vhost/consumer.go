@@ -20,12 +20,13 @@ type ConnectionChannelKey struct {
 }
 
 type Consumer struct {
-	Tag        string
-	Channel    uint16
-	QueueName  string
-	Connection net.Conn
-	Active     bool
-	Props      *ConsumerProperties
+	Tag           string
+	Channel       uint16
+	QueueName     string
+	Connection    net.Conn
+	Active        bool
+	PrefetchCount uint16 // 0 means unlimited
+	Props         *ConsumerProperties
 }
 
 type ConsumerProperties struct {
@@ -47,6 +48,14 @@ func NewConsumer(conn net.Conn, channel uint16, queueName, consumerTag string, p
 func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
+
+	// Apply consumer prefetch if it was set via QoS(global = false)
+	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
+	if state, exists := vh.ChannelDeliveries[channelKey]; exists {
+		if !state.PrefetchGlobal && state.NextPrefetchCount > 0 {
+			consumer.PrefetchCount = state.NextPrefetchCount
+		}
+	}
 
 	// Check if queue exists
 	_, ok := vh.Queues[consumer.QueueName]
@@ -108,7 +117,6 @@ func (vh *VHost) RegisterConsumer(consumer *Consumer) error {
 		consumer,
 	)
 	// Index for channel (connection-scoped)
-	channelKey := ConnectionChannelKey{consumer.Connection, consumer.Channel}
 	if _, exists := vh.ConsumersByChannel[channelKey]; !exists {
 		vh.ConsumersByChannel[channelKey] = []*Consumer{}
 	}
@@ -149,6 +157,12 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
 		queue := vh.Queues[consumer.QueueName]
 		queue.stopDeliveryLoop()
+		// verify if the queue can be auto-deleted
+		if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
+			log.Printf("Failed to check auto-delete queue: %v", err)
+		} else if deleted {
+			log.Printf("Queue %s was auto-deleted", queue.Name)
+		}
 	}
 
 	// Remove from ConsumersByChannel (connection-scoped)
@@ -164,6 +178,27 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	return nil
 }
 
+// checkAutoDeleteQueueUnlocked checks if a queue is auto-delete and has no consumers, and deletes it if so.
+func (vh *VHost) checkAutoDeleteQueueUnlocked(name string) (bool, error) {
+	queue, exists := vh.Queues[name]
+	if !exists {
+		return false, fmt.Errorf("queue %s not found", name)
+	}
+	if !queue.Props.AutoDelete {
+		return false, nil
+	}
+
+	if len(vh.ConsumersByQueue[name]) > 0 {
+		return false, nil
+	}
+
+	err := vh.deleteQueueUnlocked(name)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 	vh.mu.Lock()
 	defer vh.mu.Unlock()
@@ -172,14 +207,14 @@ func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
 	// Get copy of consumers to avoid modification during iteration
 	_ = cancelAllConsumers(vh, channelKey)
 
-	if ch := vh.ChannelDeliveries[channelKey]; ch != nil {
-		ch.mu.Lock()
+	if state := vh.ChannelDeliveries[channelKey]; state != nil {
+		state.mu.Lock()
 		// copy records to avoid modification during iteration
-		records := make([]*DeliveryRecord, 0, len(ch.Unacked))
-		for _, record := range ch.Unacked {
+		records := make([]*DeliveryRecord, 0, len(state.Unacked))
+		for _, record := range state.Unacked {
 			records = append(records, record)
 		}
-		ch.mu.Unlock()
+		state.mu.Unlock()
 
 		// Requeue unacknowledged messages
 		for _, record := range records {
