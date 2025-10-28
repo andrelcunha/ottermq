@@ -20,8 +20,11 @@ This site tracks project status and documentation for users and contributors. Fo
 
 ## Highlights
 
-- AMQP-style exchanges and queues
-- RabbitMQ client compatibility (basic)
+- **Complete AMQP 0.9.1 Basic Class** - All message operations implemented
+- AMQP-style exchanges and queues (direct, fanout, topic)
+- RabbitMQ client compatibility tested with multiple clients
+- Quality of Service (QoS) with prefetch limits
+- Message acknowledgments, rejections, and recovery
 - Pluggable persistence layer (JSON today; Memento WAL planned)
 - Built-in management UI (Vue + Quasar)
 

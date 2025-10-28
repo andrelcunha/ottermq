@@ -138,13 +138,19 @@ This uses the provided `Dockerfile` and `docker-compose.yml` for convenience.
 
 OtterMq is under active development. While it follows the AMQP 0.9.1 protocol, several features are still in progress or not yet implemented, including:
 
-- Message acknowledgments and recovery
-- Advanced routing and delivery guarantees
+- Transaction support (tx class)
+- Advanced queue operations (unbind, purge)
 - Memento WAL persistence engine (planned)
+- Topic exchange routing (direct and fanout work)
 
-**Push-based message consumption (`basic.consume`/`basic.deliver`) is now fully implemented and compatible with RabbitMQ clients.**
+**All basic AMQP message operations are now fully implemented**, including:
+- Push-based consumption (`basic.consume`/`basic.deliver`)
+- Pull-based consumption (`basic.get`)
+- Message acknowledgments (`basic.ack`, `basic.nack`, `basic.reject`)
+- Quality of Service controls (`basic.qos`)
+- Message recovery (`basic.recover`, `basic.recover-async`)
 
-Basic compatibility with RabbitMQ clients is already functional, and more protocol features are being added incrementally. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
+Basic compatibility with RabbitMQ clients is functional and tested. See [ROADMAP.md](ROADMAP.md) for detailed development plans.
 
 ## 📚 API Documentation
 

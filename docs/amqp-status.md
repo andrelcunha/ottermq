@@ -19,10 +19,10 @@ Status levels:
 |------:|:------:|-------|
 | connection | 100% | Handshake and basic lifecycle supported |
 | channel | 67% | Basic open/close implemented; flow control not yet implemented |
-| exchange | 80% | direct/fanout declare implemented; missing topic |
-| queue | 55% | declare/bind implemented; unbind/purge/delete planned |
-| basic | 88% | Most methods implemented; nack and qos missing |
-| tx | 0% | |
+| exchange | 80% | direct/fanout declare implemented; missing topic pattern matching |
+| queue | 60% | declare/bind/delete implemented; unbind/purge planned |
+| basic | 100% | All methods fully implemented and tested |
+| tx | 0% | Transaction support planned |
 
 ## connection
 
@@ -69,7 +69,7 @@ Status levels:
 | queue.unbind-ok | ❌ | |
 | queue.purge | ❌ | |
 | queue.purge-ok | ❌ | |
-| queue.delete | ⚠️ | missing `if-unused`/`if-empty`|
+| queue.delete | ⚠️ | Basic deletion works; `if-unused`/`if-empty` flags TODO |
 | queue.delete-ok | ✅ | |
 
 ## basic

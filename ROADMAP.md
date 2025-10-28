@@ -24,13 +24,27 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Queue declare/delete with properties
   - [x] Queue binding to exchanges
   - [x] Message buffering and storage
-- [x] **Basic Publishing**
+- [x] **Basic Publishing & Consumption**
   - [x] `BASIC_PUBLISH` with routing
+  - [x] `BASIC_CONSUME` - Push-based consumption
+  - [x] `BASIC_DELIVER` - Server-initiated message delivery
+  - [x] `BASIC_CANCEL` - Cancel consumer subscription
+  - [x] `BASIC_GET` - Pull-based consumption
   - [x] Multi-frame message assembly (method + header + body)
   - [x] Message properties and headers
-- [x] **Basic Getting**
-  - [x] `BASIC_GET` for pull-based consumption
   - [x] Message count reporting
+- [x] **Message Acknowledgments & Recovery**
+  - [x] `BASIC_ACK` - Acknowledge messages (single and multiple)
+  - [x] `BASIC_NACK` - Negative acknowledgment with requeue
+  - [x] `BASIC_REJECT` - Reject single message with requeue
+  - [x] `BASIC_RECOVER` - Redeliver unacknowledged messages
+  - [x] `BASIC_RECOVER_ASYNC` - Async message recovery
+  - [x] Delivery tag tracking and management
+- [x] **Quality of Service**
+  - [x] `BASIC_QOS` - Prefetch count limits
+  - [x] Per-consumer prefetch control (global=false)
+  - [x] Channel-wide prefetch control (global=true)
+  - [x] Message throttling and flow control
 
 ### � **Recently Completed**
 
@@ -47,44 +61,33 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
   - [x] Resource cleanup on cancellation
 - [x] **`BASIC_CONSUME_OK`** / **`BASIC_CANCEL_OK`** - Response frames
 
-### ❌ **Missing Critical Features**
+### ❌ **Missing Features**
 
-
-#### **Phase 2: Message Acknowledgments (High Priority)**
-
-- [ ] **`BASIC_ACK`** - Acknowledge message delivery
-  - [ ] Single and multiple message acknowledgment
-  - [ ] Integration with delivery tracking
-- [ ] **`BASIC_REJECT`** - Reject single message
-  - [ ] Requeue option support
-  - [ ] Dead letter handling (future)
-- [ ] **`BASIC_RECOVER`** - Redeliver unacknowledged messages
-  - [ ] Async and sync variants
-  - [ ] Channel-wide message recovery
-
-#### **Phase 3: Quality of Service (Medium Priority)**
-- [ ] **`BASIC_QOS`** - Control message prefetching
-  - [ ] Per-channel prefetch limits
-  - [ ] Per-consumer prefetch limits
-  - [ ] Global QoS settings
-- [ ] **Flow control integration**
-  - [ ] Backpressure handling
-  - [ ] Channel flow control (`CHANNEL_FLOW`)
-
-#### **Phase 4: Transaction Support (Medium Priority)**
+#### **Phase 1: Transaction Support (High Priority)**
 
 - [ ] **`TX_SELECT`** - Enter transaction mode
 - [ ] **`TX_COMMIT`** - Commit transaction
 - [ ] **`TX_ROLLBACK`** - Rollback transaction
 - [ ] **Transactional publishing/consuming**
 
-#### **Phase 5: Advanced Features (Low Priority)**
+#### **Phase 2: Advanced Queue Operations (Medium Priority)**
 
 - [ ] **`QUEUE_UNBIND`** - Remove queue bindings
 - [ ] **`QUEUE_PURGE`** - Clear queue contents
+- [ ] **`QUEUE_DELETE` improvements** - Support if-unused and if-empty flags
+
+#### **Phase 3: Flow Control (Medium Priority)**
+
+- [ ] **`CHANNEL_FLOW`** - Channel-level flow control
+- [ ] **`CHANNEL_FLOW_OK`** - Flow control acknowledgment
+- [ ] Backpressure handling integration
+
+#### **Phase 4: Advanced Features (Lower Priority)**
+
 - [ ] **Message TTL and expiration**
 - [ ] **Dead letter exchanges**
 - [ ] **Priority queues**
+- [ ] **Topic exchange pattern matching**
 - [ ] **Cluster support**
 
 ## Architecture Improvements
@@ -127,46 +130,16 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ## Development Phases
 
-### **Phase 1: Core Messaging (Weeks 1-2)**
+### ✅ **Phase 1-3: Core Messaging (COMPLETED)**
 
-**Goal**: Enable push-based message consumption
+**Completed implementations**:
+- Push and pull-based message consumption
+- Message acknowledgments and recovery
+- Quality of Service (QoS) with prefetch limits
+- Consumer lifecycle management
+- Delivery tracking and flow control
 
-**Tasks**:
-
-1. Implement `BASIC_CONSUME` parsing and handler
-2. Add consumer lifecycle management to VHost
-3. Implement `BASIC_DELIVER` for message pushing
-4. Add consumer cleanup with `BASIC_CANCEL`
-
-**Files to modify**:
-
-- `internal/core/amqp/basic.go`
-- `internal/core/broker/broker.go`
-- `internal/core/broker/vhost/vhost.go`
-- `internal/core/broker/vhost/message.go`
-
-### **Phase 2: Reliable Delivery (Weeks 3-4)**
-
-**Goal**: Message acknowledgment and recovery
-
-**Tasks**:
-
-1. Implement `BASIC_ACK` with delivery tracking
-2. Add `BASIC_REJECT` with requeue support
-3. Implement `BASIC_RECOVER` for unacked messages
-4. Add delivery tag management
-
-### **Phase 3: Performance Tuning (Week 5)**
-
-**Goal**: QoS and flow control
-
-**Tasks**:
-
-1. Implement `BASIC_QOS` prefetch limits
-2. Add channel flow control
-3. Integrate QoS with message delivery loops
-
-### **Phase 4: Transactions (Week 6)**
+### **Phase 4: Transactions (Current Focus)**
 
 **Goal**: ACID message operations
 
@@ -175,6 +148,33 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 1. Implement transaction state tracking
 2. Add transactional publishing
 3. Implement commit/rollback logic
+4. Add transaction mode per channel
+
+**Files to modify**:
+
+- `internal/core/amqp/tx.go` (create)
+- `internal/core/broker/tx.go` (create)
+- `internal/core/broker/vhost/transaction.go` (create)
+
+### **Phase 5: Advanced Queue Operations**
+
+**Goal**: Complete queue management
+
+**Tasks**:
+
+1. Implement `QUEUE_UNBIND`
+2. Add `QUEUE_PURGE` functionality
+3. Enhance `QUEUE_DELETE` with conditional flags
+
+### **Phase 6: Flow Control & Performance**
+
+**Goal**: Channel flow control and optimization
+
+**Tasks**:
+
+1. Implement `CHANNEL_FLOW` and `CHANNEL_FLOW_OK`
+2. Add backpressure handling
+3. Performance profiling and optimization
 
 ## Testing Strategy
 
@@ -203,17 +203,18 @@ OtterMQ aims to be a fully AMQP 0.9.1 compliant message broker with RabbitMQ com
 
 ### **Current Priority**
 
-The highest priority is **Phase 1: Core Messaging**. Contributors should focus on:
+The highest priority is **Phase 4: Transaction Support**. Contributors should focus on:
 
-1. `BASIC_CONSUME` implementation
-2. Consumer management system
-3. Push-based message delivery
+1. Transaction state management per channel
+2. `TX_SELECT`, `TX_COMMIT`, `TX_ROLLBACK` implementation
+3. Transactional message publishing and consumption
 
 ### **Getting Started**
 
-1. Review `internal/core/amqp/basic.go` for commented-out parsers
-2. Check `internal/core/broker/broker.go` for empty switch cases
+1. Review `internal/core/amqp/tx.go` for transaction-related types
+2. Check `internal/core/broker/tx.go` for transaction handler implementation patterns
 3. See `.github/copilot-instructions.md` for architecture patterns
+4. Study existing channel state management in `internal/core/broker/vhost/`
 
 ### **Code Guidelines**
 
@@ -221,13 +222,15 @@ The highest priority is **Phase 1: Core Messaging**. Contributors should focus o
 - Add comprehensive error handling
 - Include unit tests for new parsers
 - Test with RabbitMQ clients for compatibility
+- Ensure transaction state is properly isolated per channel
 
 ---
 
 ## Progress Tracking
 
-**Last Updated**: October 2025  
-**Current Focus**: Phase 2 - Reliable Delivery (Message Acknowledgments)  
-**Next Milestone**: `BASIC_ACK` and delivery tracking implementation
+**Last Updated**: October 28, 2025  
+**Current Focus**: Phase 4 - Transaction Support  
+**Completed**: All basic class methods (consume, deliver, ack, nack, reject, recover, qos)  
+**Next Milestone**: Transaction support (`TX_SELECT`, `TX_COMMIT`, `TX_ROLLBACK`)
 
 For detailed implementation tasks, see GitHub Issues tagged with the respective phase labels.
