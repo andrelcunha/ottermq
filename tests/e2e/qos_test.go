@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	brokerURL = "amqp://guest:guest@localhost:5672/"
 	testQueue = "test-qos-queue"
 )
 

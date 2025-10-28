@@ -2,18 +2,13 @@
 
 ## Quick Start
 
-1. **Terminal 1** - Start the broker:
-```bash
-cd /home/andre/src/repos/ottermq
-make run
-```
+The e2e suite will start a test broker automatically by default. You can simply run the tests directly.
 
-2. **Terminal 2** - Run the tests:
 ```bash
-# Run all QoS tests
+# Run all QoS/e2e tests (automatic broker startup)
 go test -v ./tests/e2e -run TestQoS
 
-# Run specific test
+# Run a specific test
 go test -v ./tests/e2e -run TestQoS_PerConsumer_PrefetchLimit
 
 # Run with race detector (recommended)
@@ -111,18 +106,10 @@ ok      github.com/andrelcunha/ottermq/tests/e2e        15.627s
 
 ## CI Integration
 
-To run these tests in CI:
+Because the test suite starts a broker automatically, CI can simply run the tests directly without a separate broker process:
+
 ```bash
-# Start broker in background
-make run &
-BROKER_PID=$!
-
-# Wait for broker to be ready
-sleep 2
-
-# Run tests
 go test -v -race ./tests/e2e -run TestQoS
-
-# Cleanup
-kill $BROKER_PID
 ```
+
+If you prefer to manage the broker process yourself in CI, you can still start the broker in the background and run tests against it (legacy/manual mode), but this is optional.
