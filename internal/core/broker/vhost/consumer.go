@@ -157,6 +157,12 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	if len(vh.ConsumersByQueue[consumer.QueueName]) == 0 {
 		queue := vh.Queues[consumer.QueueName]
 		queue.stopDeliveryLoop()
+		// verify if the queue can be auto-deleted
+		if deleted, err := vh.checkAutoDeleteQueueUnlocked(queue.Name); err != nil {
+			log.Printf("Failed to check auto-delete queue: %v", err)
+		} else if deleted {
+			log.Printf("Queue %s was auto-deleted", queue.Name)
+		}
 	}
 
 	// Remove from ConsumersByChannel (connection-scoped)
@@ -170,6 +176,27 @@ func (vh *VHost) CancelConsumer(channel uint16, tag string) error {
 	}
 
 	return nil
+}
+
+// checkAutoDeleteQueueUnlocked checks if a queue is auto-delete and has no consumers, and deletes it if so.
+func (vh *VHost) checkAutoDeleteQueueUnlocked(name string) (bool, error) {
+	queue, exists := vh.Queues[name]
+	if !exists {
+		return false, fmt.Errorf("queue %s not found", name)
+	}
+	if !queue.Props.AutoDelete {
+		return false, nil
+	}
+
+	if len(vh.ConsumersByQueue[name]) > 0 {
+		return false, nil
+	}
+
+	err := vh.deleteQueueUnlocked(name)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (vh *VHost) CleanupChannel(connection net.Conn, channel uint16) {
